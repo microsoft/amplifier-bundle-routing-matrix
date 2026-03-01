@@ -99,7 +99,8 @@ def _extract_section(content: str, heading: str) -> str:
                 else:
                     break
             if line_level <= level:
-                # Calculate the actual position
+                # Sum byte-lengths of preceding lines + their newline characters
+                # to convert the line index back to a character offset
                 end = search_from + sum(
                     len(part) + 1 for part in content[search_from:].split("\n")[:i]
                 )
@@ -448,24 +449,34 @@ class TestSectionOrdering:
     def test_taxonomy_before_checklist(self, guide_content: str) -> None:
         taxonomy_pos = guide_content.index("## Complete Role Taxonomy")
         checklist_pos = guide_content.index("## Checklist for Matrix Updates")
-        assert taxonomy_pos < checklist_pos
+        assert taxonomy_pos < checklist_pos, (
+            f"Taxonomy ({taxonomy_pos}) should appear before Checklist ({checklist_pos})"
+        )
 
     def test_sourcing_before_checklist(self, guide_content: str) -> None:
         sourcing_pos = guide_content.index("## Sourcing Methodology")
         checklist_pos = guide_content.index("## Checklist for Matrix Updates")
-        assert sourcing_pos < checklist_pos
+        assert sourcing_pos < checklist_pos, (
+            f"Sourcing ({sourcing_pos}) should appear before Checklist ({checklist_pos})"
+        )
 
     def test_curation_before_checklist(self, guide_content: str) -> None:
         curation_pos = guide_content.index("## Curation Principles")
         checklist_pos = guide_content.index("## Checklist for Matrix Updates")
-        assert curation_pos < checklist_pos
+        assert curation_pos < checklist_pos, (
+            f"Curation ({curation_pos}) should appear before Checklist ({checklist_pos})"
+        )
 
     def test_deriving_before_checklist(self, guide_content: str) -> None:
         deriving_pos = guide_content.index("## Deriving Per-Provider Matrices")
         checklist_pos = guide_content.index("## Checklist for Matrix Updates")
-        assert deriving_pos < checklist_pos
+        assert deriving_pos < checklist_pos, (
+            f"Deriving ({deriving_pos}) should appear before Checklist ({checklist_pos})"
+        )
 
     def test_refresh_before_checklist(self, guide_content: str) -> None:
         refresh_pos = guide_content.index("## When to Refresh")
         checklist_pos = guide_content.index("## Checklist for Matrix Updates")
-        assert refresh_pos < checklist_pos
+        assert refresh_pos < checklist_pos, (
+            f"Refresh ({refresh_pos}) should appear before Checklist ({checklist_pos})"
+        )
