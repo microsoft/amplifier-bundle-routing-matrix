@@ -5,51 +5,91 @@
 
 name: openai
 description: "OpenAI-only routing. All roles use OpenAI models exclusively."
-updated: "2026-02-28"
+updated: "2026-03-01"
 
 roles:
+  general:
+    description: "Versatile catch-all, no specialization needed"
+    candidates:
+      - provider: openai
+        model: gpt-5.2
+
+  fast:
+    description: "Quick utility tasks — parsing, classification, file ops, bulk work"
+    candidates:
+      - provider: openai
+        model: gpt-5-mini
+
   coding:
     description: "Code generation, implementation, debugging"
     candidates:
       - provider: openai
         model: gpt-5.3-codex
 
-  coding-image:
-    description: "Image-related code work (UI, diagrams, vision tasks)"
+  ui-coding:
+    description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: openai
         model: gpt-5.3-codex
 
-  planning:
-    description: "Architecture, design, complex multi-step reasoning"
+  security-audit:
+    description: "Vulnerability assessment, attack surface analysis, code auditing"
+    candidates:
+      - provider: openai
+        model: gpt-5.3-codex
+        config:
+          reasoning_effort: high
+
+  reasoning:
+    description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: openai
         model: gpt-5.2-pro
         config:
           reasoning_effort: high
 
-  fast:
-    description: "Quick parsing, classification, utility work"
+  critique:
+    description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
       - provider: openai
-        model: gpt-5-mini
+        model: gpt-5.2
+        config:
+          reasoning_effort: extra_high
 
-  general:
-    description: "Balanced catch-all for unspecialized tasks"
+  creative:
+    description: "Design direction, aesthetic judgment, high-quality creative output"
+    candidates:
+      - provider: openai
+        model: gpt-5.2
+
+  writing:
+    description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: openai
         model: gpt-5.2
 
   research:
-    description: "Deep analysis, web search, long-horizon investigation"
+    description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: openai
         model: gpt-5.2-pro
         config:
           reasoning_effort: high
 
-  agentic:
-    description: "Multi-turn autonomous tool use and task execution"
+  vision:
+    description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
       - provider: openai
         model: gpt-5.3-codex
+
+  image-gen:
+    description: "Image generation, visual mockup creation, visual ideation"
+    candidates:
+      - provider: openai
+        model: gpt-5.3-codex
+
+  critical-ops:
+    description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
+    candidates:
+      - provider: openai
+        model: gpt-5.2-pro

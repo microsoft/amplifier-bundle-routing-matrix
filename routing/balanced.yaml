@@ -16,9 +16,49 @@
 
 name: balanced
 description: "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team."
-updated: "2026-02-28"
+updated: "2026-03-01"
 
 roles:
+  # ---------------------------------------------------------------------------
+  # Foundation Roles (required in every matrix)
+  # ---------------------------------------------------------------------------
+
+  general:
+    description: "Versatile catch-all, no specialization needed"
+    candidates:
+      - provider: anthropic
+        model: claude-sonnet-4-6
+      - provider: openai
+        model: gpt-5.2
+      - provider: google
+        model: gemini-3.1-pro-preview
+      - provider: github-copilot
+        model: claude-sonnet-4.6
+      - provider: github-copilot
+        model: gpt-5.2
+      - provider: ollama
+        model: "*"
+
+  fast:
+    description: "Quick utility tasks — parsing, classification, file ops, bulk work"
+    candidates:
+      - provider: anthropic
+        model: claude-haiku-4-5
+      - provider: openai
+        model: gpt-5-mini
+      - provider: google
+        model: gemini-3-flash-preview
+      - provider: github-copilot
+        model: claude-haiku-4.5
+      - provider: github-copilot
+        model: gpt-5-mini
+      - provider: ollama
+        model: "*"
+
+  # ---------------------------------------------------------------------------
+  # Coding Domain Roles
+  # ---------------------------------------------------------------------------
+
   coding:
     description: "Code generation, implementation, debugging"
     candidates:
@@ -35,24 +75,46 @@ roles:
       - provider: ollama
         model: "*"
 
-  coding-image:
-    description: "Image-related code work (UI, diagrams, vision tasks)"
+  ui-coding:
+    description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
-      - provider: google
-        model: gemini-3-flash-preview
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
         model: gpt-5.3-codex
-      - provider: github-copilot
-        model: gpt-5.3-codex
+      - provider: google
+        model: gemini-3.1-pro-preview
       - provider: github-copilot
         model: claude-sonnet-4.6
+      - provider: github-copilot
+        model: gpt-5.3-codex
 
-  planning:
-    description: "Architecture, design, complex multi-step reasoning"
+  security-audit:
+    description: "Vulnerability assessment, attack surface analysis, code auditing"
+    candidates:
+      - provider: openai
+        model: gpt-5.3-codex
+        config:
+          reasoning_effort: high
+      - provider: anthropic
+        model: claude-sonnet-4-6
+        config:
+          reasoning_effort: high
+      - provider: google
+        model: gemini-3.1-pro-preview
+        config:
+          reasoning_effort: high
+      - provider: github-copilot
+        model: gpt-5.3-codex
+        config:
+          reasoning_effort: high
+
+  # ---------------------------------------------------------------------------
+  # Cognitive Mode Roles
+  # ---------------------------------------------------------------------------
+
+  reasoning:
+    description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: anthropic
         model: claude-opus-4-6
@@ -75,40 +137,52 @@ roles:
       - provider: openai
         model: gpt-5.3-codex
 
-  fast:
-    description: "Quick parsing, classification, utility work"
+  critique:
+    description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
-      - provider: anthropic
-        model: claude-haiku-4-5
       - provider: openai
-        model: gpt-5-mini
-      - provider: google
-        model: gemini-3-flash-preview
-      - provider: github-copilot
-        model: claude-haiku-4.5
-      - provider: github-copilot
-        model: gpt-5-mini
-      - provider: ollama
-        model: "*"
-
-  general:
-    description: "Balanced catch-all for unspecialized tasks"
-    candidates:
+        model: gpt-5.2
+        config:
+          reasoning_effort: extra_high
       - provider: anthropic
         model: claude-sonnet-4-6
+        config:
+          reasoning_effort: extra_high
+      - provider: google
+        model: gemini-3.1-pro-preview
+        config:
+          reasoning_effort: extra_high
+      - provider: github-copilot
+        model: gpt-5.2
+        config:
+          reasoning_effort: extra_high
+
+  creative:
+    description: "Design direction, aesthetic judgment, high-quality creative output"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-4-6
       - provider: openai
         model: gpt-5.2
       - provider: google
         model: gemini-3.1-pro-preview
       - provider: github-copilot
-        model: claude-sonnet-4.6
-      - provider: github-copilot
+        model: claude-opus-4.6
+
+  writing:
+    description: "Long-form content — documentation, marketing, case studies, storytelling"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-4-6
+      - provider: openai
         model: gpt-5.2
-      - provider: ollama
-        model: "*"
+      - provider: google
+        model: gemini-3.1-pro-preview
+      - provider: github-copilot
+        model: claude-opus-4.6
 
   research:
-    description: "Deep analysis, web search, long-horizon investigation"
+    description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: anthropic
         model: claude-opus-4-6
@@ -127,16 +201,44 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
 
-  agentic:
-    description: "Multi-turn autonomous tool use and task execution"
+  # ---------------------------------------------------------------------------
+  # Capability Roles
+  # ---------------------------------------------------------------------------
+
+  vision:
+    description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
+      - provider: google
+        model: gemini-3-flash-preview
+      - provider: google
+        model: gemini-3.1-pro-preview
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
         model: gpt-5.3-codex
-      - provider: google
-        model: gemini-3-flash-preview
-      - provider: github-copilot
-        model: claude-sonnet-4.6
       - provider: github-copilot
         model: gpt-5.3-codex
+      - provider: github-copilot
+        model: claude-sonnet-4.6
+
+  image-gen:
+    description: "Image generation, visual mockup creation, visual ideation"
+    candidates:
+      - provider: google
+        model: gemini-3-pro-image-preview
+
+  # ---------------------------------------------------------------------------
+  # Operational Role
+  # ---------------------------------------------------------------------------
+
+  critical-ops:
+    description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-4-6
+      - provider: openai
+        model: gpt-5.2
+      - provider: google
+        model: gemini-3.1-pro-preview
+      - provider: github-copilot
+        model: claude-opus-4.6
