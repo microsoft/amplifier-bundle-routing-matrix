@@ -29,7 +29,7 @@ roles:
       - provider: google
         model: gemini-3-flash-preview
       - provider: github-copilot
-        model: gpt-4.1
+        model: claude-haiku-4.5
       - provider: github-copilot
         model: claude-haiku-4.5
       - provider: ollama
@@ -41,7 +41,7 @@ roles:
       - provider: google
         model: gemini-3-flash-preview
       - provider: github-copilot
-        model: gpt-4.1
+        model: claude-haiku-4.5
       - provider: openai
         model: gpt-5-mini
       - provider: anthropic
@@ -71,7 +71,7 @@ roles:
       - provider: google
         model: gemini-3-flash-preview
       - provider: github-copilot
-        model: gpt-4.1
+        model: claude-haiku-4.5
       - provider: github-copilot
         model: gpt-5-mini
       - provider: ollama
@@ -87,7 +87,7 @@ roles:
       - provider: google
         model: gemini-3-flash-preview
       - provider: github-copilot
-        model: gpt-4.1
+        model: claude-haiku-4.5
       - provider: github-copilot
         model: claude-haiku-4.5
       - provider: ollama
@@ -115,6 +115,6 @@ roles:
       - provider: google
         model: gemini-3-flash-preview
       - provider: github-copilot
-        model: gpt-4.1
+        model: claude-haiku-4.5
       - provider: ollama
         model: "*"

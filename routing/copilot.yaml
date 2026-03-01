@@ -1,0 +1,54 @@
+# Routing Matrix: copilot
+#
+# GitHub Copilot-optimized routing. Balances Copilot multiplier costs.
+# Avoids the 30x claude-opus-4.6-fast trap. Uses Haiku (0.33x) for budget roles.
+# Use when GitHub Copilot is your primary or only provider.
+
+name: copilot
+description: "GitHub Copilot-optimized routing. Balances multiplier costs, avoids 30x trap."
+updated: "2026-02-28"
+
+roles:
+  coding:
+    description: "Code generation, implementation, debugging"
+    candidates:
+      - provider: github-copilot
+        model: claude-sonnet-4.6
+
+  coding-image:
+    description: "Image-related code work (UI, diagrams, vision tasks)"
+    candidates:
+      - provider: github-copilot
+        model: gpt-5.3-codex
+
+  planning:
+    description: "Architecture, design, complex multi-step reasoning"
+    candidates:
+      - provider: github-copilot
+        model: claude-opus-4.6
+        config:
+          reasoning_effort: high
+
+  fast:
+    description: "Quick parsing, classification, utility work"
+    candidates:
+      - provider: github-copilot
+        model: claude-haiku-4.5
+
+  general:
+    description: "Balanced catch-all for unspecialized tasks"
+    candidates:
+      - provider: github-copilot
+        model: claude-haiku-4.5
+
+  research:
+    description: "Deep analysis, web search, long-horizon investigation"
+    candidates:
+      - provider: github-copilot
+        model: claude-opus-4.6
+
+  agentic:
+    description: "Multi-turn autonomous tool use and task execution"
+    candidates:
+      - provider: github-copilot
+        model: claude-sonnet-4.6

@@ -1,0 +1,55 @@
+# Routing Matrix: gemini
+#
+# Google Gemini-only routing. All roles use Gemini models exclusively.
+# Use when you want to run entirely on your Google AI account.
+
+name: gemini
+description: "Google Gemini-only routing. All roles use Gemini models exclusively."
+updated: "2026-02-28"
+
+roles:
+  coding:
+    description: "Code generation, implementation, debugging"
+    candidates:
+      - provider: google
+        model: gemini-3.1-pro-preview
+
+  coding-image:
+    description: "Image-related code work (UI, diagrams, vision tasks)"
+    candidates:
+      - provider: google
+        model: gemini-3.1-pro-preview
+
+  planning:
+    description: "Architecture, design, complex multi-step reasoning"
+    candidates:
+      - provider: google
+        model: gemini-3.1-pro-preview
+        config:
+          reasoning_effort: high
+
+  fast:
+    description: "Quick parsing, classification, utility work"
+    candidates:
+      - provider: google
+        model: gemini-3-flash-preview
+
+  general:
+    description: "Balanced catch-all for unspecialized tasks"
+    candidates:
+      - provider: google
+        model: gemini-3.1-pro-preview
+
+  research:
+    description: "Deep analysis, web search, long-horizon investigation"
+    candidates:
+      - provider: google
+        model: gemini-3.1-pro-preview
+        config:
+          reasoning_effort: high
+
+  agentic:
+    description: "Multi-turn autonomous tool use and task execution"
+    candidates:
+      - provider: google
+        model: gemini-3-flash-preview

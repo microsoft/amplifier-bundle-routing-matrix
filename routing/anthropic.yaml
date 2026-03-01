@@ -1,0 +1,58 @@
+# Routing Matrix: anthropic
+#
+# Anthropic-only routing. All roles use Claude models exclusively.
+# Use when you want to run entirely on your Anthropic API account.
+#
+# Required roles: "general" and "fast" must be defined in every matrix.
+# See docs/MATRIX_CURATOR_GUIDE.md for schema details.
+
+name: anthropic
+description: "Anthropic-only routing. All roles use Claude models exclusively."
+updated: "2026-02-28"
+
+roles:
+  coding:
+    description: "Code generation, implementation, debugging"
+    candidates:
+      - provider: anthropic
+        model: claude-sonnet-4-6
+
+  coding-image:
+    description: "Image-related code work (UI, diagrams, vision tasks)"
+    candidates:
+      - provider: anthropic
+        model: claude-sonnet-4-6
+
+  planning:
+    description: "Architecture, design, complex multi-step reasoning"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-4-6
+        config:
+          reasoning_effort: high
+
+  fast:
+    description: "Quick parsing, classification, utility work"
+    candidates:
+      - provider: anthropic
+        model: claude-haiku-4-5
+
+  general:
+    description: "Balanced catch-all for unspecialized tasks"
+    candidates:
+      - provider: anthropic
+        model: claude-sonnet-4-6
+
+  research:
+    description: "Deep analysis, web search, long-horizon investigation"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-4-6
+        config:
+          reasoning_effort: high
+
+  agentic:
+    description: "Multi-turn autonomous tool use and task execution"
+    candidates:
+      - provider: anthropic
+        model: claude-sonnet-4-6

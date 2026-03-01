@@ -1,0 +1,55 @@
+# Routing Matrix: openai
+#
+# OpenAI-only routing. All roles use OpenAI models exclusively.
+# Use when you want to run entirely on your OpenAI API account.
+
+name: openai
+description: "OpenAI-only routing. All roles use OpenAI models exclusively."
+updated: "2026-02-28"
+
+roles:
+  coding:
+    description: "Code generation, implementation, debugging"
+    candidates:
+      - provider: openai
+        model: gpt-5.3-codex
+
+  coding-image:
+    description: "Image-related code work (UI, diagrams, vision tasks)"
+    candidates:
+      - provider: openai
+        model: gpt-5.3-codex
+
+  planning:
+    description: "Architecture, design, complex multi-step reasoning"
+    candidates:
+      - provider: openai
+        model: gpt-5.2-pro
+        config:
+          reasoning_effort: high
+
+  fast:
+    description: "Quick parsing, classification, utility work"
+    candidates:
+      - provider: openai
+        model: gpt-5-mini
+
+  general:
+    description: "Balanced catch-all for unspecialized tasks"
+    candidates:
+      - provider: openai
+        model: gpt-5.2
+
+  research:
+    description: "Deep analysis, web search, long-horizon investigation"
+    candidates:
+      - provider: openai
+        model: gpt-5.2-pro
+        config:
+          reasoning_effort: high
+
+  agentic:
+    description: "Multi-turn autonomous tool use and task execution"
+    candidates:
+      - provider: openai
+        model: gpt-5.3-codex
