@@ -60,6 +60,11 @@ def _matrix_ids() -> list[str]:
     return [f.name for f in sorted(ROUTING_DIR.glob("*.yaml"))]
 
 
+def _load(matrix_file: str) -> dict:
+    """Load and parse a matrix YAML file from routing/."""
+    return yaml.safe_load((ROUTING_DIR / matrix_file).read_text())
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -71,14 +76,15 @@ class TestBalancedCompleteness:
     def test_balanced_has_all_13_roles(self) -> None:
         balanced = ROUTING_DIR / "balanced.yaml"
         assert balanced.exists(), "balanced.yaml not found"
-        data = yaml.safe_load(balanced.read_text())
+        data = _load("balanced.yaml")
         actual_roles = set(data["roles"].keys())
         missing = ALL_ROLES - actual_roles
         assert not missing, f"balanced.yaml missing roles: {missing}"
 
     def test_balanced_has_no_extra_roles(self) -> None:
         balanced = ROUTING_DIR / "balanced.yaml"
-        data = yaml.safe_load(balanced.read_text())
+        assert balanced.exists(), "balanced.yaml not found"
+        data = _load("balanced.yaml")
         actual_roles = set(data["roles"].keys())
         extra = actual_roles - ALL_ROLES
         assert not extra, f"balanced.yaml has unexpected roles: {extra}"
@@ -89,13 +95,13 @@ class TestAllMatrices:
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_valid_yaml(self, matrix_file: str) -> None:
-        data = yaml.safe_load((ROUTING_DIR / matrix_file).read_text())
+        data = _load(matrix_file)
         assert data is not None, f"{matrix_file}: failed to parse YAML"
         assert "roles" in data, f"{matrix_file}: missing 'roles' key"
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_updated_date(self, matrix_file: str) -> None:
-        data = yaml.safe_load((ROUTING_DIR / matrix_file).read_text())
+        data = _load(matrix_file)
         assert (
             data.get("updated") == "2026-03-01"
         ), (  # Sync with latest matrix update date
@@ -104,14 +110,14 @@ class TestAllMatrices:
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_required_roles_present(self, matrix_file: str) -> None:
-        data = yaml.safe_load((ROUTING_DIR / matrix_file).read_text())
+        data = _load(matrix_file)
         actual_roles = set(data["roles"].keys())
         missing = REQUIRED_ROLES - actual_roles
         assert not missing, f"{matrix_file} missing required roles: {missing}"
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_no_removed_roles(self, matrix_file: str) -> None:
-        data = yaml.safe_load((ROUTING_DIR / matrix_file).read_text())
+        data = _load(matrix_file)
         actual_roles = set(data["roles"].keys())
         stale = REMOVED_ROLES & actual_roles
         assert not stale, f"{matrix_file} still has removed roles: {stale}"
@@ -119,7 +125,7 @@ class TestAllMatrices:
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_no_duplicate_candidates(self, matrix_file: str) -> None:
         """No role should have the same provider+model pair listed twice."""
-        data = yaml.safe_load((ROUTING_DIR / matrix_file).read_text())
+        data = _load(matrix_file)
         for role_name, role_def in data["roles"].items():
             seen = set()
             for candidate in role_def["candidates"]:
@@ -132,7 +138,7 @@ class TestAllMatrices:
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_every_role_has_description_and_candidates(self, matrix_file: str) -> None:
-        data = yaml.safe_load((ROUTING_DIR / matrix_file).read_text())
+        data = _load(matrix_file)
         for role_name, role_def in data["roles"].items():
             assert "description" in role_def, (
                 f"{matrix_file}/{role_name}: missing description"
@@ -147,7 +153,7 @@ class TestAllMatrices:
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_no_blacklisted_models(self, matrix_file: str) -> None:
         """Ensure purged models never sneak back in."""
-        data = yaml.safe_load((ROUTING_DIR / matrix_file).read_text())
+        data = _load(matrix_file)
         for role_name, role_def in data["roles"].items():
             for candidate in role_def["candidates"]:
                 assert candidate["model"] not in BLACKLISTED_MODELS, (
