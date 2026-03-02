@@ -82,10 +82,12 @@ roles:
         model: gpt-5.3-codex
 
   image-gen:
-    description: "Image generation, visual mockup creation, visual ideation"
+    # Copilot has no native image generation API. Falls back to the best
+    # creative model for image planning, prompt crafting, and SVG generation.
+    description: "Image generation (limited — no native Copilot image API)"
     candidates:
       - provider: github-copilot
-        model: gpt-5.3-codex
+        model: claude-sonnet-4.6
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"

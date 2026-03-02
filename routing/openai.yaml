@@ -83,10 +83,13 @@ roles:
         model: gpt-5.3-codex
 
   image-gen:
-    description: "Image generation, visual mockup creation, visual ideation"
+    # OpenAI image generation (DALL-E) is not available through the chat
+    # completions API. Falls back to the best creative model for image
+    # planning, prompt crafting, and SVG generation.
+    description: "Image generation (limited — DALL-E not available via chat API)"
     candidates:
       - provider: openai
-        model: gpt-5.3-codex
+        model: gpt-5.2-pro
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"

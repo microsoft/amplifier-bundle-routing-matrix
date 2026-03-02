@@ -86,10 +86,12 @@ roles:
         model: claude-sonnet-4-6
 
   image-gen:
-    description: "Image generation, visual mockup creation, visual ideation"
+    # Anthropic has no native image generation API. Falls back to the best
+    # creative model for image planning, prompt crafting, and SVG/ASCII art.
+    description: "Image generation (limited — no native Anthropic image API)"
     candidates:
       - provider: anthropic
-        model: claude-sonnet-4-6
+        model: claude-opus-4-6
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"

@@ -7,3 +7,4 @@ hooks:
 context:
   include:
     - routing-matrix:context/routing-instructions.md
+    - routing-matrix:context/role-definitions.md

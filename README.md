@@ -1,20 +1,24 @@
 # Routing Matrix Bundle
 
-Curated model routing matrices for Amplifier. Maps semantic roles (like `coding`, `planning`, `fast`) to ranked lists of provider/model candidates, so agents request *what kind* of model they need rather than hardcoding a specific one.
+Curated model routing matrices for Amplifier. Maps semantic roles (like `coding`, `reasoning`, `fast`) to ranked lists of provider/model candidates, so agents request *what kind* of model they need rather than hardcoding a specific one.
 
 The routing hook tries candidates top-to-bottom and uses the first that matches an installed provider.
 
 ## Matrices
 
-Three curated matrices ship with this bundle:
+Seven curated matrices ship with this bundle:
 
 | Matrix | When to use |
 |--------|-------------|
 | **balanced** (default) | Mixed workloads. Good quality/cost tradeoff for everyday development. |
 | **quality** | Maximum capability. Uses the strongest models for every role, regardless of cost. |
 | **economy** | Cost-optimized. Prefers free tiers, smaller models, and local providers like Ollama. |
+| **anthropic** | Anthropic Claude models exclusively. |
+| **openai** | OpenAI models exclusively. |
+| **gemini** | Google Gemini models exclusively. |
+| **copilot** | GitHub Copilot-optimized. Balances multiplier costs, avoids the 30x fast-variant trap. |
 
-Browse the matrix files directly: [`routing/balanced.yaml`](routing/balanced.yaml), [`routing/quality.yaml`](routing/quality.yaml), [`routing/economy.yaml`](routing/economy.yaml).
+Browse the matrix files directly in the [`routing/`](routing/) directory.
 
 ## Including the Bundle
 
