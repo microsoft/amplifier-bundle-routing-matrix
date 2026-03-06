@@ -101,11 +101,12 @@ class TestAllMatrices:
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_updated_date(self, matrix_file: str) -> None:
+        # Matrices are updated independently; accept any known-good date.
+        valid_dates = {"2026-03-01", "2026-03-06"}
         data = _load(matrix_file)
-        assert (
-            data.get("updated") == "2026-03-01"
-        ), (  # Sync with latest matrix update date
-            f"{matrix_file}: updated field is '{data.get('updated')}', expected '2026-03-01'"
+        actual = data.get("updated")
+        assert actual in valid_dates, (
+            f"{matrix_file}: updated field is '{actual}', expected one of {sorted(valid_dates)}"
         )
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
