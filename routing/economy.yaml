@@ -16,7 +16,7 @@
 
 name: economy
 description: "Cost-optimized routing. Prefers free tiers and budget models."
-updated: "2026-03-01"
+updated: "2026-03-06"
 
 roles:
   general:
@@ -83,7 +83,7 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
-        model: gpt-5.2
+        model: gpt-5.4
         config:
           reasoning_effort: high
       - provider: google
@@ -101,33 +101,33 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
-        model: gpt-5.2
+        model: gpt-5.4
       - provider: google
         model: gemini-3.1-pro-preview
       - provider: github-copilot
         model: claude-sonnet-4.6
       - provider: github-copilot
-        model: gpt-5.2
+        model: gpt-5.4
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
       - provider: openai
-        model: gpt-5.2
+        model: gpt-5.4
         config:
-          reasoning_effort: extra_high
+          reasoning_effort: xhigh
       - provider: anthropic
         model: claude-sonnet-4-6
         config:
-          reasoning_effort: extra_high
+          reasoning_effort: xhigh
       - provider: google
         model: gemini-3.1-pro-preview
         config:
-          reasoning_effort: extra_high
+          reasoning_effort: xhigh
       - provider: github-copilot
-        model: gpt-5.2
+        model: gpt-5.4
         config:
-          reasoning_effort: extra_high
+          reasoning_effort: xhigh
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
@@ -135,7 +135,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
-        model: gpt-5.2
+        model: gpt-5.4
       - provider: google
         model: gemini-3.1-pro-preview
       - provider: github-copilot
@@ -147,7 +147,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
-        model: gpt-5.2
+        model: gpt-5.4
       - provider: google
         model: gemini-3.1-pro-preview
       - provider: github-copilot
@@ -159,7 +159,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
-        model: gpt-5.2
+        model: gpt-5.4
       - provider: google
         model: gemini-3.1-pro-preview
       - provider: github-copilot
@@ -189,7 +189,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
-        model: gpt-5.2
+        model: gpt-5.4
       - provider: google
         model: gemini-3.1-pro-preview
       - provider: github-copilot
