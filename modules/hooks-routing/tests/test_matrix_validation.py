@@ -102,10 +102,8 @@ class TestAllMatrices:
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_updated_date(self, matrix_file: str) -> None:
         data = _load(matrix_file)
-        assert (
-            data.get("updated") == "2026-03-01"
-        ), (  # Sync with latest matrix update date
-            f"{matrix_file}: updated field is '{data.get('updated')}', expected '2026-03-01'"
+        assert data.get("updated") == "2026-03-06", (
+            f"{matrix_file}: updated field is '{data.get('updated')}', expected '2026-03-06'"
         )
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())

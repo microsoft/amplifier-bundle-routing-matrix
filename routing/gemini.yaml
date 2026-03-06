@@ -5,7 +5,7 @@
 
 name: gemini
 description: "Google Gemini-only routing. All roles use Gemini models exclusively."
-updated: "2026-03-01"
+updated: "2026-03-06"
 
 roles:
   general:

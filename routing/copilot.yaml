@@ -6,7 +6,7 @@
 
 name: copilot
 description: "GitHub Copilot-optimized routing. Balances multiplier costs, avoids 30x trap."
-updated: "2026-03-01"
+updated: "2026-03-06"
 
 roles:
   general:
@@ -31,13 +31,13 @@ roles:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: github-copilot
-        model: gpt-5.3-codex
+        model: gpt-5.3-codex  # TODO: Update to gpt-5.4 when available on Copilot
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
       - provider: github-copilot
-        model: gpt-5.3-codex
+        model: gpt-5.3-codex  # TODO: Update to gpt-5.4 when available on Copilot
         config:
           reasoning_effort: high
 
@@ -53,9 +53,9 @@ roles:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
       - provider: github-copilot
-        model: gpt-5.2
+        model: gpt-5.2  # TODO: Update to gpt-5.4 when available on Copilot
         config:
-          reasoning_effort: extra_high
+          reasoning_effort: xhigh
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
@@ -79,7 +79,7 @@ roles:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
       - provider: github-copilot
-        model: gpt-5.3-codex
+        model: gpt-5.3-codex  # TODO: Update to gpt-5.4 when available on Copilot
 
   image-gen:
     # Copilot has no native image generation API. Falls back to the best
