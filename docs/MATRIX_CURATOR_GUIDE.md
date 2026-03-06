@@ -301,7 +301,6 @@ Different providers use different naming conventions for the **same underlying m
 | Claude Sonnet 4.6 | `claude-sonnet-4-6` | — | — | `claude-sonnet-4.6` |
 | Claude Opus 4.6 | `claude-opus-4-6` | — | — | `claude-opus-4.6` |
 | Claude Haiku 4.5 | `claude-haiku-4-5` | — | — | `claude-haiku-4.5` |
-| GPT-5.2 | — | `gpt-5.2` | — | `gpt-5.2` |
 | GPT-5.3 Codex | — | `gpt-5.3-codex` | — | `gpt-5.3-codex` |
 | GPT-5.4 | — | `gpt-5.4` | — | `gpt-5.4` |
 | GPT-5.4 Pro | — | `gpt-5.4-pro` | — | `gpt-5.4-pro` |
