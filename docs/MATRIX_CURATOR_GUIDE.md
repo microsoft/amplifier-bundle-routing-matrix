@@ -20,7 +20,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
-        model: gpt-5.2
+        model: gpt-5.4
 
   fast:
     description: "Quick parsing, classification, utility work"
@@ -116,7 +116,7 @@ The optional `config` map is passed directly to the provider's session configura
     reasoning_effort: high
 
 - provider: openai
-  model: gpt-5.2
+  model: gpt-5.4
   config:
     reasoning_effort: high
 ```
@@ -125,7 +125,7 @@ Common values:
 
 | Key | Values | Effect |
 |-----|--------|--------|
-| `reasoning_effort` | `low`, `medium`, `high` | Controls extended thinking / chain-of-thought depth |
+| `reasoning_effort` | `none`, `low`, `medium`, `high`, `xhigh` | Controls extended thinking / chain-of-thought depth |
 
 Only include `config` when a candidate genuinely needs different parameters from the provider default. Most candidates don't need it.
 
@@ -145,7 +145,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
-        model: gpt-5.2
+        model: gpt-5.4
 ```
 
 2. Update the context file (`context/routing-instructions.md`) to mention the new role so agents know it exists.
@@ -212,19 +212,19 @@ The routing system defines 13 roles organized into 5 categories. For full descri
 
 | # | Role | Category | Model Tier | Reasoning | Description |
 |---|------|----------|------------|-----------|-------------|
-| 1 | `general` | Foundation | Mid (Sonnet, gpt-5.2) | default | Versatile catch-all, no specialization needed |
+| 1 | `general` | Foundation | Mid (Sonnet, gpt-5.4) | default | Versatile catch-all, no specialization needed |
 | 2 | `fast` | Foundation | Cheap (Haiku, gpt-5-mini) | default | Quick utility tasks — parsing, classification, file ops |
 | 3 | `coding` | Coding | Mid, code-specialized | default | Code generation, implementation, debugging |
 | 4 | `ui-coding` | Coding | Mid, code-specialized | default | Frontend/UI code — components, layouts, styling |
 | 5 | `security-audit` | Coding | Mid, code-specialized | high | Vulnerability assessment, attack surface analysis |
-| 6 | `reasoning` | Cognitive | Heavy (Opus, gpt-5.2) | high | Deep architectural reasoning, system design |
+| 6 | `reasoning` | Cognitive | Heavy (Opus, gpt-5.4) | high | Deep architectural reasoning, system design |
 | 7 | `critique` | Cognitive | Mid | extra-high | Analytical evaluation — finding flaws in existing work |
-| 8 | `creative` | Cognitive | Heavy (Opus, gpt-5.2) | default | Design direction, aesthetic judgment |
-| 9 | `writing` | Cognitive | Heavy (Opus, gpt-5.2) | default | Long-form content — docs, marketing, case studies |
-| 10 | `research` | Cognitive | Heavy (Opus, gpt-5.2-pro) | high | Deep investigation, information synthesis |
+| 8 | `creative` | Cognitive | Heavy (Opus, gpt-5.4) | default | Design direction, aesthetic judgment |
+| 9 | `writing` | Cognitive | Heavy (Opus, gpt-5.4) | default | Long-form content — docs, marketing, case studies |
+| 10 | `research` | Cognitive | Heavy (Opus, gpt-5.4-pro) | high | Deep investigation, information synthesis |
 | 11 | `vision` | Capability | Mid, multimodal | default | Understanding visual input — screenshots, diagrams |
 | 12 | `image-gen` | Capability | Specialized | default | Image generation, visual mockup creation |
-| 13 | `critical-ops` | Operational | Heavy (Opus, gpt-5.2) | default | High-reliability operational tasks — infrastructure, orchestration |
+| 13 | `critical-ops` | Operational | Heavy (Opus, gpt-5.4) | default | High-reliability operational tasks — infrastructure, orchestration |
 
 ---
 
@@ -303,6 +303,8 @@ Different providers use different naming conventions for the **same underlying m
 | Claude Haiku 4.5 | `claude-haiku-4-5` | — | — | `claude-haiku-4.5` |
 | GPT-5.2 | — | `gpt-5.2` | — | `gpt-5.2` |
 | GPT-5.3 Codex | — | `gpt-5.3-codex` | — | `gpt-5.3-codex` |
+| GPT-5.4 | — | `gpt-5.4` | — | `gpt-5.4` |
+| GPT-5.4 Pro | — | `gpt-5.4-pro` | — | `gpt-5.4-pro` |
 
 > **CRITICAL:** Anthropic uses **hyphens** (`claude-sonnet-4-6`) while GitHub Copilot uses **dots** (`claude-sonnet-4.6`). Mixing these up causes silent resolution failures — the candidate won't match any installed model.
 

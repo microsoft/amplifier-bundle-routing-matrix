@@ -8,7 +8,7 @@
 
 name: anthropic
 description: "Anthropic-only routing. All roles use Claude models exclusively."
-updated: "2026-03-01"
+updated: "2026-03-06"
 
 roles:
   general:
