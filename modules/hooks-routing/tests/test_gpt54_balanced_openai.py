@@ -294,18 +294,21 @@ class TestOpenAIReasoningEffort:
         data = _load("openai.yaml")
         candidates = data["roles"]["security-audit"]["candidates"]
         openai_candidate = _find_candidate(candidates, "openai")
+        assert openai_candidate is not None
         assert openai_candidate.get("config", {}).get("reasoning_effort") == "high"
 
     def test_reasoning_effort_high(self) -> None:
         data = _load("openai.yaml")
         candidates = data["roles"]["reasoning"]["candidates"]
         openai_candidate = _find_candidate(candidates, "openai")
+        assert openai_candidate is not None
         assert openai_candidate.get("config", {}).get("reasoning_effort") == "high"
 
     def test_research_effort_high(self) -> None:
         data = _load("openai.yaml")
         candidates = data["roles"]["research"]["candidates"]
         openai_candidate = _find_candidate(candidates, "openai")
+        assert openai_candidate is not None
         assert openai_candidate.get("config", {}).get("reasoning_effort") == "high"
 
 
