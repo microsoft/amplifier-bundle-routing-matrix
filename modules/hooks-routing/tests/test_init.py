@@ -378,6 +378,110 @@ class TestSessionStartHook:
         assert prefs[0]["config"] == {"reasoning_effort": "high"}
 
 
+class TestCustomMatrixFallback:
+    @pytest.mark.asyncio
+    async def test_mount_loads_custom_matrix_from_user_dir(
+        self, tmp_path: Path
+    ) -> None:
+        """mount() falls back to ~/.amplifier/routing/ for custom matrices not in bundle."""
+        # Bundle root has no balanced-custom.yaml — simulates the cache dir
+        bundle_root = tmp_path / "bundle"
+        (bundle_root / "routing").mkdir(parents=True)
+        # (intentionally do NOT write balanced-custom.yaml in bundle routing dir)
+
+        # Custom matrix lives in the user's ~/.amplifier/routing/
+        custom_dir = tmp_path / "home" / ".amplifier" / "routing"
+        custom_dir.mkdir(parents=True)
+        custom_content = textwrap.dedent("""\
+            name: balanced-custom
+            description: "My custom matrix"
+            updated: "2026-03-07"
+            roles:
+              general:
+                description: "Custom general"
+                candidates:
+                  - provider: anthropic
+                    model: claude-opus-4-6
+        """)
+        (custom_dir / "balanced-custom.yaml").write_text(custom_content)
+
+        coordinator = _make_coordinator()
+
+        # Patch Path.home() so the module finds our fake home dir
+        with patch(
+            "amplifier_module_hooks_routing.Path.home",
+            return_value=tmp_path / "home",
+        ):
+            await mount(
+                coordinator,
+                config={
+                    "default_matrix": "balanced-custom",
+                    "_bundle_root": str(bundle_root),
+                },
+            )
+
+        # Session state must be populated — routing was NOT disabled
+        assert "routing_matrix" in coordinator.session_state
+        assert coordinator.session_state["routing_matrix"]["name"] == "balanced-custom"
+        assert "general" in coordinator.session_state["routing_matrix"]["roles"]
+
+    @pytest.mark.asyncio
+    async def test_mount_prefers_bundle_matrix_over_user_dir(
+        self, tmp_path: Path
+    ) -> None:
+        """Bundle routing dir takes precedence over ~/.amplifier/routing/ for named matrix."""
+        # Bundle has the matrix
+        bundle_root = tmp_path / "bundle"
+        routing_dir = bundle_root / "routing"
+        routing_dir.mkdir(parents=True)
+        bundle_content = textwrap.dedent("""\
+            name: balanced
+            description: "Bundle balanced"
+            updated: "2026-01-01"
+            roles:
+              general:
+                description: "From bundle"
+                candidates:
+                  - provider: openai
+                    model: gpt-4o
+        """)
+        (routing_dir / "balanced.yaml").write_text(bundle_content)
+
+        # User dir also has a "balanced.yaml" (should NOT be used)
+        custom_dir = tmp_path / "home" / ".amplifier" / "routing"
+        custom_dir.mkdir(parents=True)
+        user_content = textwrap.dedent("""\
+            name: balanced
+            description: "User balanced"
+            updated: "2026-01-01"
+            roles:
+              general:
+                description: "From user dir"
+                candidates:
+                  - provider: anthropic
+                    model: claude-sonnet-4-6
+        """)
+        (custom_dir / "balanced.yaml").write_text(user_content)
+
+        coordinator = _make_coordinator()
+
+        with patch(
+            "amplifier_module_hooks_routing.Path.home",
+            return_value=tmp_path / "home",
+        ):
+            await mount(
+                coordinator,
+                config={
+                    "default_matrix": "balanced",
+                    "_bundle_root": str(bundle_root),
+                },
+            )
+
+        # Should have used the bundle version (openai), not user dir version (anthropic)
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["roles"]["general"]["candidates"][0]["provider"] == "openai"
+
+
 class TestProviderRequestHook:
     @pytest.mark.asyncio
     async def test_provider_request_injects_context(self, tmp_path: Path) -> None:
