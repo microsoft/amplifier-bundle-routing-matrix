@@ -104,7 +104,9 @@ class TestMount:
 
         # Simpler approach: set up the real directory structure
         bundle_root = tmp_path / "bundle"
-        modules_dir = bundle_root / "modules" / "hooks-routing" / "amplifier_module_hooks_routing"
+        modules_dir = (
+            bundle_root / "modules" / "hooks-routing" / "amplifier_module_hooks_routing"
+        )
         modules_dir.mkdir(parents=True)
         routing_dir = bundle_root / "routing"
         routing_dir.mkdir()
@@ -324,6 +326,56 @@ class TestSessionStartHook:
 
         # plain should not have provider_preferences
         assert "provider_preferences" not in agents["plain"]
+
+    @pytest.mark.asyncio
+    async def test_on_session_start_includes_config_in_preferences(
+        self, tmp_path: Path
+    ) -> None:
+        """Resolved preferences should include config from matrix candidates."""
+        bundle_root = tmp_path / "bundle"
+        routing_dir = bundle_root / "routing"
+        routing_dir.mkdir(parents=True)
+        content = textwrap.dedent("""\
+            name: balanced
+            description: "Test"
+            updated: "2026-01-01"
+            roles:
+              coding:
+                description: "Code generation"
+                candidates:
+                  - provider: anthropic
+                    model: claude-sonnet-4-6
+                    config:
+                      reasoning_effort: high
+        """)
+        (routing_dir / "balanced.yaml").write_text(content)
+
+        agents: dict[str, Any] = {"coder": {"model_role": "coding"}}
+        providers = {"provider-anthropic": MagicMock()}
+        coordinator = _make_coordinator(providers=providers, agents=agents)
+
+        await mount(
+            coordinator,
+            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
+        )
+
+        # Extract and invoke the session:start handler
+        calls = coordinator.hooks.register.call_args_list
+        session_start_handler = None
+        for call in calls:
+            if call.args[0] == "session:start":
+                session_start_handler = call.args[1]
+                break
+        assert session_start_handler is not None
+
+        await session_start_handler("session:start", {})
+
+        # provider_preferences must include config from the candidate
+        prefs: list[Any] = agents["coder"]["provider_preferences"]
+        assert len(prefs) == 1
+        assert prefs[0]["provider"] == "anthropic"
+        assert prefs[0]["model"] == "claude-sonnet-4-6"
+        assert prefs[0]["config"] == {"reasoning_effort": "high"}
 
 
 class TestProviderRequestHook:
