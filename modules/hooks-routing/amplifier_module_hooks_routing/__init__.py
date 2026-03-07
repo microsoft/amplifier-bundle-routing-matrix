@@ -104,7 +104,12 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             resolved = await resolve_model_role(model_role, effective_matrix, providers)
             if resolved:
                 agent_cfg["provider_preferences"] = [
-                    {"provider": r["provider"], "model": r["model"]} for r in resolved
+                    {
+                        "provider": r["provider"],
+                        "model": r["model"],
+                        "config": r.get("config", {}),
+                    }
+                    for r in resolved
                 ]
 
         from amplifier_core.models import HookResult
