@@ -19,22 +19,28 @@ from amplifier_module_hooks_routing import mount
 
 def _make_coordinator(
     *,
-    session_state: dict[str, Any] | None = None,
     providers: dict[str, Any] | None = None,
     agents: dict[str, Any] | None = None,
     has_hooks: bool = True,
 ) -> MagicMock:
     """Build a mock coordinator that follows the real API."""
     coordinator = MagicMock()
-    coordinator.session_state = session_state if session_state is not None else {}
+
+    # Capability storage backed by a dict, with side_effects on the mock methods
+    _capability_store: dict[str, Any] = {}
+    coordinator.register_capability = MagicMock(
+        side_effect=lambda key, value: _capability_store.__setitem__(key, value)
+    )
+    coordinator.get_capability = MagicMock(
+        side_effect=lambda key: _capability_store.get(key)
+    )
+
     coordinator.get = MagicMock(return_value=providers)
 
     if agents is not None:
         coordinator.config = {"agents": agents}
     else:
         coordinator.config = {"agents": {}}
-
-    coordinator.get_capability = MagicMock(return_value=None)
 
     if has_hooks:
         coordinator.hooks = MagicMock()
@@ -212,7 +218,7 @@ class TestMount:
         )
 
         # The effective matrix should have the override applied to "fast"
-        stored = coordinator.session_state["routing_matrix"]
+        stored = coordinator.get_capability("session.routing_matrix")
         assert stored["roles"]["fast"]["candidates"] == [
             {"provider": "anthropic", "model": "claude-haiku-3"},
         ]
@@ -222,8 +228,8 @@ class TestMount:
         ]
 
     @pytest.mark.asyncio
-    async def test_mount_stores_session_state(self, tmp_path: Path) -> None:
-        """Mount stores routing matrix info in session_state."""
+    async def test_mount_registers_routing_capability(self, tmp_path: Path) -> None:
+        """Mount registers routing matrix info via register_capability."""
         bundle_root = tmp_path / "bundle"
         routing_dir = bundle_root / "routing"
         routing_dir.mkdir(parents=True)
@@ -251,9 +257,10 @@ class TestMount:
             config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
         )
 
-        assert "routing_matrix" in coordinator.session_state
-        assert coordinator.session_state["routing_matrix"]["name"] == "balanced"
-        assert "general" in coordinator.session_state["routing_matrix"]["roles"]
+        stored = coordinator.get_capability("session.routing_matrix")
+        assert stored is not None
+        assert stored["name"] == "balanced"
+        assert "general" in stored["roles"]
 
 
 # ---------------------------------------------------------------------------
@@ -420,10 +427,11 @@ class TestCustomMatrixFallback:
                 },
             )
 
-        # Session state must be populated — routing was NOT disabled
-        assert "routing_matrix" in coordinator.session_state
-        assert coordinator.session_state["routing_matrix"]["name"] == "balanced-custom"
-        assert "general" in coordinator.session_state["routing_matrix"]["roles"]
+        # Capability must be populated — routing was NOT disabled
+        stored = coordinator.get_capability("session.routing_matrix")
+        assert stored is not None
+        assert stored["name"] == "balanced-custom"
+        assert "general" in stored["roles"]
 
     @pytest.mark.asyncio
     async def test_mount_prefers_bundle_matrix_over_user_dir(
@@ -478,7 +486,7 @@ class TestCustomMatrixFallback:
             )
 
         # Should have used the bundle version (openai), not user dir version (anthropic)
-        stored = coordinator.session_state["routing_matrix"]
+        stored = coordinator.get_capability("session.routing_matrix")
         assert stored["roles"]["general"]["candidates"][0]["provider"] == "openai"
 
 
