@@ -46,6 +46,12 @@ async def resolve_model_role(
 ) -> list[dict[str, Any]]:
     """Resolve model role(s) against routing matrix.
 
+    Iterates through roles in priority order.  For the first role that has
+    at least one resolvable candidate, returns **all** resolvable candidates
+    for that role (preserving the matrix ordering).  This gives downstream
+    consumers (orchestrators, the CLI provider-selector) a full failover
+    chain rather than a single provider.
+
     Args:
         roles: Prioritised list of role names to try.
         matrix: Composed matrix ``roles`` dict (from :mod:`matrix_loader`).
@@ -53,7 +59,7 @@ async def resolve_model_role(
 
     Returns:
         List of ``{provider, model, config}`` dicts representing resolved
-        preferences.  Empty if no role resolves.
+        preferences in priority order.  Empty if no role resolves.
     """
     for role in roles:
         role_data = matrix.get(role)
@@ -61,6 +67,8 @@ async def resolve_model_role(
             continue
 
         candidates = role_data.get("candidates", [])
+        resolved: list[dict[str, Any]] = []
+
         for candidate in candidates:
             provider_type = candidate.get("provider", "")
             model_pattern = candidate.get("model", "")
@@ -83,13 +91,16 @@ async def resolve_model_role(
             else:
                 resolved_model = model_pattern
 
-            return [
+            resolved.append(
                 {
                     "provider": provider_type,
                     "model": resolved_model,
                     "config": config,
                 }
-            ]
+            )
+
+        if resolved:
+            return resolved
 
     return []
 

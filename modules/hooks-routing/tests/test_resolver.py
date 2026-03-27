@@ -230,3 +230,87 @@ class TestResolveModelRole:
 
         assert len(result) == 1
         assert result[0]["provider"] == "openai"
+
+    @pytest.mark.asyncio
+    async def test_resolve_returns_full_candidate_chain(self) -> None:
+        """All resolvable candidates are returned for failover, not just the first."""
+        providers = {
+            "provider-anthropic": _make_provider(),
+            "provider-openai": _make_provider(),
+        }
+        roles = {
+            "general": {
+                "description": "General purpose",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
+                    {"provider": "openai", "model": "gpt-4o"},
+                    {"provider": "google", "model": "gemini-pro"},  # not installed
+                ],
+            },
+        }
+
+        result = await resolve_model_role(["general"], roles, providers)
+
+        # Should return both installed providers, skip google (not installed)
+        assert len(result) == 2
+        assert result[0]["provider"] == "anthropic"
+        assert result[0]["model"] == "claude-sonnet-4-20250514"
+        assert result[1]["provider"] == "openai"
+        assert result[1]["model"] == "gpt-4o"
+
+    @pytest.mark.asyncio
+    async def test_resolve_chain_preserves_config(self) -> None:
+        """Config is preserved for each candidate in the chain."""
+        providers = {
+            "provider-anthropic": _make_provider(),
+            "provider-openai": _make_provider(),
+        }
+        roles = {
+            "reasoning": {
+                "description": "Deep reasoning",
+                "candidates": [
+                    {
+                        "provider": "anthropic",
+                        "model": "claude-opus-4-6",
+                        "config": {"reasoning_effort": "high"},
+                    },
+                    {
+                        "provider": "openai",
+                        "model": "gpt-5.4-pro",
+                        "config": {"reasoning_effort": "high"},
+                    },
+                ],
+            },
+        }
+
+        result = await resolve_model_role(["reasoning"], roles, providers)
+
+        assert len(result) == 2
+        assert result[0]["config"] == {"reasoning_effort": "high"}
+        assert result[1]["config"] == {"reasoning_effort": "high"}
+
+    @pytest.mark.asyncio
+    async def test_resolve_chain_with_partial_glob_failure(self) -> None:
+        """Glob failure for one candidate doesn't block others."""
+        providers = {
+            "provider-anthropic": _make_provider(models=[], raises=True),
+            "provider-openai": _make_provider(),
+            "provider-google": _make_provider(),
+        }
+        roles = {
+            "coding": {
+                "description": "Code gen",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-sonnet-*"},  # glob fails
+                    {"provider": "openai", "model": "gpt-4o"},
+                    {"provider": "google", "model": "gemini-pro"},
+                ],
+            },
+        }
+
+        result = await resolve_model_role(["coding"], roles, providers)
+
+        # Anthropic skipped (glob failure), openai + google returned
+        assert len(result) == 2
+        assert result[0]["provider"] == "openai"
+        assert result[1]["provider"] == "google"
