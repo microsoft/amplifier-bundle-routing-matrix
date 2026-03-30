@@ -17,6 +17,8 @@ class TestTask4TieredContext:
     """Verify the role-definitions context was converted to an on-demand skill."""
 
     SKILL_PATH = SKILLS_DIR / "role-definitions" / "SKILL.md"
+    ROUTING_YAML = BEHAVIORS_DIR / "routing.yaml"
+    INSTRUCTIONS = CONTEXT_DIR / "routing-instructions.md"
 
     def test_skill_file_exists(self):
         """Check 1: skill file exists at skills/role-definitions/SKILL.md."""
@@ -26,11 +28,10 @@ class TestTask4TieredContext:
 
     def test_skill_frontmatter_name(self):
         """Check 2: skill frontmatter has name: role-definitions."""
-        skill_path = self.SKILL_PATH
-        assert skill_path.exists(), (
-            f"SKILL.md not found at {skill_path} — run task-1 to create the skill file."
+        assert self.SKILL_PATH.exists(), (
+            f"SKILL.md not found at {self.SKILL_PATH} — run task-1 to create the skill file."
         )
-        raw = skill_path.read_text()
+        raw = self.SKILL_PATH.read_text()
 
         # Extract YAML frontmatter between --- delimiters
         parts = raw.split("---", 2)
@@ -47,8 +48,7 @@ class TestTask4TieredContext:
 
     def test_routing_yaml_no_role_definitions_context(self):
         """Check 3: routing.yaml does not reference context/role-definitions."""
-        routing_yaml = BEHAVIORS_DIR / "routing.yaml"
-        raw = routing_yaml.read_text()
+        raw = self.ROUTING_YAML.read_text()
         assert "role-definitions" not in raw, (
             "routing.yaml still contains 'role-definitions' — it must be removed from context"
         )
@@ -66,8 +66,7 @@ class TestTask4TieredContext:
 
     def test_routing_yaml_has_tool_skills(self):
         """Check 4: routing.yaml has tool-skills in the tools section."""
-        routing_yaml = BEHAVIORS_DIR / "routing.yaml"
-        raw = routing_yaml.read_text()
+        raw = self.ROUTING_YAML.read_text()
         assert "tool-skills" in raw, (
             "routing.yaml is missing 'tool-skills' in the tools section. "
             "Run task-3 to register the skill."
@@ -75,8 +74,7 @@ class TestTask4TieredContext:
 
     def test_routing_instructions_has_load_skill_pointer(self):
         """Check 5: routing-instructions.md has a load_skill pointer."""
-        instructions = CONTEXT_DIR / "routing-instructions.md"
-        raw = instructions.read_text()
+        raw = self.INSTRUCTIONS.read_text()
         assert "load_skill" in raw, (
             "routing-instructions.md is missing a load_skill pointer. "
             "Run task-2 to add the pointer."
