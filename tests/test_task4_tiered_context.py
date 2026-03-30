@@ -16,16 +16,20 @@ CONTEXT_DIR = REPO_ROOT / "context"
 class TestTask4TieredContext:
     """Verify the role-definitions context was converted to an on-demand skill."""
 
+    SKILL_PATH = SKILLS_DIR / "role-definitions" / "SKILL.md"
+
     def test_skill_file_exists(self):
         """Check 1: skill file exists at skills/role-definitions/SKILL.md."""
-        skill_path = SKILLS_DIR / "role-definitions" / "SKILL.md"
-        assert skill_path.exists(), (
-            f"SKILL.md not found at {skill_path}. Run task-1 to create the skill file."
+        assert self.SKILL_PATH.exists(), (
+            f"SKILL.md not found at {self.SKILL_PATH}. Run task-1 to create the skill file."
         )
 
     def test_skill_frontmatter_name(self):
         """Check 2: skill frontmatter has name: role-definitions."""
-        skill_path = SKILLS_DIR / "role-definitions" / "SKILL.md"
+        skill_path = self.SKILL_PATH
+        assert skill_path.exists(), (
+            f"SKILL.md not found at {skill_path} — run task-1 to create the skill file."
+        )
         raw = skill_path.read_text()
 
         # Extract YAML frontmatter between --- delimiters
@@ -45,8 +49,8 @@ class TestTask4TieredContext:
         """Check 3: routing.yaml does not reference context/role-definitions."""
         routing_yaml = BEHAVIORS_DIR / "routing.yaml"
         raw = routing_yaml.read_text()
-        assert "role-definitions" not in raw or "tool-skills" in raw, (
-            "routing.yaml still references role-definitions in context (not via tool-skills)"
+        assert "role-definitions" not in raw, (
+            "routing.yaml still contains 'role-definitions' — it must be removed from context"
         )
         # Specifically check it's not in the context include section
         data = yaml.safe_load(raw)
