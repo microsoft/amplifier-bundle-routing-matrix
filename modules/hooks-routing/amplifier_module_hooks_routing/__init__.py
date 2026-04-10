@@ -41,16 +41,17 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
 
     # --- Load default matrix ---
     default_matrix_name = config.get("default_matrix", "balanced")
-    matrix_path = routing_dir / f"{default_matrix_name}.yaml"
 
-    # Fall back to user's custom routing directory (~/.amplifier/routing/)
-    # This allows custom matrices saved by the matrix editor to be found even
-    # when the matrix name doesn't exist in the bundle cache's routing dir.
-    if not matrix_path.exists():
-        custom_routing_dir = Path.home() / ".amplifier" / "routing"
-        custom_matrix_path = custom_routing_dir / f"{default_matrix_name}.yaml"
-        if custom_matrix_path.exists():
-            matrix_path = custom_matrix_path
+    # User custom matrices (~/.amplifier/routing/) take priority over bundled
+    # matrices in the cache.  The CLI matrix editor saves customizations here,
+    # so runtime must honour them first to stay consistent with what the user
+    # sees in `amplifier routing manage`.
+    custom_routing_dir = Path.home() / ".amplifier" / "routing"
+    custom_matrix_path = custom_routing_dir / f"{default_matrix_name}.yaml"
+    if custom_matrix_path.exists():
+        matrix_path = custom_matrix_path
+    else:
+        matrix_path = routing_dir / f"{default_matrix_name}.yaml"
 
     base_matrix: dict[str, Any] = {}
     if matrix_path.exists():

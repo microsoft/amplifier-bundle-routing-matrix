@@ -426,16 +426,15 @@ class TestCustomMatrixFallback:
         assert "general" in coordinator.session_state["routing_matrix"]["roles"]
 
     @pytest.mark.asyncio
-    async def test_mount_prefers_bundle_matrix_over_user_dir(
+    async def test_mount_prefers_user_dir_over_bundle_matrix(
         self, tmp_path: Path
     ) -> None:
-        """Bundle routing dir takes precedence over ~/.amplifier/routing/ for named matrix."""
+        """User custom dir (~/.amplifier/routing/) takes priority over bundle cache."""
         # Bundle has the matrix
         bundle_root = tmp_path / "bundle"
         routing_dir = bundle_root / "routing"
         routing_dir.mkdir(parents=True)
-        bundle_content = textwrap.dedent("""\
-            name: balanced
+        bundle_content = textwrap.dedent("""            name: balanced
             description: "Bundle balanced"
             updated: "2026-01-01"
             roles:
@@ -447,11 +446,10 @@ class TestCustomMatrixFallback:
         """)
         (routing_dir / "balanced.yaml").write_text(bundle_content)
 
-        # User dir also has a "balanced.yaml" (should NOT be used)
+        # User dir also has a "balanced.yaml" — should be used (user wins)
         custom_dir = tmp_path / "home" / ".amplifier" / "routing"
         custom_dir.mkdir(parents=True)
-        user_content = textwrap.dedent("""\
-            name: balanced
+        user_content = textwrap.dedent("""            name: balanced
             description: "User balanced"
             updated: "2026-01-01"
             roles:
@@ -477,10 +475,9 @@ class TestCustomMatrixFallback:
                 },
             )
 
-        # Should have used the bundle version (openai), not user dir version (anthropic)
+        # User custom dir should win over bundle cache
         stored = coordinator.session_state["routing_matrix"]
-        assert stored["roles"]["general"]["candidates"][0]["provider"] == "openai"
-
+        assert stored["roles"]["general"]["candidates"][0]["provider"] == "anthropic"
 
 class TestProviderRequestHook:
     @pytest.mark.asyncio
