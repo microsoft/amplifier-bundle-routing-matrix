@@ -161,25 +161,25 @@ class TestCopilotYaml:
         data = load_yaml("copilot.yaml")
         assert data["updated"] == "2026-03-06"
 
-    def test_no_model_name_changes_gpt_5_2_still_present(self):
-        """gpt-5.2 must still be present in copilot.yaml (NOT on Copilot yet)."""
+    def test_gpt_5_4_available_on_copilot(self):
+        """gpt-5.4 is now available on Copilot (PR #4) and should be used in applicable roles."""
         data = load_yaml("copilot.yaml")
-        critique_models = [c["model"] for c in data["roles"]["critique"]["candidates"]]
-        assert "gpt-5.2" in critique_models, "gpt-5.2 must remain in copilot.yaml"
+        all_models = []
+        for role_data in data["roles"].values():
+            all_models.extend(c["model"] for c in role_data["candidates"])
+        assert "gpt-5.4" in all_models, "gpt-5.4 should be present in copilot.yaml"
 
-    def test_no_gpt_5_4_as_model_in_copilot(self):
-        """gpt-5.4 must NOT appear as a model value in copilot.yaml (not available on Copilot yet)."""
-        data = load_yaml("copilot.yaml")
-        for role_name, role_data in data["roles"].items():
-            for candidate in role_data["candidates"]:
-                assert candidate["model"] != "gpt-5.4", (
-                    f"Role {role_name} has gpt-5.4 as model - not available on Copilot yet"
-                )
-
-    def test_gpt_5_3_codex_still_present(self):
-        """gpt-5.3-codex must still be present in copilot.yaml."""
+    def test_no_stale_gpt_5_2_in_copilot(self):
+        """gpt-5.2 has been replaced by gpt-5.4 (PR #4) and should not appear."""
         raw = read_raw("copilot.yaml")
-        assert "gpt-5.3-codex" in raw
+        assert "gpt-5.2" not in raw, "gpt-5.2 should be fully replaced in copilot.yaml"
+
+    def test_no_stale_gpt_5_3_codex_in_copilot(self):
+        """gpt-5.3-codex has been replaced by gpt-5.4 (PR #4) and should not appear."""
+        raw = read_raw("copilot.yaml")
+        assert "gpt-5.3-codex" not in raw, (
+            "gpt-5.3-codex should be fully replaced in copilot.yaml"
+        )
 
     def test_critique_reasoning_effort_xhigh(self):
         """critique role must use xhigh (not extra_high)."""

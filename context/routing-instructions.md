@@ -44,4 +44,4 @@ When delegating to sub-agents, you can override the model role:
 }
 ```
 
-For detailed role descriptions, decision flowchart, and example fallback chains, see the role-definitions context file.
+For detailed role definitions, decision flowchart, model tier grid, and fallback chain guidance, use `load_skill(skill_name='role-definitions')`.
