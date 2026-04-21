@@ -42,13 +42,28 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # --- Load default matrix ---
     default_matrix_name = config.get("default_matrix", "balanced")
 
+    # Project-scoped matrices (<cwd>/.amplifier/routing/) have the highest
+    # runtime priority, after the _bundle_root escape hatch.  This matches the
+    # convention documented at amplifier-app-cli/amplifier_app_cli/paths.py:72
+    # where _get_user_and_project_paths() uses project > user-global for
+    # bundles, agents, and skills.  Routing follows the same rule so that a
+    # project-local matrix is picked up automatically when amplifier is launched
+    # from the project root — no ~/.amplifier symlink required.
+    #
+    # Discovery is flat (no walk-up): cwd must be exactly the project root.
+    # Running from a subdirectory will miss the project matrix and fall through
+    # to the next level — consistent with paths.py:72-75 and intentional.
+    #
     # User custom matrices (~/.amplifier/routing/) take priority over bundled
     # matrices in the cache.  The CLI matrix editor saves customizations here,
     # so runtime must honour them first to stay consistent with what the user
     # sees in `amplifier routing manage`.
+    project_matrix_path = Path.cwd() / ".amplifier" / "routing" / f"{default_matrix_name}.yaml"
     custom_routing_dir = Path.home() / ".amplifier" / "routing"
     custom_matrix_path = custom_routing_dir / f"{default_matrix_name}.yaml"
-    if custom_matrix_path.exists():
+    if project_matrix_path.exists():
+        matrix_path = project_matrix_path
+    elif custom_matrix_path.exists():
         matrix_path = custom_matrix_path
     else:
         matrix_path = routing_dir / f"{default_matrix_name}.yaml"
