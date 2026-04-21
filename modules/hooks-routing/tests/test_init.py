@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import textwrap
 from pathlib import Path
 from typing import Any
@@ -528,3 +529,365 @@ class TestProviderRequestHook:
         assert "balanced" in result.context_injection
         assert "general" in result.context_injection
         assert "fast" in result.context_injection
+
+
+# ---------------------------------------------------------------------------
+# Project-scoped discovery tests
+# ---------------------------------------------------------------------------
+
+
+class TestProjectScopedDiscovery:
+    """<cwd>/.amplifier/routing/ discovery with precedence project > user-global > bundle."""
+
+    @pytest.mark.asyncio
+    async def test_project_scoped_matrix_found_and_used(
+        self, tmp_path: Path
+    ) -> None:
+        """Happy path: project-local matrix is loaded when cwd has .amplifier/routing/."""
+        project_root = tmp_path / "project"
+        project_routing = project_root / ".amplifier" / "routing"
+        project_routing.mkdir(parents=True)
+        (project_routing / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Project balanced matrix"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "Project general"
+                    candidates:
+                      - provider: project-llm
+                        model: project-model-v1
+            """)
+        )
+
+        # Bundle has no balanced.yaml — would cause routing-disabled if used
+        bundle_root = tmp_path / "bundle"
+        (bundle_root / "routing").mkdir(parents=True)
+
+        coordinator = _make_coordinator()
+
+        with patch(
+            "amplifier_module_hooks_routing.Path.cwd",
+            return_value=project_root,
+        ):
+            with patch(
+                "amplifier_module_hooks_routing.Path.home",
+                return_value=tmp_path / "home",
+            ):
+                await mount(
+                    coordinator,
+                    config={
+                        "default_matrix": "balanced",
+                        "_bundle_root": str(bundle_root),
+                    },
+                )
+
+        assert "routing_matrix" in coordinator.session_state
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["name"] == "balanced"
+        assert "general" in stored["roles"]
+        assert stored["roles"]["general"]["candidates"][0]["provider"] == "project-llm"
+
+    @pytest.mark.asyncio
+    async def test_project_beats_user_global(
+        self, tmp_path: Path
+    ) -> None:
+        """Project-scoped matrix wins over user-global (~/.amplifier/routing/).
+
+        Asserts the project > user-global ordering that matches paths.py:72.
+        """
+        project_root = tmp_path / "project"
+        project_routing = project_root / ".amplifier" / "routing"
+        project_routing.mkdir(parents=True)
+        (project_routing / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Project matrix"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "From project"
+                    candidates:
+                      - provider: project-provider
+                        model: project-model
+            """)
+        )
+
+        home_dir = tmp_path / "home"
+        user_routing = home_dir / ".amplifier" / "routing"
+        user_routing.mkdir(parents=True)
+        (user_routing / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "User-global matrix"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "From user-global"
+                    candidates:
+                      - provider: user-provider
+                        model: user-model
+            """)
+        )
+
+        bundle_root = tmp_path / "bundle"
+        (bundle_root / "routing").mkdir(parents=True)
+
+        coordinator = _make_coordinator()
+
+        with patch(
+            "amplifier_module_hooks_routing.Path.cwd",
+            return_value=project_root,
+        ):
+            with patch(
+                "amplifier_module_hooks_routing.Path.home",
+                return_value=home_dir,
+            ):
+                await mount(
+                    coordinator,
+                    config={
+                        "default_matrix": "balanced",
+                        "_bundle_root": str(bundle_root),
+                    },
+                )
+
+        # Project must win — NOT user-global
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["roles"]["general"]["candidates"][0]["provider"] == "project-provider"
+
+    @pytest.mark.asyncio
+    async def test_project_beats_bundle(
+        self, tmp_path: Path
+    ) -> None:
+        """Project-scoped matrix shadows a bundled matrix of the same name."""
+        bundle_root = tmp_path / "bundle"
+        bundle_routing = bundle_root / "routing"
+        bundle_routing.mkdir(parents=True)
+        (bundle_routing / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Bundle matrix"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "From bundle"
+                    candidates:
+                      - provider: bundle-provider
+                        model: bundle-model
+            """)
+        )
+
+        project_root = tmp_path / "project"
+        project_routing = project_root / ".amplifier" / "routing"
+        project_routing.mkdir(parents=True)
+        (project_routing / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Project matrix"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "From project"
+                    candidates:
+                      - provider: project-provider
+                        model: project-model
+            """)
+        )
+
+        coordinator = _make_coordinator()
+
+        with patch(
+            "amplifier_module_hooks_routing.Path.cwd",
+            return_value=project_root,
+        ):
+            with patch(
+                "amplifier_module_hooks_routing.Path.home",
+                return_value=tmp_path / "home",
+            ):
+                await mount(
+                    coordinator,
+                    config={
+                        "default_matrix": "balanced",
+                        "_bundle_root": str(bundle_root),
+                    },
+                )
+
+        # Project must shadow bundle
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["roles"]["general"]["candidates"][0]["provider"] == "project-provider"
+
+    @pytest.mark.asyncio
+    async def test_graceful_fallback_when_no_project_matrix(
+        self, tmp_path: Path
+    ) -> None:
+        """No project file, no user-global: bundle matrix loads normally (regression guard)."""
+        bundle_root = tmp_path / "bundle"
+        bundle_routing = bundle_root / "routing"
+        bundle_routing.mkdir(parents=True)
+        (bundle_routing / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Bundle matrix"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "From bundle"
+                    candidates:
+                      - provider: bundle-provider
+                        model: bundle-model
+            """)
+        )
+
+        # cwd has no .amplifier/routing/ at all
+        empty_cwd = tmp_path / "empty-cwd"
+        empty_cwd.mkdir()
+
+        coordinator = _make_coordinator()
+
+        with patch(
+            "amplifier_module_hooks_routing.Path.cwd",
+            return_value=empty_cwd,
+        ):
+            with patch(
+                "amplifier_module_hooks_routing.Path.home",
+                return_value=tmp_path / "home",
+            ):
+                await mount(
+                    coordinator,
+                    config={
+                        "default_matrix": "balanced",
+                        "_bundle_root": str(bundle_root),
+                    },
+                )
+
+        assert "routing_matrix" in coordinator.session_state
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["roles"]["general"]["candidates"][0]["provider"] == "bundle-provider"
+
+    @pytest.mark.asyncio
+    async def test_filename_mismatch_falls_through(
+        self, tmp_path: Path
+    ) -> None:
+        """Project dir has .amplifier/routing/ but a differently-named matrix; falls through to bundle."""
+        project_root = tmp_path / "project"
+        project_routing = project_root / ".amplifier" / "routing"
+        project_routing.mkdir(parents=True)
+        # Write a DIFFERENT matrix name in the project routing dir
+        (project_routing / "custom.yaml").write_text(
+            textwrap.dedent("""\
+                name: custom
+                description: "A different matrix"
+                updated: "2026-01-01"
+                roles:
+                  special:
+                    description: "Special role"
+                    candidates:
+                      - provider: special-provider
+                        model: special-model
+            """)
+        )
+        # "balanced.yaml" is intentionally absent from the project routing dir
+
+        bundle_root = tmp_path / "bundle"
+        bundle_routing = bundle_root / "routing"
+        bundle_routing.mkdir(parents=True)
+        (bundle_routing / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Bundle matrix"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "From bundle"
+                    candidates:
+                      - provider: bundle-provider
+                        model: bundle-model
+            """)
+        )
+
+        coordinator = _make_coordinator()
+
+        with patch(
+            "amplifier_module_hooks_routing.Path.cwd",
+            return_value=project_root,
+        ):
+            with patch(
+                "amplifier_module_hooks_routing.Path.home",
+                return_value=tmp_path / "home",
+            ):
+                await mount(
+                    coordinator,
+                    config={
+                        "default_matrix": "balanced",
+                        "_bundle_root": str(bundle_root),
+                    },
+                )
+
+        # Falls through project (filename mismatch) and user-global (absent) to bundle
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["roles"]["general"]["candidates"][0]["provider"] == "bundle-provider"
+
+    @pytest.mark.asyncio
+    async def test_cwd_subdirectory_misses_project_matrix_and_warns(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """COE-added: cwd=<project>/src/ misses the project matrix; routing disabled with warning.
+
+        Flat cwd discovery (no walk-up) means running from a subdirectory of
+        the project root will NOT find <project>/.amplifier/routing/.  The
+        failure must be loud (warning logged), not silent.
+        """
+        # Project matrix exists at the real project root (not visible from src/)
+        project_root = tmp_path / "project"
+        project_routing = project_root / ".amplifier" / "routing"
+        project_routing.mkdir(parents=True)
+        (project_routing / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Project matrix"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "From project"
+                    candidates:
+                      - provider: project-provider
+                        model: project-model
+            """)
+        )
+
+        # Simulate launching from a subdirectory
+        src_dir = project_root / "src"
+        src_dir.mkdir()
+
+        # Bundle has no balanced.yaml — ensures bundle fallback also misses
+        bundle_root = tmp_path / "bundle"
+        (bundle_root / "routing").mkdir(parents=True)
+
+        coordinator = _make_coordinator()
+
+        with caplog.at_level(logging.WARNING, logger="amplifier_module_hooks_routing"):
+            with patch(
+                "amplifier_module_hooks_routing.Path.cwd",
+                return_value=src_dir,
+            ):
+                with patch(
+                    "amplifier_module_hooks_routing.Path.home",
+                    return_value=tmp_path / "home",
+                ):
+                    await mount(
+                        coordinator,
+                        config={
+                            "default_matrix": "balanced",
+                            "_bundle_root": str(bundle_root),
+                        },
+                    )
+
+        # Warning must be logged — failure is loud, not silent
+        warning_messages = [
+            r.message for r in caplog.records if r.levelno >= logging.WARNING
+        ]
+        assert any("Matrix file not found" in msg for msg in warning_messages)
+
+        # Routing is disabled — roles dict is empty
+        assert coordinator.session_state["routing_matrix"]["roles"] == {}
