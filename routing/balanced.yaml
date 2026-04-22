@@ -5,18 +5,26 @@
 # that matches an installed provider.
 #
 # Schema:
-#   provider: Module type name (e.g., "anthropic", not "provider-anthropic")
-#   model: Exact model name or glob pattern (e.g., "claude-sonnet-*")
-#   config: Optional model parameters (e.g., reasoning_effort: high)
+#   provider: Module mount name (e.g., "anthropic", "gemini", "github-copilot")
+#             For multi-instance providers, use the instance id directly.
+#   model:    Exact model name or glob pattern. Class-scoped globs
+#             (claude-opus-*, gemini-*-pro-preview, gpt-?.?-mini*) auto-track
+#             within-class version bumps. Copilot candidates stay PINNED because
+#             the github-copilot provider has no static fallback for list_models().
+#   config:   Optional model parameters (e.g., reasoning_effort: high|xhigh)
 #
 # Required roles: "general" and "fast" must be defined in every matrix.
 # All other roles are optional — agents fall back through their model_role list.
+#
+# Ordering rule: Anthropic candidates come above OpenAI candidates in every
+# multi-provider role, reflecting current quality leadership in coding/critique
+# workloads. If this changes, revisit balanced.yaml, quality.yaml, economy.yaml.
 #
 # Curated by Amplifier Foundation team. See docs/MATRIX_CURATOR_GUIDE.md.
 
 name: balanced
 description: "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team."
-updated: "2026-03-06"
+updated: "2026-04-22"
 
 roles:
   # ---------------------------------------------------------------------------
@@ -27,11 +35,11 @@ roles:
     description: "Versatile catch-all, no specialization needed"
     candidates:
       - provider: anthropic
-        model: claude-sonnet-4-6
+        model: claude-sonnet-*
       - provider: openai
         model: gpt-5.4
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-sonnet-4.6
       - provider: github-copilot
@@ -43,15 +51,15 @@ roles:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: anthropic
-        model: claude-haiku-4-5
+        model: claude-haiku-*
       - provider: openai
-        model: gpt-5-mini
-      - provider: google
-        model: gemini-3-flash-preview
+        model: gpt-?.?-mini*
+      - provider: gemini
+        model: gemini-*-flash-preview
       - provider: github-copilot
         model: claude-haiku-4.5
       - provider: github-copilot
-        model: gpt-5-mini
+        model: gpt-5.4-mini
       - provider: ollama
         model: "*"
 
@@ -63,11 +71,11 @@ roles:
     description: "Code generation, implementation, debugging"
     candidates:
       - provider: anthropic
-        model: claude-sonnet-4-6
+        model: claude-sonnet-*
       - provider: openai
         model: gpt-5.4
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-sonnet-4.6
       - provider: github-copilot
@@ -79,11 +87,11 @@ roles:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: anthropic
-        model: claude-sonnet-4-6
+        model: claude-sonnet-*
       - provider: openai
         model: gpt-5.4
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-sonnet-4.6
       - provider: github-copilot
@@ -92,16 +100,17 @@ roles:
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
+      # Anthropic promoted above OpenAI per ordering rule (2026-04-22).
+      - provider: anthropic
+        model: claude-sonnet-*
+        config:
+          reasoning_effort: high
       - provider: openai
         model: gpt-5.4
         config:
           reasoning_effort: high
-      - provider: anthropic
-        model: claude-sonnet-4-6
-        config:
-          reasoning_effort: high
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
         config:
           reasoning_effort: high
       - provider: github-copilot
@@ -117,15 +126,15 @@ roles:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: anthropic
-        model: claude-opus-4-6
+        model: claude-opus-*
         config:
           reasoning_effort: high
       - provider: openai
-        model: gpt-5.4-pro
+        model: gpt-?.?-pro*
         config:
           reasoning_effort: high
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
         config:
           reasoning_effort: high
       - provider: github-copilot
@@ -133,23 +142,24 @@ roles:
         config:
           reasoning_effort: high
       - provider: anthropic
-        model: claude-sonnet-4-6
+        model: claude-sonnet-*
       - provider: openai
         model: gpt-5.4
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
+      # Anthropic promoted above OpenAI per ordering rule (2026-04-22).
+      - provider: anthropic
+        model: claude-sonnet-*
+        config:
+          reasoning_effort: xhigh
       - provider: openai
         model: gpt-5.4
         config:
           reasoning_effort: xhigh
-      - provider: anthropic
-        model: claude-sonnet-4-6
-        config:
-          reasoning_effort: xhigh
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
         config:
           reasoning_effort: xhigh
       - provider: github-copilot
@@ -161,11 +171,11 @@ roles:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
       - provider: anthropic
-        model: claude-opus-4-6
+        model: claude-opus-*
       - provider: openai
         model: gpt-5.4
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-opus-4.6
 
@@ -173,11 +183,11 @@ roles:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: anthropic
-        model: claude-opus-4-6
+        model: claude-opus-*
       - provider: openai
         model: gpt-5.4
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-opus-4.6
 
@@ -185,21 +195,21 @@ roles:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: anthropic
-        model: claude-opus-4-6
+        model: claude-opus-*
         config:
           reasoning_effort: high
       - provider: openai
-        model: gpt-5.4-pro
+        model: gpt-?.?-pro*
         config:
           reasoning_effort: high
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
         config:
           reasoning_effort: high
       - provider: github-copilot
         model: claude-opus-4.6
       - provider: anthropic
-        model: claude-sonnet-4-6
+        model: claude-sonnet-*
 
   # ---------------------------------------------------------------------------
   # Capability Roles
@@ -208,12 +218,12 @@ roles:
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
-      - provider: google
-        model: gemini-3-flash-preview
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-flash-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
       - provider: anthropic
-        model: claude-sonnet-4-6
+        model: claude-sonnet-*
       - provider: openai
         model: gpt-5.4
       - provider: github-copilot
@@ -222,10 +232,12 @@ roles:
         model: claude-sonnet-4.6
 
   image-gen:
+    # nano-banana-pro-preview as exact name: bypasses list_models() filter
+    # (which requires "gemini" in model name) and passes directly to the API.
     description: "Image generation, visual mockup creation, visual ideation"
     candidates:
-      - provider: google
-        model: gemini-3-pro-image-preview
+      - provider: gemini
+        model: nano-banana-pro-preview
 
   # ---------------------------------------------------------------------------
   # Operational Role
@@ -235,10 +247,10 @@ roles:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
       - provider: anthropic
-        model: claude-opus-4-6
+        model: claude-opus-*
       - provider: openai
-        model: gpt-5.4-pro
-      - provider: google
-        model: gemini-3.1-pro-preview
+        model: gpt-?.?-pro*
+      - provider: gemini
+        model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-opus-4.6

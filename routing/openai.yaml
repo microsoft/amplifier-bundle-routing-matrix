@@ -2,10 +2,15 @@
 #
 # OpenAI-only routing. All roles use OpenAI models exclusively.
 # Use when you want to run entirely on your OpenAI API account.
+#
+# Glob strategy: tier suffixes (`gpt-?.?-pro*`, `gpt-?.?-mini*`, `gpt-?.?-nano*`)
+# auto-track minor version bumps (gpt-5.4 → gpt-5.5) without matching wrong tier.
+# The base mid-tier model stays pinned as `gpt-5.4` because `gpt-5.4*` would
+# incorrectly match the suffix variants. Bump the base pin when a new minor ships.
 
 name: openai
 description: "OpenAI-only routing. All roles use OpenAI models exclusively."
-updated: "2026-03-06"
+updated: "2026-04-22"
 
 roles:
   general:
@@ -18,7 +23,7 @@ roles:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: openai
-        model: gpt-5-mini
+        model: gpt-?.?-mini*
 
   coding:
     description: "Code generation, implementation, debugging"
@@ -44,7 +49,7 @@ roles:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: openai
-        model: gpt-5.4-pro
+        model: gpt-?.?-pro*
         config:
           reasoning_effort: high
 
@@ -72,7 +77,7 @@ roles:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: openai
-        model: gpt-5.4-pro
+        model: gpt-?.?-pro*
         config:
           reasoning_effort: high
 
@@ -83,16 +88,16 @@ roles:
         model: gpt-5.4
 
   image-gen:
-    # OpenAI image generation (DALL-E) is not available through the chat
-    # completions API. Falls back to the best creative model for image
-    # planning, prompt crafting, and SVG generation.
-    description: "Image generation (limited — DALL-E not available via chat API)"
+    # OpenAI image generation (gpt-image-*) is not yet available through the
+    # chat-completions interface used by this provider. Falls back to the best
+    # creative model for image planning, prompt crafting, and SVG generation.
+    description: "Image generation (limited — gpt-image not available via chat API)"
     candidates:
       - provider: openai
-        model: gpt-5.4-pro
+        model: gpt-?.?-pro*
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
       - provider: openai
-        model: gpt-5.4-pro
+        model: gpt-?.?-pro*
