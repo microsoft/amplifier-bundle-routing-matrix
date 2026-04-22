@@ -1,12 +1,17 @@
 # Routing Matrix: copilot
 #
 # GitHub Copilot-optimized routing. Balances Copilot multiplier costs.
-# Avoids the 30x claude-opus-4.6-fast trap. Uses Haiku (0.33x) for budget roles.
+# Avoids the 30x claude-opus-fast trap. Uses Haiku (0.33x) for budget roles.
 # Use when GitHub Copilot is your primary or only provider.
+#
+# NOTE: Copilot models are PINNED (not globbed). The github-copilot provider's
+# list_models() has NO static fallback — if the SDK or disk cache is unavailable,
+# it raises and glob resolution fails. Pinning avoids this fragility. Bump
+# manually when new model versions appear in the Copilot API.
 
 name: copilot
 description: "GitHub Copilot-optimized routing. Balances multiplier costs, avoids 30x trap."
-updated: "2026-03-06"
+updated: "2026-04-22"
 
 roles:
   general:
@@ -31,11 +36,17 @@ roles:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: github-copilot
+        model: claude-sonnet-4.6
+      - provider: github-copilot
         model: gpt-5.4
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
+      - provider: github-copilot
+        model: claude-sonnet-4.6
+        config:
+          reasoning_effort: high
       - provider: github-copilot
         model: gpt-5.4
         config:
@@ -52,6 +63,10 @@ roles:
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
+      - provider: github-copilot
+        model: claude-sonnet-4.6
+        config:
+          reasoning_effort: xhigh
       - provider: github-copilot
         model: gpt-5.4
         config:
@@ -78,6 +93,8 @@ roles:
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
+      - provider: github-copilot
+        model: claude-sonnet-4.6
       - provider: github-copilot
         model: gpt-5.4
 

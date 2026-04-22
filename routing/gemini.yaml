@@ -2,94 +2,107 @@
 #
 # Google Gemini-only routing. All roles use Gemini models exclusively.
 # Use when you want to run entirely on your Google AI account.
+#
+# NOTE: The provider type is `gemini` (matching the module mount name), NOT
+# `google`. Earlier versions of this file used `google` which silently failed
+# to resolve — fixed as of 2026-04-22.
+#
+# Glob strategy: class-scoped (`gemini-*-pro-preview`, `gemini-*-flash-preview`,
+# `gemini-*-flash-lite-preview`) auto-tracks within-class generation bumps.
+# Exact names are used for specialized models like nano-banana (image generation)
+# which don't fit the family naming pattern.
 
 name: gemini
 description: "Google Gemini-only routing. All roles use Gemini models exclusively."
-updated: "2026-03-06"
+updated: "2026-04-22"
 
 roles:
   general:
     description: "Versatile catch-all, no specialization needed"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
 
   fast:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
-      - provider: google
-        model: gemini-3-flash-preview
+      - provider: gemini
+        model: gemini-*-flash-preview
 
   coding:
     description: "Code generation, implementation, debugging"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
 
   ui-coding:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
         config:
           reasoning_effort: high
 
   reasoning:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
         config:
           reasoning_effort: high
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
         config:
-          reasoning_effort: extra_high
+          reasoning_effort: xhigh
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
 
   writing:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
         config:
           reasoning_effort: high
 
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
-      - provider: google
-        model: gemini-3-flash-preview
+      - provider: gemini
+        model: gemini-*-flash-preview
 
   image-gen:
+    # nano-banana-pro-preview is used as an exact name (no glob). The provider's
+    # list_models() filters to names containing "gemini", so nano-banana would be
+    # excluded from glob resolution. As an exact name the resolver bypasses
+    # list_models() entirely and sends the string to Google's API directly.
     description: "Image generation, visual mockup creation, visual ideation"
     candidates:
-      - provider: google
-        model: gemini-3-pro-image-preview
+      - provider: gemini
+        model: nano-banana-pro-preview
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
-      - provider: google
-        model: gemini-3.1-pro-preview
+      - provider: gemini
+        model: gemini-*-pro-preview

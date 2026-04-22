@@ -49,7 +49,7 @@ roles:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `provider` | Yes | Module type name (e.g., `anthropic`, `openai`, `google`, `ollama`) |
+| `provider` | Yes | Module type name (e.g., `anthropic`, `openai`, `gemini`) — or a multi-instance id (see [Multi-Instance Providers](#multi-instance-providers)) |
 | `model` | Yes | Exact model name or glob pattern |
 | `config` | No | Optional map of parameters passed to the provider session config |
 
@@ -57,15 +57,80 @@ roles:
 
 ## Provider Names
 
-The `provider` field uses the module **type name**, not the full module identifier:
+The `provider` field uses the module **type name**, not the full module identifier.
+Match the name the provider module registers under via `coordinator.mount(...)`
+— not the `pyproject.toml` entry-point key.
 
 | Write this | Not this |
 |------------|----------|
 | `anthropic` | `provider-anthropic` |
 | `openai` | `provider-openai` |
-| `google` | `provider-gemini` |
+| `gemini` | `provider-gemini`, `google` |
 | `ollama` | `provider-ollama` |
 | `github-copilot` | `provider-github-copilot` |
+
+> **Note (2026-04-22):** Earlier versions of this guide showed `google` for the
+> Gemini provider. That was wrong — the module mounts under `gemini`, and
+> `provider: google` silently failed resolution in every matrix. Fixed in all
+> shipped matrices; update any user-written matrices or `settings.yaml`
+> overrides that still use `google`.
+
+---
+
+## Multi-Instance Providers
+
+Users can run multiple instances of the same provider module — for example,
+two `provider-openai` instances pointing at different endpoints (one real
+OpenAI, one internal vLLM server). Configure them via `settings.yaml` with
+unique `id:` values:
+
+```yaml
+# ~/.amplifier/settings.yaml
+config:
+  providers:
+    - module: provider-openai
+      id: openai-internal
+      config:
+        base_url: https://internal-llm.company.com/v1
+        api_key: sk-internal-inline
+        default_model: codellama-70b
+
+    - module: provider-openai
+      id: openai-main
+      config:
+        base_url: https://api.openai.com/v1
+        api_key: ${OPENAI_API_KEY}
+        default_model: gpt-5.4
+```
+
+In a matrix, **reference a specific instance by its id** as the `provider:`
+value:
+
+```yaml
+roles:
+  coding:
+    candidates:
+      - provider: openai-internal     # matches coordinator key "openai-internal"
+        model: codellama-70b
+  reasoning:
+    candidates:
+      - provider: openai-main         # matches coordinator key "openai-main"
+        model: gpt-?.?-pro*
+        config:
+          reasoning_effort: high
+```
+
+How it works: the `id:` in settings.yaml is mapped to the kernel's
+`instance_id` during mount plan assembly, and the provider is re-mounted under
+that key in `coordinator.providers`. The resolver's `find_provider_by_type`
+does an exact-key match first, so any arbitrary instance id works in the
+`provider:` field.
+
+**API key caveat:** The CLI `amplifier provider add` wizard currently stores
+both instances' api_key values in the same env var (e.g. `$OPENAI_API_KEY`),
+so two instances via the wizard collide in the keyring. Until that's fixed,
+authors of multi-instance configs should edit `settings.yaml` directly and
+inline the keys (or use distinct env var names per instance).
 
 ---
 
@@ -278,34 +343,68 @@ After reviewing benchmark data and weather report alignment, follow this 3-step 
 
 Always use exact, versioned model names in matrix files. Globs are for user overrides and local providers only.
 
-**Good** — pinned to a specific version:
-```yaml
-- provider: anthropic
-  model: claude-sonnet-4-6
-```
+**Good ✅ — class-scoped globs** for providers whose `list_models()` is backed
+by a live API. These auto-track new releases within a class without silently
+jumping classes. The resolver's version-aware sort (with date-suffix
+stripping) ensures the highest clean version wins.
 
-**Bad** — will silently shift when provider updates:
-```yaml
-- provider: anthropic
-  model: claude-sonnet-*
-```
+**Bad ❌ — broad unbounded globs** like `claude-*` or `gpt-*`. These cross
+class boundaries (Opus and Haiku both match `claude-*`) and will silently
+swap a premium role to a budget model when the provider reorders its list.
+Avoid them outside of `model: "*"` for user-managed providers like Ollama.
 
-The only exception is `model: "*"` for providers like Ollama where users choose their own models.
+| Pattern | What it matches | What it excludes |
+|---------|----------------|-----------------|
+| `claude-opus-*` | all Opus versions | Sonnet, Haiku |
+| `claude-sonnet-*` | all Sonnet versions | Opus, Haiku |
+| `claude-haiku-*` | all Haiku versions | Opus, Sonnet |
+| `gemini-*-pro-preview` | Pro-tier previews, any generation | Flash, Flash-Lite, Image, `*-customtools` |
+| `gemini-*-flash-preview` | Flash-tier previews | Flash-Lite, Image, TTS |
+| `gemini-*-flash-lite-preview` | Flash-Lite-tier previews | Flash, TTS |
+| `gpt-?.?-mini*` | any dotted-version mini (e.g. `gpt-5.4-mini`) | base, pro, nano, `gpt-5-mini` (no dot) |
+| `gpt-?.?-pro*` | any dotted-version pro | base, mini, nano |
+| `gpt-?.?-nano*` | any dotted-version nano | base, mini, pro |
+
+**Pinned names** remain appropriate when:
+
+1. The base mid-tier is ambiguous to glob (e.g. `gpt-5.4` — `gpt-5.4*` would
+   accidentally match `gpt-5.4-mini`/`-pro`/`-nano`). Pin the base, glob the
+   tier suffixes separately.
+2. The provider has no static fallback for `list_models()`. `github-copilot`
+   raises `ProviderUnavailableError` if both the SDK and the disk cache are
+   unavailable, so glob resolution fails catastrophically when offline. Keep
+   all `github-copilot` candidates pinned until the provider gains a fallback.
+3. A specialized model does not follow its family's naming pattern and would
+   be filtered out of `list_models()`. Example: `nano-banana-pro-preview` is
+   excluded from gemini's listing (the provider filters to IDs containing
+   "gemini"). Using it as an **exact name** bypasses `list_models()` entirely
+   and passes the string directly to the API.
+4. The `*-latest` aliases. Exact names like `gemini-pro-latest` are safer than
+   globs because they reach the API even when the listing endpoint is
+   unreachable.
+
+The only universal free-pass glob is `model: "*"` for providers like Ollama
+where users choose their own models.
 
 ### Provider-Specific Naming
 
 Different providers use different naming conventions for the **same underlying model**. Always use the provider's native format.
 
-| Model | anthropic | openai | google | github-copilot |
+| Model | anthropic | openai | gemini | github-copilot |
 |-------|-----------|--------|--------|----------------|
-| Claude Sonnet 4.6 | `claude-sonnet-4-6` | — | — | `claude-sonnet-4.6` |
-| Claude Opus 4.6 | `claude-opus-4-6` | — | — | `claude-opus-4.6` |
-| Claude Haiku 4.5 | `claude-haiku-4-5` | — | — | `claude-haiku-4.5` |
-| GPT-5.3 Codex | — | `gpt-5.3-codex` | — | `gpt-5.3-codex` |
-| GPT-5.4 | — | `gpt-5.4` | — | `gpt-5.4` |
-| GPT-5.4 Pro | — | `gpt-5.4-pro` | — | `gpt-5.4-pro` |
+| Claude Sonnet 4.x | `claude-sonnet-*` (glob) | — | — | `claude-sonnet-4.6` (pin) |
+| Claude Opus 4.x | `claude-opus-*` (glob) | — | — | `claude-opus-4.6` (pin) |
+| Claude Haiku 4.x | `claude-haiku-*` (glob) | — | — | `claude-haiku-4.5` (pin) |
+| GPT-5.x base | — | `gpt-5.4` (pin base) | — | `gpt-5.4` (pin) |
+| GPT-5.x pro | — | `gpt-?.?-pro*` (glob) | — | pinned, e.g. `gpt-5.4-pro` |
+| GPT-5.x mini | — | `gpt-?.?-mini*` (glob) | — | pinned, e.g. `gpt-5.4-mini` |
+| Gemini Pro | — | — | `gemini-*-pro-preview` (glob) | — |
+| Gemini Flash | — | — | `gemini-*-flash-preview` (glob) | — |
+| Gemini Image | — | — | `nano-banana-pro-preview` (exact) | — |
 
-> **CRITICAL:** Anthropic uses **hyphens** (`claude-sonnet-4-6`) while GitHub Copilot uses **dots** (`claude-sonnet-4.6`). Mixing these up causes silent resolution failures — the candidate won't match any installed model.
+> **CRITICAL — naming formats:** Anthropic uses **hyphens** (`claude-sonnet-4-6`)
+> while GitHub Copilot uses **dots** (`claude-sonnet-4.6`). Mixing these up causes
+> silent resolution failures — the candidate won't match any installed model.
 
 ### Model Blacklist
 
@@ -316,6 +415,9 @@ The following models must **never** appear in any matrix file:
 | `gpt-4.1` | Deprecated; replaced by gpt-5.x family |
 | `claude-opus-4.6-fast` | Not a real model; confused with claude-opus-4-6 |
 | `claude-opus-4-6-fast` | Not a real model; no "fast" variant of Opus exists |
+| `gpt-5.2` | Superseded by gpt-5.4 in the March 2026 rollout |
+| `gpt-5.2-pro` | Superseded by gpt-5.4-pro in the March 2026 rollout |
+| `gpt-5.3-codex` | Codex line consolidated back into base gpt-5.x; no longer a separate model for routing |
 
 If a blacklisted model appears in a PR, reject and request replacement with a valid alternative.
 
@@ -374,7 +476,7 @@ Follow this 6-step refresh process:
 - [ ] `provider` uses module type names (not full module identifiers)
 - [ ] Candidates are ordered by preference (best first)
 - [ ] `config` is only present where needed
-- [ ] No blacklisted models (`gpt-4.1`, `claude-opus-4.6-fast`, `claude-opus-4-6-fast`)
+- [ ] No blacklisted models (see [Model Blacklist](#model-blacklist))
 - [ ] No duplicate candidates within the same role
 - [ ] Provider-specific naming correct (anthropic hyphens, copilot dots)
 - [ ] Tests pass: `python -m pytest tests/`

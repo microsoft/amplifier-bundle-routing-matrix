@@ -51,11 +51,14 @@ ROLE_CATEGORIES = [
     "Operational",
 ]
 
-# Blacklisted models
+# Blacklisted models (kept in sync with docs/MATRIX_CURATOR_GUIDE.md § Model Blacklist)
 BLACKLISTED_MODELS = [
     "gpt-4.1",
     "claude-opus-4.6-fast",
     "claude-opus-4-6-fast",
+    "gpt-5.2",
+    "gpt-5.2-pro",
+    "gpt-5.3-codex",
 ]
 
 

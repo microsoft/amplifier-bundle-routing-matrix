@@ -44,9 +44,18 @@ REMOVED_ROLES = frozenset({"agentic", "planning", "coding-image"})
 # Required in every matrix
 REQUIRED_ROLES = frozenset({"general", "fast"})
 
-# Models that must never appear in any matrix
+# Models that must never appear in any matrix.
+# Updated 2026-04-22: added gpt-5.2 / gpt-5.2-pro / gpt-5.3-codex as the
+# March 2026 GPT-5.4 rollout purged these from every matrix.
 BLACKLISTED_MODELS = frozenset(
-    {"gpt-4.1", "claude-opus-4.6-fast", "claude-opus-4-6-fast"}
+    {
+        "gpt-4.1",
+        "claude-opus-4.6-fast",
+        "claude-opus-4-6-fast",
+        "gpt-5.2",
+        "gpt-5.2-pro",
+        "gpt-5.3-codex",
+    }
 )
 
 
@@ -100,11 +109,23 @@ class TestAllMatrices:
         assert "roles" in data, f"{matrix_file}: missing 'roles' key"
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
-    def test_updated_date(self, matrix_file: str) -> None:
+    def test_updated_field_is_iso_date(self, matrix_file: str) -> None:
+        """The 'updated' field must be a valid YYYY-MM-DD string."""
+        import datetime
+
         data = _load(matrix_file)
-        assert data.get("updated") == "2026-03-06", (
-            f"{matrix_file}: updated field is '{data.get('updated')}', expected '2026-03-06'"
+        updated = data.get("updated")
+        assert updated, f"{matrix_file}: missing 'updated' field"
+        assert isinstance(updated, str), (
+            f"{matrix_file}: 'updated' must be a string, got {type(updated).__name__}"
         )
+        # Round-trip through datetime to verify it's a real ISO date
+        try:
+            datetime.date.fromisoformat(updated)
+        except ValueError as exc:
+            raise AssertionError(
+                f"{matrix_file}: 'updated' is not a valid YYYY-MM-DD date: {updated!r}"
+            ) from exc
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_required_roles_present(self, matrix_file: str) -> None:
