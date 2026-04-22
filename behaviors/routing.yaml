@@ -7,4 +7,10 @@ hooks:
 context:
   include:
     - routing-matrix:context/routing-instructions.md
-    - routing-matrix:context/role-definitions.md
+
+tools:
+  - module: tool-skills
+    source: git+https://github.com/microsoft/amplifier-module-tool-skills@main
+    config:
+      skills:
+        - '@routing-matrix:skills'
