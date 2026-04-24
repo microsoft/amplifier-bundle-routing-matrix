@@ -5,7 +5,7 @@
 # that matches an installed provider.
 #
 # Philosophy: budget-first. Prefer cheap tier (Haiku, *-mini, Flash, Flash-Lite)
-# for utility roles. Reserve mid-tier (Sonnet, gpt-5.4, Pro) for quality-sensitive
+# for utility roles. Reserve mid-tier (Sonnet, gpt-5.5, Pro) for quality-sensitive
 # roles like security-audit, critique, creative, writing, research.
 #
 # Schema:
@@ -95,7 +95,7 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
         config:
           reasoning_effort: high
       - provider: gemini
@@ -113,13 +113,13 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-sonnet-4.6
       - provider: github-copilot
-        model: gpt-5.4
+        model: gpt-5.5
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
@@ -130,7 +130,7 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
         config:
           reasoning_effort: xhigh
       - provider: gemini
@@ -138,7 +138,7 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: github-copilot
-        model: gpt-5.4
+        model: gpt-5.5
         config:
           reasoning_effort: xhigh
 
@@ -148,7 +148,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -160,7 +160,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -172,7 +172,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -203,7 +203,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot

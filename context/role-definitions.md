@@ -43,7 +43,7 @@ These two roles are required in every matrix and serve as universal fallbacks.
 
 #### `general`
 - **Description:** Versatile catch-all, no specialization needed
-- **Model tier:** Mid (Sonnet, gpt-5.4, Gemini Pro)
+- **Model tier:** Mid (Sonnet, gpt-5.5, Gemini Pro)
 - **When to use:** The agent's work is genuinely varied — knowledge experts, ecosystem consultants, integration specialists
 - **When NOT to use:** If you can name what the agent primarily does (codes, designs, reviews), use that role instead
 - **Example agents:** explorer, foundation-expert, amplifier-expert, core-expert
@@ -65,7 +65,7 @@ For agents whose primary output is code.
 
 #### `coding`
 - **Description:** Code generation, implementation, debugging
-- **Model tier:** Mid, code-specialized (Sonnet, gpt-5.4, Gemini Pro)
+- **Model tier:** Mid, code-specialized (Sonnet, gpt-5.5, Gemini Pro)
 - **When to use:** The agent writes, modifies, or debugs code as its primary activity — bug fixing, feature implementation, test writing, infrastructure-as-code
 - **When NOT to use:** If the agent primarily reviews code (use `critique`), designs UI layouts (use `ui-coding`), or audits for vulnerabilities (use `security-audit`)
 - **Example agents:** bug-hunter, modular-builder, test-coverage, python-dev, rust-dev
@@ -95,7 +95,7 @@ For agents whose primary value is in HOW they think.
 
 #### `reasoning`
 - **Description:** Deep architectural reasoning, system design, complex multi-step analysis
-- **Model tier:** Heavy (Opus, gpt-5.4-pro, Gemini Pro) with high reasoning effort
+- **Model tier:** Heavy (Opus, gpt-5.5-pro, Gemini Pro) with high reasoning effort
 - **When to use:** The agent designs systems, plans architectures, breaks complex problems into steps, or needs extended chain-of-thought
 - **When NOT to use:** If the agent evaluates existing work (use `critique`), writes prose (use `writing`), or generates creative concepts (use `creative`)
 - **Example agents:** zen-architect, brainstormer, plan-writer, recipe-author
@@ -111,7 +111,7 @@ For agents whose primary value is in HOW they think.
 
 #### `creative`
 - **Description:** Design direction, aesthetic judgment, high-quality creative output
-- **Model tier:** Heavy (Opus, gpt-5.4, Gemini Pro)
+- **Model tier:** Heavy (Opus, gpt-5.5, Gemini Pro)
 - **When to use:** The agent makes aesthetic judgments, establishes design direction, creates visual concepts
 - **When NOT to use:** If the agent writes long-form content (use `writing`). If it writes UI code (use `ui-coding`)
 - **Example agents:** art-director, style-curator, storyboard-writer, character-designer
@@ -119,7 +119,7 @@ For agents whose primary value is in HOW they think.
 
 #### `writing`
 - **Description:** Long-form content — documentation, marketing, case studies, storytelling
-- **Model tier:** Heavy (Opus, gpt-5.4, Gemini Pro)
+- **Model tier:** Heavy (Opus, gpt-5.5, Gemini Pro)
 - **When to use:** The agent produces sustained written content — documentation, blog posts, case studies, release notes
 - **When NOT to use:** If the output is code with comments (use `coding`). If the writing is short utility text (use `fast`)
 - **Example agents:** technical-writer, marketing-writer, release-manager
@@ -127,7 +127,7 @@ For agents whose primary value is in HOW they think.
 
 #### `research`
 - **Description:** Deep investigation, information synthesis across multiple sources
-- **Model tier:** Heavy (Opus, gpt-5.4-pro, Gemini Pro) with high reasoning effort
+- **Model tier:** Heavy (Opus, gpt-5.5-pro, Gemini Pro) with high reasoning effort
 - **When to use:** The agent investigates and synthesizes from multiple sources. Extended context windows matter
 - **When NOT to use:** If the agent designs based on what it already knows (use `reasoning`)
 - **Example agents:** browser-researcher, story-researcher
@@ -141,7 +141,7 @@ For agents that need specific model capabilities beyond text.
 
 #### `vision`
 - **Description:** Understanding visual input — screenshots, diagrams, UI mockups
-- **Model tier:** Mid, multimodal (Gemini Flash, Sonnet, gpt-5.4)
+- **Model tier:** Mid, multimodal (Gemini Flash, Sonnet, gpt-5.5)
 - **When to use:** The agent analyzes screenshots, reads diagrams, interprets UI mockups
 - **When NOT to use:** If the agent generates images (use `image-gen`). If it writes UI code without seeing existing UI (use `ui-coding`)
 - **Example agents:** browser-operator, visual-documenter
@@ -162,7 +162,7 @@ For agents that need specific model capabilities beyond text.
 
 #### `critical-ops`
 - **Description:** High-reliability operational tasks — infrastructure, orchestration, coordination where mistakes are costly
-- **Model tier:** Heavy (Opus, gpt-5.4-pro, Gemini Pro)
+- **Model tier:** Heavy (Opus, gpt-5.5-pro, Gemini Pro)
 - **When to use:** The agent orchestrates infrastructure, manages deployments, verifies shadow environments, or performs operational tasks where failures cascade
 - **When NOT to use:** If the agent writes IaC as its primary activity (use `coding`). If it does quick operational checks (use `fast`)
 - **Example agents:** shadow-operator, shadow-smoke-test, container-operator

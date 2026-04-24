@@ -37,13 +37,13 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-sonnet-4.6
       - provider: github-copilot
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: ollama
         model: "*"
 
@@ -73,13 +73,13 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-sonnet-4.6
       - provider: github-copilot
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: ollama
         model: "*"
 
@@ -89,13 +89,13 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
         model: claude-sonnet-4.6
       - provider: github-copilot
-        model: gpt-5.4
+        model: gpt-5.5
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
@@ -106,7 +106,7 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
         config:
           reasoning_effort: high
       - provider: gemini
@@ -114,7 +114,7 @@ roles:
         config:
           reasoning_effort: high
       - provider: github-copilot
-        model: gpt-5.4
+        model: gpt-5.5
         config:
           reasoning_effort: high
 
@@ -144,7 +144,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
@@ -155,7 +155,7 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
         config:
           reasoning_effort: xhigh
       - provider: gemini
@@ -163,7 +163,7 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: github-copilot
-        model: gpt-5.4
+        model: gpt-5.5
         config:
           reasoning_effort: xhigh
 
@@ -173,7 +173,7 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -185,7 +185,7 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -225,9 +225,9 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: github-copilot
-        model: gpt-5.4
+        model: gpt-5.5
       - provider: github-copilot
         model: claude-sonnet-4.6
 
