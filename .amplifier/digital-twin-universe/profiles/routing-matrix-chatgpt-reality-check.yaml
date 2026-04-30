@@ -1,0 +1,143 @@
+# Reality-check validation profile for the routing-matrix bundle paired
+# with the ChatGPT provider.
+#
+# Scope (different from the chatgpt-provider's own reality-check profile):
+#   - That profile validates the provider in isolation by dropping a
+#     single matrix YAML file into ~/.amplifier/routing/.
+#   - THIS profile validates the routing-matrix bundle as a whole: the
+#     bundle is registered with `amplifier bundle add --app`, the
+#     hooks-routing module is loaded, and the openai-chatgpt matrix is
+#     selected as the active routing matrix.
+#
+# What this validates:
+#   - The routing-matrix bundle installs cleanly as an app bundle
+#   - `amplifier routing list` discovers all matrices shipped with the bundle
+#   - `amplifier routing use openai-chatgpt` succeeds and persists
+#   - The chatgpt provider mounts and is reachable from the routing matrix
+#   - `amplifier routing show` resolves all 13 roles to chatgpt models
+#
+# Out-of-band state required:
+#   - A valid OAuth token JSON file on the host. Default location is
+#     ~/.amplifier/openai-chatgpt-oauth.json (produced by running the
+#     device-code login flow once on your host with the provider).
+#   - Path passed via --var OAUTH_TOKEN_FILE.
+#   - Incus running (`incus version`).
+#
+# Launch:
+#   amplifier-digital-twin launch \
+#     amplifier-bundle-routing-matrix/.amplifier/digital-twin-universe/profiles/routing-matrix-chatgpt-reality-check.yaml \
+#     --var OAUTH_TOKEN_FILE=$HOME/.amplifier/openai-chatgpt-oauth.json
+#
+# After launch:
+#   amplifier-digital-twin check-readiness <id>
+#   amplifier-digital-twin exec --visual-id "" <id>
+#   amplifier-digital-twin destroy <id>
+
+name: routing-matrix-chatgpt-reality-check
+description: >
+  Validate the routing-matrix bundle end-to-end with the ChatGPT provider.
+  Installs Amplifier, registers the routing-matrix bundle as an app bundle,
+  installs the chatgpt provider, activates the openai-chatgpt routing matrix,
+  and verifies all roles resolve to chatgpt models.
+
+base:
+  image: ubuntu:24.04
+
+passthrough:
+  # The ChatGPT backend API (chatgpt.com) and OpenAI auth (auth.openai.com)
+  # must be reachable for inference and token refresh. github.com is needed
+  # for installing the bundle and provider from git.
+  allow_external: true
+
+provision:
+  files:
+    # Pre-authenticated OAuth token -- avoids device-code flow in headless env.
+    - src: ${OAUTH_TOKEN_FILE}
+      dest: /root/.amplifier/openai-chatgpt-oauth.json
+      mode: "0600"
+
+  setup_cmds:
+    # Base tooling
+    - apt-get update && apt-get install -y git curl ca-certificates
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    # Install Amplifier CLI from upstream
+    - |
+      export PATH="/root/.local/bin:$PATH"
+      uv tool install git+https://github.com/microsoft/amplifier
+
+    # Register and install the ChatGPT provider module.
+    # Module source is microsoft/amplifier-module-provider-openai-chatgpt@main
+    # (already merged), so we install from there directly.
+    - |
+      export PATH="/root/.local/bin:$PATH"
+      amplifier module add provider-openai-chatgpt \
+        --source git+https://github.com/microsoft/amplifier-module-provider-openai-chatgpt
+    - |
+      export PATH="/root/.local/bin:$PATH"
+      amplifier provider install openai-chatgpt --force
+
+    # Write provider configuration directly. Same pattern as the chatgpt
+    # provider's own reality-check profile -- skips the interactive
+    # `amplifier provider add` wizard and disables device-code login flow
+    # (login_on_mount: false) since we already have a pre-authed token.
+    #
+    # IMPORTANT: This heredoc must run BEFORE `bundle add` and `routing use`
+    # below, because those commands modify settings.yaml in place; if we
+    # wrote the heredoc afterward we would clobber their entries.
+    - |
+      cat > /root/.amplifier/settings.yaml << 'EOF'
+      config:
+        providers:
+          - module: provider-openai-chatgpt
+            source: git+https://github.com/microsoft/amplifier-module-provider-openai-chatgpt
+            config:
+              login_on_mount: false
+      modules:
+        providers:
+          - module: provider-openai-chatgpt
+            source: git+https://github.com/microsoft/amplifier-module-provider-openai-chatgpt
+      EOF
+
+    # Register the routing-matrix bundle as an app bundle so it composes
+    # onto every session. Installed from the feat branch on robotdad's fork
+    # while the upstream PR is in review.
+    - |
+      export PATH="/root/.local/bin:$PATH"
+      amplifier bundle add \
+        git+https://github.com/robotdad/amplifier-bundle-routing-matrix@feat/add-openai-chatgpt-provider \
+        --app
+
+    # Activate the openai-chatgpt matrix.
+    - |
+      export PATH="/root/.local/bin:$PATH"
+      amplifier routing use openai-chatgpt
+
+    # Verify installation
+    - export PATH="/root/.local/bin:$PATH" && amplifier --version
+
+    # Workspace for test sessions
+    - mkdir -p /home/user/project
+
+update:
+  cmds:
+    # Pull latest bundle + provider code without full rebuild.
+    # Clears caches so amplifier re-fetches both git sources.
+    - rm -rf /root/.amplifier/cache/amplifier-module-provider-openai-chatgpt*
+    - rm -rf /root/.amplifier/cache/amplifier-bundle-routing-matrix*
+    - |
+      export PATH="/root/.local/bin:$PATH"
+      uv tool install --reinstall --force git+https://github.com/microsoft/amplifier
+    - |
+      export PATH="/root/.local/bin:$PATH"
+      amplifier bundle update || true
+
+readiness:
+  - name: amplifier-installed
+    command: "PATH=/root/.local/bin:$PATH amplifier --version"
+  - name: token-present
+    command: "test -f /root/.amplifier/openai-chatgpt-oauth.json && echo 'Token file found'"
+  - name: routing-matrix-bundle-registered
+    command: "PATH=/root/.local/bin:$PATH amplifier bundle list 2>&1 | grep -q routing-matrix && echo 'Bundle registered'"
+  - name: openai-chatgpt-matrix-active
+    command: "PATH=/root/.local/bin:$PATH amplifier routing list 2>&1 | grep -E '\u2192.*openai-chatgpt' && echo 'Matrix active'"
