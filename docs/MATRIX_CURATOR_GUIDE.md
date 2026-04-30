@@ -67,6 +67,7 @@ Match the name the provider module registers under via `coordinator.mount(...)`
 | `openai` | `provider-openai` |
 | `gemini` | `provider-gemini`, `google` |
 | `ollama` | `provider-ollama` |
+| `openai-chatgpt` | `provider-openai-chatgpt` |
 | `github-copilot` | `provider-github-copilot` |
 
 > **Note (2026-04-22):** Earlier versions of this guide showed `google` for the

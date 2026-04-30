@@ -23,7 +23,7 @@
 
 name: quality
 description: "Best available models. Prioritizes capability over cost."
-updated: "2026-04-22"
+updated: "2026-04-29"
 
 roles:
   general:
@@ -32,6 +32,10 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-5.4
+        config:
+          reasoning_effort: low
+      - provider: openai-chatgpt
         model: gpt-5.4
         config:
           reasoning_effort: low
@@ -47,6 +51,8 @@ roles:
         model: claude-sonnet-*
       - provider: openai
         model: gpt-5.4
+      - provider: openai-chatgpt
+        model: gpt-5.4
       - provider: gemini
         model: gemini-*-flash-preview
       - provider: github-copilot
@@ -58,6 +64,10 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-5.4
+        config:
+          reasoning_effort: medium
+      - provider: openai-chatgpt
         model: gpt-5.4
         config:
           reasoning_effort: medium
@@ -75,6 +85,10 @@ roles:
         model: gpt-5.4
         config:
           reasoning_effort: medium
+      - provider: openai-chatgpt
+        model: gpt-5.4
+        config:
+          reasoning_effort: medium
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -89,6 +103,10 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
+        model: gpt-5.4
+        config:
+          reasoning_effort: high
+      - provider: openai-chatgpt
         model: gpt-5.4
         config:
           reasoning_effort: high
@@ -116,6 +134,10 @@ roles:
         model: gpt-?.?-pro*
         config:
           reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
       - provider: github-copilot
         model: claude-opus-4.6
         config:
@@ -131,6 +153,10 @@ roles:
           reasoning_effort: xhigh
       - provider: openai
         model: gpt-?.?-pro*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai-chatgpt
+        model: gpt-5.5
         config:
           reasoning_effort: xhigh
       - provider: gemini
@@ -151,6 +177,10 @@ roles:
         model: gpt-?.?-pro*
         config:
           reasoning_effort: low
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: low
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -163,6 +193,10 @@ roles:
         model: claude-opus-*
       - provider: openai
         model: gpt-?.?-pro*
+        config:
+          reasoning_effort: low
+      - provider: openai-chatgpt
+        model: gpt-5.5
         config:
           reasoning_effort: low
       - provider: gemini
@@ -181,6 +215,10 @@ roles:
         model: gpt-?.?-pro*
         config:
           reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
       - provider: gemini
         model: gemini-*-pro-preview
         config:
@@ -196,6 +234,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-5.4
+      - provider: openai-chatgpt
         model: gpt-5.4
       - provider: github-copilot
         model: claude-sonnet-4.6
@@ -213,6 +253,10 @@ roles:
         model: claude-opus-*
       - provider: openai
         model: gpt-?.?-pro*
+        config:
+          reasoning_effort: medium
+      - provider: openai-chatgpt
+        model: gpt-5.5
         config:
           reasoning_effort: medium
       - provider: gemini
