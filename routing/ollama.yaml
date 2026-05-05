@@ -1,0 +1,127 @@
+# Routing Matrix: ollama
+#
+# Ollama-only routing across TWO instances of the ollama provider:
+#
+#   - `provider: ollama`        — the default LOCAL instance (host = http://localhost:11434)
+#   - `provider: ollama-cloud`  — a SECOND instance pointing at Ollama Cloud
+#                                 (host = https://ollama.com, with api_key set)
+#
+# This matrix routes heavy reasoning roles to `ollama-cloud:gpt-oss:120b`
+# and falls back to local model globs (`llama3.2:*`, `qwen3-coder*`,
+# `deepseek-r1:*`, vision models) on the default local instance.
+#
+# To use this matrix, configure both instances in your providers list. See
+# `amplifier-module-provider-ollama` README "Mixed local + cloud (multi-instance)"
+# for a worked TOML example. Single-mode users (cloud-only or local-only) can
+# either configure only the instance they need (the other-instance candidates
+# will fall through to subsequent ones) or pick a different matrix.
+#
+# Required roles: "general" and "fast" must be defined in every matrix.
+#
+# Intentional omission: no `image-gen` role. Ollama does not generate images,
+# and unlike anthropic.yaml/openai.yaml the role-definitions skill's guidance
+# of "always include a non-image-gen fallback" cannot be satisfied here
+# because there's no Ollama-side fallback to provide. Consumers that need
+# image generation should compose with another matrix (e.g. balanced) or
+# add an explicit per-bundle image-gen routing override.
+#
+# See docs/MATRIX_CURATOR_GUIDE.md for schema details.
+
+name: ollama
+description: "Ollama-only routing across two instances (local + ollama-cloud). Routes heavy reasoning roles to gpt-oss:120b on Ollama Cloud; falls back to local model globs."
+updated: "2026-05-05"
+
+roles:
+  general:
+    description: "Versatile catch-all, no specialization needed"
+    candidates:
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+      - provider: ollama
+        model: "llama3.2:*"
+
+  fast:
+    description: "Quick utility tasks — parsing, classification, file ops, bulk work"
+    candidates:
+      - provider: ollama
+        model: "llama3.2:*"
+      - provider: ollama
+        model: "*"
+
+  coding:
+    description: "Code generation, implementation, debugging"
+    candidates:
+      - provider: ollama
+        model: "qwen3-coder*"
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+
+  ui-coding:
+    description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
+    candidates:
+      - provider: ollama
+        model: "qwen3-coder*"
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+
+  security-audit:
+    description: "Vulnerability assessment, attack surface analysis, code auditing"
+    candidates:
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+      - provider: ollama
+        model: "deepseek-r1:*"
+
+  reasoning:
+    description: "Deep architectural reasoning, system design, complex multi-step analysis"
+    candidates:
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+      - provider: ollama
+        model: "deepseek-r1:*"
+
+  critique:
+    description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
+    candidates:
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+      - provider: ollama
+        model: "deepseek-r1:*"
+
+  creative:
+    description: "Design direction, aesthetic judgment, high-quality creative output"
+    candidates:
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+
+  writing:
+    description: "Long-form content — documentation, marketing, case studies, storytelling"
+    candidates:
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+      - provider: ollama
+        model: "llama3.2:*"
+
+  research:
+    description: "Deep investigation, information synthesis across multiple sources"
+    candidates:
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+      - provider: ollama
+        model: "deepseek-r1:*"
+
+  critical-ops:
+    description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
+    candidates:
+      - provider: ollama-cloud
+        model: gpt-oss:120b
+      - provider: ollama
+        model: "deepseek-r1:*"
+
+  vision:
+    description: "Understanding visual input — screenshots, diagrams, UI mockups"
+    candidates:
+      - provider: ollama
+        model: "llava*"
+      - provider: ollama
+        model: "moondream*"
