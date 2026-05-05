@@ -6,7 +6,7 @@ The routing hook tries candidates top-to-bottom and uses the first that matches 
 
 ## Matrices
 
-Seven curated matrices ship with this bundle:
+Eight curated matrices ship with this bundle:
 
 | Matrix | When to use |
 |--------|-------------|
@@ -17,6 +17,7 @@ Seven curated matrices ship with this bundle:
 | **openai** | OpenAI models exclusively. |
 | **gemini** | Google Gemini models exclusively. |
 | **copilot** | GitHub Copilot-optimized. Balances multiplier costs, avoids the 30x fast-variant trap. |
+| **ollama** | Ollama across two instances: `ollama` (local) + `ollama-cloud` (Ollama Cloud). Routes heavy roles to `gpt-oss:120b` on cloud; local fallbacks. Requires both provider instances configured — see [provider README](https://github.com/microsoft/amplifier-module-provider-ollama#mixed-local--cloud-multi-instance). |
 
 Browse the matrix files directly in the [`routing/`](routing/) directory.
 
