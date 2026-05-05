@@ -171,7 +171,7 @@ For agents that need specific model capabilities beyond text.
 - **Model tier:** Heavy (Opus, gpt-5.5-pro, Gemini Pro)
 - **When to use:** The agent orchestrates infrastructure, manages deployments, verifies shadow environments, or performs operational tasks where failures cascade
 - **When NOT to use:** If the agent writes IaC as its primary activity (use `coding`). If it does quick operational checks (use `fast`)
-- **Example agents:** shadow-operator, shadow-smoke-test, container-operator
+- **Example agents:** setup-digital-twin, dtu-profile-builder, container-operator
 - **Example chains:** `[critical-ops, coding, general]`
 
 ---
