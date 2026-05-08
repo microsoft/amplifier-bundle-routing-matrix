@@ -12,7 +12,7 @@
 
 name: anthropic
 description: "Anthropic-only routing. All roles use Claude models exclusively."
-updated: "2026-04-22"
+updated: "2026-05-08"
 
 roles:
   general:
@@ -59,9 +59,9 @@ roles:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-opus-*
         config:
-          reasoning_effort: xhigh
+          reasoning_effort: high
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
@@ -74,9 +74,35 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-opus-*
+        config:
+          reasoning_effort: medium
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-*
+        config:
+          reasoning_effort: high
+
+  debugging:
+    description: "Hypothesis-driven debugging, incident analysis, session forensics"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-*
+        config:
+          reasoning_effort: high
+
+  orchestration:
+    description: "Root-session coordination, multi-agent task orchestration"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-*
+        config:
+          reasoning_effort: medium
+
+  evaluation:
+    description: "Comparing parallel agent outputs, judging quality across candidates"
     candidates:
       - provider: anthropic
         model: claude-opus-*
