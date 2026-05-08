@@ -24,7 +24,7 @@
 
 name: balanced
 description: "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team."
-updated: "2026-04-22"
+updated: "2026-05-08"
 
 roles:
   # ---------------------------------------------------------------------------
@@ -149,23 +149,25 @@ roles:
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
-      # Anthropic promoted above OpenAI per ordering rule (2026-04-22).
+      # Capability over thinking budget: Opus+high beats Sonnet+xhigh on critique
+      # quality (joi-90y, 2026-05-08). xhigh produces longer outputs of the
+      # same model class, not higher-quality outputs.
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-opus-*
         config:
-          reasoning_effort: xhigh
+          reasoning_effort: high
       - provider: openai
-        model: gpt-5.5
+        model: gpt-?.?-pro*
         config:
-          reasoning_effort: xhigh
+          reasoning_effort: high
       - provider: gemini
         model: gemini-*-pro-preview
         config:
-          reasoning_effort: xhigh
+          reasoning_effort: high
       - provider: github-copilot
-        model: gpt-5.5
+        model: claude-opus-4.6
         config:
-          reasoning_effort: xhigh
+          reasoning_effort: high
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
@@ -184,12 +186,20 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-opus-*
+        config:
+          reasoning_effort: medium
       - provider: openai
         model: gpt-5.5
+        config:
+          reasoning_effort: medium
       - provider: gemini
         model: gemini-*-pro-preview
+        config:
+          reasoning_effort: medium
       - provider: github-copilot
         model: claude-opus-4.6
+        config:
+          reasoning_effort: medium
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
@@ -210,6 +220,64 @@ roles:
         model: claude-opus-4.6
       - provider: anthropic
         model: claude-sonnet-*
+
+  debugging:
+    description: "Hypothesis-driven debugging, incident analysis, session forensics"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: gpt-?.?-pro*
+        config:
+          reasoning_effort: high
+      - provider: gemini
+        model: gemini-*-pro-preview
+        config:
+          reasoning_effort: high
+      - provider: github-copilot
+        model: claude-opus-4.6
+        config:
+          reasoning_effort: high
+
+  orchestration:
+    description: "Root-session coordination, multi-agent task orchestration"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-*
+        config:
+          reasoning_effort: medium
+      - provider: openai
+        model: gpt-?.?-pro*
+        config:
+          reasoning_effort: medium
+      - provider: gemini
+        model: gemini-*-pro-preview
+        config:
+          reasoning_effort: medium
+      - provider: github-copilot
+        model: claude-opus-4.6
+
+  evaluation:
+    description: "Comparing parallel agent outputs, judging quality across candidates"
+    candidates:
+      - provider: anthropic
+        model: claude-opus-*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: gpt-?.?-pro*
+        config:
+          reasoning_effort: high
+      - provider: gemini
+        model: gemini-*-pro-preview
+        config:
+          reasoning_effort: high
+      - provider: github-copilot
+        model: claude-opus-4.6
+        config:
+          reasoning_effort: high
 
   # ---------------------------------------------------------------------------
   # Capability Roles
