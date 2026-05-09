@@ -36,6 +36,7 @@ def _make_coordinator(
         coordinator.config = {"agents": {}}
 
     coordinator.get_capability = MagicMock(return_value=None)
+    coordinator.register_capability = MagicMock()
 
     if has_hooks:
         coordinator.hooks = MagicMock()
@@ -80,6 +81,23 @@ def _write_matrix(tmp_path: Path, name: str = "balanced") -> Path:
 
 # ---------------------------------------------------------------------------
 # mount() tests
+
+
+def _get_resolver(coordinator: Any) -> Any:
+    """Pull the registered ``model_role_resolver`` off a mocked coordinator.
+
+    Mount registers the resolver via ``coordinator.register_capability(
+    "model_role_resolver", resolver)``. Tests inspect the resolver's
+    ``.name`` and (private) ``._matrix_roles`` for the same shape checks
+    that previously read ``_get_resolver(coordinator)``.
+    """
+    for call in coordinator.register_capability.call_args_list:
+        if call.args and call.args[0] == "model_role_resolver":
+            return call.args[1]
+    raise AssertionError(
+        "model_role_resolver capability was not registered; calls=%r"
+        % (coordinator.register_capability.call_args_list,)
+    )
 # ---------------------------------------------------------------------------
 
 
@@ -213,18 +231,18 @@ class TestMount:
         )
 
         # The effective matrix should have the override applied to "fast"
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["roles"]["fast"]["candidates"] == [
+        stored = _get_resolver(coordinator)
+        assert stored._matrix_roles["fast"]["candidates"] == [
             {"provider": "anthropic", "model": "claude-haiku-3"},
         ]
         # "general" should remain unchanged from the base matrix
-        assert stored["roles"]["general"]["candidates"] == [
+        assert stored._matrix_roles["general"]["candidates"] == [
             {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
         ]
 
     @pytest.mark.asyncio
-    async def test_mount_stores_session_state(self, tmp_path: Path) -> None:
-        """Mount stores routing matrix info in session_state."""
+    async def test_mount_registers_resolver_capability(self, tmp_path: Path) -> None:
+        """Mount registers a model_role_resolver capability with the matrix data."""
         bundle_root = tmp_path / "bundle"
         routing_dir = bundle_root / "routing"
         routing_dir.mkdir(parents=True)
@@ -252,9 +270,8 @@ class TestMount:
             config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
         )
 
-        assert "routing_matrix" in coordinator.session_state
-        assert coordinator.session_state["routing_matrix"]["name"] == "balanced"
-        assert "general" in coordinator.session_state["routing_matrix"]["roles"]
+        assert _get_resolver(coordinator).name == "balanced"
+        assert "general" in _get_resolver(coordinator)._matrix_roles
 
 
 # ---------------------------------------------------------------------------
@@ -422,9 +439,8 @@ class TestCustomMatrixFallback:
             )
 
         # Session state must be populated — routing was NOT disabled
-        assert "routing_matrix" in coordinator.session_state
-        assert coordinator.session_state["routing_matrix"]["name"] == "balanced-custom"
-        assert "general" in coordinator.session_state["routing_matrix"]["roles"]
+        assert _get_resolver(coordinator).name == "balanced-custom"
+        assert "general" in _get_resolver(coordinator)._matrix_roles
 
     @pytest.mark.asyncio
     async def test_mount_prefers_user_dir_over_bundle_matrix(
@@ -477,8 +493,8 @@ class TestCustomMatrixFallback:
             )
 
         # User custom dir should win over bundle cache
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["roles"]["general"]["candidates"][0]["provider"] == "anthropic"
+        stored = _get_resolver(coordinator)
+        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "anthropic"
 
 class TestProviderRequestHook:
     @pytest.mark.asyncio
@@ -583,11 +599,10 @@ class TestProjectScopedDiscovery:
                     },
                 )
 
-        assert "routing_matrix" in coordinator.session_state
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["name"] == "balanced"
-        assert "general" in stored["roles"]
-        assert stored["roles"]["general"]["candidates"][0]["provider"] == "project-llm"
+        stored = _get_resolver(coordinator)
+        assert stored.name == "balanced"
+        assert "general" in stored._matrix_roles
+        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "project-llm"
 
     @pytest.mark.asyncio
     async def test_project_beats_user_global(
@@ -653,8 +668,8 @@ class TestProjectScopedDiscovery:
                 )
 
         # Project must win — NOT user-global
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["roles"]["general"]["candidates"][0]["provider"] == "project-provider"
+        stored = _get_resolver(coordinator)
+        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "project-provider"
 
     @pytest.mark.asyncio
     async def test_project_beats_bundle(
@@ -714,8 +729,8 @@ class TestProjectScopedDiscovery:
                 )
 
         # Project must shadow bundle
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["roles"]["general"]["candidates"][0]["provider"] == "project-provider"
+        stored = _get_resolver(coordinator)
+        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "project-provider"
 
     @pytest.mark.asyncio
     async def test_graceful_fallback_when_no_project_matrix(
@@ -761,9 +776,8 @@ class TestProjectScopedDiscovery:
                     },
                 )
 
-        assert "routing_matrix" in coordinator.session_state
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["roles"]["general"]["candidates"][0]["provider"] == "bundle-provider"
+        stored = _get_resolver(coordinator)
+        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "bundle-provider"
 
     @pytest.mark.asyncio
     async def test_filename_mismatch_falls_through(
@@ -825,8 +839,8 @@ class TestProjectScopedDiscovery:
                 )
 
         # Falls through project (filename mismatch) and user-global (absent) to bundle
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["roles"]["general"]["candidates"][0]["provider"] == "bundle-provider"
+        stored = _get_resolver(coordinator)
+        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "bundle-provider"
 
     @pytest.mark.asyncio
     async def test_cwd_subdirectory_misses_project_matrix_and_warns(
@@ -890,4 +904,4 @@ class TestProjectScopedDiscovery:
         assert any("Matrix file not found" in msg for msg in warning_messages)
 
         # Routing is disabled — roles dict is empty
-        assert coordinator.session_state["routing_matrix"]["roles"] == {}
+        assert _get_resolver(coordinator)._matrix_roles == {}
