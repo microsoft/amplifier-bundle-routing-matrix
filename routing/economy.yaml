@@ -22,7 +22,7 @@
 
 name: economy
 description: "Cost-optimized routing. Prefers free tiers and budget models."
-updated: "2026-04-22"
+updated: "2026-04-29"
 
 roles:
   general:
@@ -31,6 +31,8 @@ roles:
       - provider: anthropic
         model: claude-haiku-*
       - provider: openai
+        model: gpt-?.?-mini*
+      - provider: openai-chatgpt
         model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-lite-preview
@@ -50,6 +52,8 @@ roles:
         model: gpt-?.?-nano*
       - provider: openai
         model: gpt-?.?-mini*
+      - provider: openai-chatgpt
+        model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-lite-preview
       - provider: gemini
@@ -68,6 +72,8 @@ roles:
         model: claude-haiku-*
       - provider: openai
         model: gpt-?.?-mini*
+      - provider: openai-chatgpt
+        model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-preview
       - provider: github-copilot
@@ -82,6 +88,8 @@ roles:
         model: claude-haiku-*
       - provider: openai
         model: gpt-?.?-mini*
+      - provider: openai-chatgpt
+        model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-preview
       - provider: github-copilot
@@ -95,6 +103,10 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
+      - provider: openai-chatgpt
         model: gpt-5.5
         config:
           reasoning_effort: high
@@ -113,6 +125,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-5.5
+      - provider: openai-chatgpt
         model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
@@ -133,6 +147,10 @@ roles:
         model: gpt-5.5
         config:
           reasoning_effort: xhigh
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: xhigh
       - provider: gemini
         model: gemini-*-pro-preview
         config:
@@ -149,6 +167,8 @@ roles:
         model: claude-sonnet-*
       - provider: openai
         model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -161,6 +181,8 @@ roles:
         model: claude-sonnet-*
       - provider: openai
         model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -172,6 +194,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-5.5
+      - provider: openai-chatgpt
         model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
@@ -190,6 +214,8 @@ roles:
         model: claude-haiku-*
       - provider: openai
         model: gpt-?.?-mini*
+      - provider: openai-chatgpt
+        model: gpt-?.?-mini*
 
   image-gen:
     description: "Image generation, visual mockup creation, visual ideation"
@@ -203,6 +229,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-5.5
+      - provider: openai-chatgpt
         model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview

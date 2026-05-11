@@ -24,7 +24,7 @@
 
 name: balanced
 description: "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team."
-updated: "2026-04-22"
+updated: "2026-04-29"
 
 roles:
   # ---------------------------------------------------------------------------
@@ -37,6 +37,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-5.5
+      - provider: openai-chatgpt
         model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
@@ -53,6 +55,8 @@ roles:
       - provider: anthropic
         model: claude-haiku-*
       - provider: openai
+        model: gpt-?.?-mini*
+      - provider: openai-chatgpt
         model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-preview
@@ -74,6 +78,8 @@ roles:
         model: claude-sonnet-*
       - provider: openai
         model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -89,6 +95,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-5.5
+      - provider: openai-chatgpt
         model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
@@ -106,6 +114,10 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
+      - provider: openai-chatgpt
         model: gpt-5.5
         config:
           reasoning_effort: high
@@ -133,6 +145,10 @@ roles:
         model: gpt-?.?-pro*
         config:
           reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
       - provider: gemini
         model: gemini-*-pro-preview
         config:
@@ -145,6 +161,8 @@ roles:
         model: claude-sonnet-*
       - provider: openai
         model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.5
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
@@ -155,6 +173,10 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: openai
+        model: gpt-5.5
+        config:
+          reasoning_effort: xhigh
+      - provider: openai-chatgpt
         model: gpt-5.5
         config:
           reasoning_effort: xhigh
@@ -174,6 +196,8 @@ roles:
         model: claude-opus-*
       - provider: openai
         model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -185,6 +209,8 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
+        model: gpt-5.5
+      - provider: openai-chatgpt
         model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
@@ -200,6 +226,10 @@ roles:
           reasoning_effort: high
       - provider: openai
         model: gpt-?.?-pro*
+        config:
+          reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-5.5
         config:
           reasoning_effort: high
       - provider: gemini
@@ -226,6 +256,8 @@ roles:
         model: claude-sonnet-*
       - provider: openai
         model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.5
       - provider: github-copilot
         model: gpt-5.5
       - provider: github-copilot
@@ -250,6 +282,8 @@ roles:
         model: claude-opus-*
       - provider: openai
         model: gpt-?.?-pro*
+      - provider: openai-chatgpt
+        model: gpt-5.5
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot

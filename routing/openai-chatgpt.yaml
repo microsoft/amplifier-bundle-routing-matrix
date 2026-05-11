@@ -1,0 +1,191 @@
+# Routing Matrix: openai-chatgpt
+#
+# Default routing for the openai-chatgpt provider (ChatGPT Plus / Pro / Team /
+# Enterprise via Codex auth flow). Selected automatically when this provider
+# is the sole/active provider; can be selected explicitly with
+# `--routing openai-chatgpt`.
+#
+# Catalog (as of 2026-04, from /backend-api/codex/models):
+#   gpt-5.5        — priority 0,  supports -fast, reasoning low/med/high/xhigh
+#   gpt-5.4        — priority 2,  supports -fast, reasoning low/med/high/xhigh
+#   gpt-5.4-mini   — priority 4,  no -fast,       reasoning low/med/high/xhigh
+#   gpt-5.3-codex  — priority 6,  no -fast,       reasoning low/med/high/xhigh
+#   gpt-5.2        — priority 10, no -fast,       reasoning low/med/high/xhigh
+#                    (intentionally excluded from fallbacks: Plus+ always exposes gpt-5.4 minimum)
+#   codex-auto-review — hidden, internal
+#
+# Differences from the standard OpenAI API catalog (routing/openai.yaml):
+#   - No `gpt-?.?-pro*` tier. Reasoning-heavy roles use gpt-5.5 + reasoning_effort:high
+#     instead of a separate pro model. All gpt-5.x models expose the same
+#     reasoning_effort dial, so the capability is preserved.
+#   - No `gpt-image-*`. The image-gen role degrades to prompt-crafting / SVG
+#     generation on the strongest available model. For real image synthesis,
+#     use the standard openai provider or a dedicated image module.
+#   - No dedicated vision-only model. Every gpt-5.x model accepts image input
+#     natively (input_modalities: ["text", "image"]).
+#
+# Glob strategy:
+#   - `gpt-?.?-mini*`  auto-tracks future mini variants (currently gpt-5.4-mini)
+#   - `gpt-?.?-codex*` auto-tracks future codex variants (currently gpt-5.3-codex)
+#   - Base models (`gpt-5.5`, `gpt-5.4`) are pinned and bumped manually on minor
+#     releases — `gpt-5.4*` would incorrectly match the suffix variants.
+#   - `?` matches exactly one character — `gpt-5.10-mini` would NOT match
+#     `gpt-?.?-mini*`. If double-digit minor versions arrive, bump to `gpt-?.*-mini*`.
+#
+# Fallback chain:
+#   Every role lists gpt-5.5 first and gpt-5.4 second. If a subscription tier
+#   does not yet expose gpt-5.5, the resolver falls through to gpt-5.4 without
+#   silent failure. Bump gpt-5.5 → gpt-5.6 (and gpt-5.4 → gpt-5.5) when
+#   the next minor lands and rotates through the catalog.
+#
+# Note on the `-fast` suffix:
+#   gpt-5.5 and gpt-5.4 support a `-fast` suffix that maps to
+#   service_tier: "priority" in the request payload. We deliberately do NOT
+#   apply `-fast` here — it consumes priority quota faster, and users who want
+#   it can opt in per-call or via a personal override matrix. The `fast` role
+#   uses gpt-?.?-mini* (which is fast by virtue of being smaller), not
+#   gpt-5.5-fast (which is fast by virtue of priority service tier).
+
+name: openai-chatgpt
+description: "OpenAI ChatGPT backend (Codex auth) — gpt-5.x models via the ChatGPT API."
+updated: "2026-04-24"
+
+roles:
+  general:
+    description: "Versatile catch-all, no specialization needed"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.4
+
+  fast:
+    description: "Quick utility tasks — parsing, classification, file ops, bulk work"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-?.?-mini*
+      - provider: openai-chatgpt
+        model: gpt-5.4
+      - provider: openai-chatgpt   # safety net during model rotation window
+        model: gpt-5.5
+
+  coding:
+    description: "Code generation, implementation, debugging"
+    candidates:
+      # Codex-tuned models are purpose-built for coding — prefer them when present.
+      - provider: openai-chatgpt
+        model: gpt-?.?-codex*
+      - provider: openai-chatgpt
+        model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.4
+
+  ui-coding:
+    description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
+    candidates:
+      # UI work benefits from vision + general intelligence more than codex tuning.
+      - provider: openai-chatgpt
+        model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.4
+
+  security-audit:
+    description: "Vulnerability assessment, attack surface analysis, code auditing"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-5.4
+        config:
+          reasoning_effort: high
+
+  reasoning:
+    description: "Deep architectural reasoning, system design, complex multi-step analysis"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-5.4
+        config:
+          reasoning_effort: high
+
+  critique:
+    # xhigh (not high): critique requires adversarial deliberation — maximum effort
+    # surfaces non-obvious flaws that high stops short of challenging.
+    description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: xhigh
+      - provider: openai-chatgpt
+        model: gpt-5.4
+        config:
+          reasoning_effort: xhigh
+
+  creative:
+    description: "Design direction, aesthetic judgment, high-quality creative output"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.4
+
+  writing:
+    description: "Long-form content — documentation, marketing, case studies, storytelling"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.4
+
+  research:
+    description: "Deep investigation, information synthesis across multiple sources"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-5.4
+        config:
+          reasoning_effort: high
+
+  vision:
+    # All gpt-5.x models accept image input. No separate vision-tier needed.
+    description: "Understanding visual input — screenshots, diagrams, UI mockups"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.4
+
+  image-gen:
+    # The ChatGPT backend does not expose image generation through this
+    # provider. Falls back to the strongest general model for image planning,
+    # prompt crafting, and SVG/ASCII generation. For true image synthesis,
+    # use the standard `openai` provider (gpt-image-*) or a dedicated image
+    # module. Mapped (not omitted) so agents declaring model_role: image-gen
+    # resolve to *something* instead of failing the routing hook.
+    description: "Image generation (degraded — no native ChatGPT image API; produces prompts/SVG)"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+      - provider: openai-chatgpt
+        model: gpt-5.4
+
+  critical-ops:
+    description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
+    candidates:
+      - provider: openai-chatgpt
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-5.4
+        config:
+          reasoning_effort: high
