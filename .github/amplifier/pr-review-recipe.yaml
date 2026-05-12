@@ -1,0 +1,52 @@
+name: PR Review
+version: 1.0.0
+description: >
+  Review a new pull request and post a structured comment with findings.
+  The comment is the primary output delivered to the author.
+
+steps:
+  - id: review
+    type: agent
+    description: Review the PR and post a structured findings comment
+    instruction: |
+      You are reviewing pull request #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
+
+      PR title: {{ context.title }}
+      PR description:
+      {{ context.body }}
+      Author: {{ context.author }}
+      Base branch: {{ context.base_ref }}
+      Head branch: {{ context.head_ref }}
+
+      Use the tool-filesystem to read the changed files in full. The diff is a starting
+      point — read the full file for each change, and read related files (callers,
+      tests, interfaces) to understand context. Do not review from the diff alone.
+
+      Apply these checks in order:
+
+      1. Necessity: What is the concrete problem this PR solves? What can't we do without it?
+         Is this the right time for this change?
+
+      2. Layer fit: Is this change in the right repository and at the right layer?
+         A change that touches multiple unrelated layers is a smell.
+
+      3. Pattern: What pattern does this change enable or establish?
+         Is that pattern fully supported end-to-end? Documented?
+
+      4. Correctness: Are there bugs, logic errors, or edge cases not handled?
+         Cite the exact file and line for every concern you raise.
+
+      5. Calibration: Only raise concerns you can support with evidence from the code.
+         Do not flag style preferences. Do not speculate. Be direct.
+
+      After applying all five checks, use the github_post_comment tool to post a comment
+      on PR #{{ context.number }} in repository {{ context.owner }}/{{ context.repo }}.
+
+      The comment format:
+      - **Summary** (2-3 sentences): what this PR does and why
+      - **Verdict**: approve | approve-with-fixes | hold-for-design | needs-more-context
+      - **Findings** (if any): bulleted list, each with file:line citation
+      - **Open questions** (if any): things that need human judgment, not more analysis
+
+      The comment is the output that reaches the author. Every finding must be
+      traceable to a specific line in the code. No hallucinated claims.

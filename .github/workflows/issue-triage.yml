@@ -1,5 +1,6 @@
-# Issue Triage — powered by amplifier-app-actions
-# Automatically triages new issues: classifies type, adds a label, posts a comment.
+# Issue Triage — powered by kenotron-ms/amplifier-app-actions
+# Runs a structured triage recipe when a new issue is opened.
+# Output: a comment on the issue with classification and next steps.
 # Docs: https://github.com/kenotron-ms/amplifier-app-actions
 name: Issue Triage
 
@@ -19,14 +20,7 @@ jobs:
 
       - uses: kenotron-ms/amplifier-app-actions@v1
         with:
-          mode: prompt
-          prompt: |
-            You are triaging a new GitHub issue.
-
-            Review the issue title and body. Then:
-            1. Classify the issue type and add the appropriate label: bug, feature-request, question, or documentation
-            2. Post a comment that acknowledges the issue, confirms its type, and briefly describes what happens next
-
-            Be concise. Do not speculate about causes or promise timelines.
+          mode: recipe
+          recipe_path: .github/amplifier/triage-recipe.yaml
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

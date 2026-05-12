@@ -1,0 +1,47 @@
+name: Issue Triage
+version: 1.0.0
+description: >
+  Classify a new GitHub issue, add a label, and post an acknowledgment comment.
+  The comment is the primary output delivered to the user.
+
+steps:
+  - id: classify
+    type: agent
+    description: Classify the issue type, severity, and appropriate label
+    instruction: |
+      You are triaging GitHub issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
+
+      Issue title: {{ context.title }}
+      Issue body:
+      {{ context.body }}
+      Author: {{ context.author }}
+
+      Read the issue carefully. Then:
+
+      1. Classify the issue type:
+         - bug: something that is broken or behaving unexpectedly
+         - feature-request: a request for new capability
+         - question: asking how something works
+         - documentation: a gap or error in the docs
+
+      2. Assess severity (bugs only):
+         - critical: blocks all users, no workaround
+         - high: significant impact, workaround exists
+         - medium: moderate impact
+         - low: minor or cosmetic
+
+      3. Determine the single best label to apply based on the classification.
+
+      4. Use the github_add_label tool to add that label to issue #{{ context.number }}
+         in repository {{ context.owner }}/{{ context.repo }}.
+
+      5. Use the github_post_comment tool to post a comment on issue #{{ context.number }}
+         in repository {{ context.owner }}/{{ context.repo }}.
+
+         The comment must:
+         - Acknowledge the issue was received
+         - State its classification in plain language
+         - Describe what happens next (who will look at it, what the process is)
+         - Be 3-5 sentences. No filler. No speculation. No timeline promises.
+
+      The comment is the output that reaches the user. Make it count.
