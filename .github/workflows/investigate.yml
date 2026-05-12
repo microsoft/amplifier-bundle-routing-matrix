@@ -1,0 +1,49 @@
+# Tier 2 investigation — powered by kenotron-ms/amplifier-app-actions
+#
+# Triggered by two paths — both evaluated by GitHub Actions if: conditions.
+# main.py never sees the command or label name. By the time the action runs,
+# GitHub has already decided the gate passed.
+#
+# Path A: /investigate comment from a trusted contributor
+# Path B: needs-investigation label applied (typically by Tier 1 triage)
+#
+# Docs: https://github.com/kenotron-ms/amplifier-app-actions
+
+name: Investigate
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  investigate:
+    # GitHub evaluates this condition — not the action.
+    # author_association is set by GitHub based on the commenter's repo relationship.
+    if: |
+      (
+        github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '/investigate') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+                 github.event.comment.author_association)
+      ) || (
+        github.event_name == 'issues' &&
+        github.event.label.name == 'needs-investigation'
+      )
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: kenotron-ms/amplifier-app-actions@v1
+        with:
+          mode: recipe
+          recipe_path: .github/amplifier/investigate-recipe.yaml
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
