@@ -1,0 +1,33 @@
+# PR Review — powered by amplifier-app-actions
+# Automatically reviews new pull requests: summarizes changes, flags concerns, posts findings.
+# Docs: https://github.com/kenotron-ms/amplifier-app-actions
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: kenotron-ms/amplifier-app-actions@v1
+        with:
+          mode: prompt
+          prompt: |
+            You are reviewing a new pull request.
+
+            Review the changed files and the PR description. Post a comment that:
+            1. Summarizes what this PR changes and why, in 2-3 sentences
+            2. Lists any bugs, logic errors, or security concerns — be specific, cite file and line where possible
+            3. Notes any improvements that would strengthen the PR
+
+            Be direct. Focus detail on concerns. Do not block on style preferences.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
