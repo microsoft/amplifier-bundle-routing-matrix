@@ -1,47 +1,109 @@
 name: Issue Triage
 version: 1.0.0
 description: >
-  Classify a new GitHub issue, add a label, and post an acknowledgment comment.
+  Structured issue triage in four steps: classify the issue, investigate relevant
+  code across repos, attempt reproduction if needed, then post findings as a comment.
   The comment is the primary output delivered to the user.
 
 steps:
   - id: classify
     type: agent
-    description: Classify the issue type, severity, and appropriate label
+    description: Classify the issue type and severity, add the appropriate label
     instruction: |
-      You are triaging GitHub issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
+      Classify GitHub issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
 
-      Issue title: {{ context.title }}
-      Issue body:
+      Title: {{ context.title }}
+      Body:
       {{ context.body }}
       Author: {{ context.author }}
 
-      Read the issue carefully. Then:
+      Determine:
+      1. Issue type: bug | feature-request | question | documentation
+      2. Severity (bugs only): critical | high | medium | low
+      3. Whether the issue contains clear reproduction steps: true | false
 
-      1. Classify the issue type:
-         - bug: something that is broken or behaving unexpectedly
-         - feature-request: a request for new capability
-         - question: asking how something works
-         - documentation: a gap or error in the docs
+      Use github_add_label to add the classification label.
 
-      2. Assess severity (bugs only):
-         - critical: blocks all users, no workaround
-         - high: significant impact, workaround exists
-         - medium: moderate impact
-         - low: minor or cosmetic
+      Respond only with valid JSON:
+      {"type": "...", "severity": "...", "has_repro_steps": true}
+    parse_json: true
 
-      3. Determine the single best label to apply based on the classification.
+  - id: investigate
+    type: agent
+    depends_on: [classify]
+    description: Identify relevant repos from the ecosystem, clone them, read the code
+    instruction: |
+      You are investigating a {{ classify.type }} in {{ context.owner }}/{{ context.repo }}.
 
-      4. Use the github_add_label tool to add that label to issue #{{ context.number }}
-         in repository {{ context.owner }}/{{ context.repo }}.
+      Issue: {{ context.title }}
+      {{ context.body }}
 
-      5. Use the github_post_comment tool to post a comment on issue #{{ context.number }}
-         in repository {{ context.owner }}/{{ context.repo }}.
+      Using the ecosystem map available to you:
+      1. Identify which repos in the Amplifier ecosystem are relevant to this issue.
+         Do not guess — trace the issue to specific components.
+      2. For each relevant repo, use github_checkout_repo to clone it.
+         Specify the owner, repo name, and if the issue references a branch or commit, use that ref.
+      3. Read the relevant files in full using tool-filesystem.
+         Read callers, implementations, and related tests — not just the file mentioned.
+      4. Form a hypothesis about the root cause or the gap this issue reveals.
 
-         The comment must:
-         - Acknowledge the issue was received
-         - State its classification in plain language
-         - Describe what happens next (who will look at it, what the process is)
-         - Be 3-5 sentences. No filler. No speculation. No timeline promises.
+      Respond only with valid JSON:
+      {"relevant_repos": ["owner/repo@ref"], "hypothesis": "...", "confidence": "high|medium|low", "needs_reproduction": true}
+    parse_json: true
 
-      The comment is the output that reaches the user. Make it count.
+  - id: reproduce
+    type: agent
+    depends_on: [investigate]
+    condition: "{{ classify.type == 'bug' and classify.has_repro_steps and investigate.needs_reproduction }}"
+    description: Attempt to reproduce the issue in an isolated Digital Twin environment
+    instruction: |
+      Attempt to reproduce issue #{{ context.number }}.
+
+      Hypothesis: {{ investigate.hypothesis }}
+      Repos involved: {{ investigate.relevant_repos }}
+      Reproduction steps from the issue:
+      {{ context.body }}
+
+      Use the launch_dtu tool to create an isolated environment:
+      - Include the relevant repos listed above at the specified refs
+      - Enable GH_TOKEN network passthrough so the container can access GitHub
+      - For any repo with in-progress local changes, mirror to Gitea first
+
+      Inside the DTU, run the reproduction steps exactly as written in the issue.
+      Capture the full output — including any error messages, stack traces, or unexpected behavior.
+
+      Respond only with valid JSON:
+      {"reproduced": true, "output": "exact output here", "conclusion": "..."}
+    parse_json: true
+
+  - id: report
+    type: agent
+    depends_on: [classify, investigate, reproduce]
+    description: Post a structured findings comment on the issue
+    instruction: |
+      Post a structured triage comment on issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
+
+      Use github_post_comment with this structure:
+
+      **Classification**: {{ classify.type }}{% if classify.severity %} — {{ classify.severity }}{% endif %}
+
+      **Investigation**
+      Repos examined: {{ investigate.relevant_repos }}
+      {{ investigate.hypothesis }}
+      Confidence: {{ investigate.confidence }}
+
+      {% if reproduce %}
+      **Reproduction**
+      Reproduced: {{ reproduce.reproduced }}
+      {{ reproduce.conclusion }}
+      Output:
+      ```
+      {{ reproduce.output }}
+      ```
+      {% endif %}
+
+      **Next steps**
+      [State clearly what a human should do: assign to a component owner, request more info,
+      escalate for design review, or close as not reproducible. Be specific.]
+
+      Every claim must reference a specific file and line. No speculation.
