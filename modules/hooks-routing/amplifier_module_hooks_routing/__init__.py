@@ -97,12 +97,21 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         if capability_overrides:
             effective_matrix = compose_matrix(effective_matrix, capability_overrides)
 
-    # --- Store in session state (modes pattern) ---
-    if hasattr(coordinator, "session_state"):
-        coordinator.session_state["routing_matrix"] = {
-            "name": base_matrix.get("name", default_matrix_name),
-            "roles": effective_matrix,
-        }
+    # --- Register the model_role_resolver capability ---
+    # Generic capability key. Other routing strategies (cost-aware, latency-aware,
+    # availability-aware, etc.) may register their own implementation under the
+    # same key; only one is active per session. Consumers (tool-delegate,
+    # hooks-session-naming, tool-recipes, tool-skills) duck-type against the
+    # async ``.resolve(role) -> list[ProviderPreference]`` contract.
+    from .resolver_class import MatrixModelRoleResolver
+
+    resolver = MatrixModelRoleResolver(
+        matrix_roles=effective_matrix,
+        providers=coordinator.get("providers") or {},
+        matrix_name=base_matrix.get("name", default_matrix_name),
+    )
+    if hasattr(coordinator, "register_capability"):
+        coordinator.register_capability("model_role_resolver", resolver)
 
     # ------------------------------------------------------------------
     # Hook 1: session:start — resolve model_role for all agents
