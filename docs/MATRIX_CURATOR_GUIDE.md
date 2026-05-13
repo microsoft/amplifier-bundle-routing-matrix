@@ -20,7 +20,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
-        model: gpt-5.4
+        model: "gpt-[0-9].[0-9]"
 
   fast:
     description: "Quick parsing, classification, utility work"
@@ -100,7 +100,7 @@ config:
       config:
         base_url: https://api.openai.com/v1
         api_key: ${OPENAI_API_KEY}
-        default_model: gpt-5.4
+        default_model: gpt-5.5
 ```
 
 In a matrix, **reference a specific instance by its id** as the `provider:`
@@ -115,9 +115,9 @@ roles:
   reasoning:
     candidates:
       - provider: openai-main         # matches coordinator key "openai-main"
-        model: gpt-?.?-pro*
+        model: "gpt-[0-9].[0-9]"
         config:
-          reasoning_effort: high
+          reasoning_effort: xhigh
 ```
 
 How it works: the `id:` in settings.yaml is mapped to the kernel's
@@ -181,7 +181,7 @@ The optional `config` map is passed directly to the provider's session configura
     reasoning_effort: high
 
 - provider: openai
-  model: gpt-5.4
+  model: "gpt-[0-9].[0-9]"
   config:
     reasoning_effort: high
 ```
@@ -210,7 +210,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-4-6
       - provider: openai
-        model: gpt-5.4
+        model: "gpt-[0-9].[0-9]"
 ```
 
 2. Update the context file (`context/routing-instructions.md`) to mention the new role so agents know it exists.
@@ -277,19 +277,19 @@ The routing system defines 13 roles organized into 5 categories. For full descri
 
 | # | Role | Category | Model Tier | Reasoning | Description |
 |---|------|----------|------------|-----------|-------------|
-| 1 | `general` | Foundation | Mid (Sonnet, gpt-5.4) | default | Versatile catch-all, no specialization needed |
+| 1 | `general` | Foundation | Mid (Sonnet, GPT base) | default | Versatile catch-all, no specialization needed |
 | 2 | `fast` | Foundation | Cheap (Haiku, gpt-5-mini) | default | Quick utility tasks — parsing, classification, file ops |
 | 3 | `coding` | Coding | Mid, code-specialized | default | Code generation, implementation, debugging |
 | 4 | `ui-coding` | Coding | Mid, code-specialized | default | Frontend/UI code — components, layouts, styling |
-| 5 | `security-audit` | Coding | Mid, code-specialized | high | Vulnerability assessment, attack surface analysis |
-| 6 | `reasoning` | Cognitive | Heavy (Opus, gpt-5.4) | high | Deep architectural reasoning, system design |
+| 5 | `security-audit` | Coding | Mid, code-specialized | xhigh | Vulnerability assessment, attack surface analysis |
+| 6 | `reasoning` | Cognitive | Heavy (Opus, GPT base) | xhigh | Deep architectural reasoning, system design |
 | 7 | `critique` | Cognitive | Mid | extra-high | Analytical evaluation — finding flaws in existing work |
-| 8 | `creative` | Cognitive | Heavy (Opus, gpt-5.4) | default | Design direction, aesthetic judgment |
-| 9 | `writing` | Cognitive | Heavy (Opus, gpt-5.4) | default | Long-form content — docs, marketing, case studies |
-| 10 | `research` | Cognitive | Heavy (Opus, gpt-5.4-pro) | high | Deep investigation, information synthesis |
+| 8 | `creative` | Cognitive | Heavy (Opus, GPT base) | default | Design direction, aesthetic judgment |
+| 9 | `writing` | Cognitive | Heavy (Opus, GPT base) | default | Long-form content — docs, marketing, case studies |
+| 10 | `research` | Cognitive | Heavy (Opus, GPT base) | high | Deep investigation, information synthesis |
 | 11 | `vision` | Capability | Mid, multimodal | default | Understanding visual input — screenshots, diagrams |
 | 12 | `image-gen` | Capability | Specialized | default | Image generation, visual mockup creation |
-| 13 | `critical-ops` | Operational | Heavy (Opus, gpt-5.4) | default | High-reliability operational tasks — infrastructure, orchestration |
+| 13 | `critical-ops` | Operational | Heavy (Opus, GPT base) | high | High-reliability operational tasks — infrastructure, orchestration |
 
 ---
 
@@ -361,25 +361,22 @@ Avoid them outside of `model: "*"` for user-managed providers like Ollama.
 | `gemini-*-pro-preview` | Pro-tier previews, any generation | Flash, Flash-Lite, Image, `*-customtools` |
 | `gemini-*-flash-preview` | Flash-tier previews | Flash-Lite, Image, TTS |
 | `gemini-*-flash-lite-preview` | Flash-Lite-tier previews | Flash, TTS |
+| `gpt-[0-9].[0-9]` | any single-digit major.minor base (e.g. `gpt-5.5`, `gpt-6.0`) | all suffix variants (-mini, -pro, -nano), dated snapshots |
 | `gpt-?.?-mini*` | any dotted-version mini (e.g. `gpt-5.4-mini`) | base, pro, nano, `gpt-5-mini` (no dot) |
-| `gpt-?.?-pro*` | any dotted-version pro | base, mini, nano |
 | `gpt-?.?-nano*` | any dotted-version nano | base, mini, pro |
 
 **Pinned names** remain appropriate when:
 
-1. The base mid-tier is ambiguous to glob (e.g. `gpt-5.4` — `gpt-5.4*` would
-   accidentally match `gpt-5.4-mini`/`-pro`/`-nano`). Pin the base, glob the
-   tier suffixes separately.
-2. The provider has no static fallback for `list_models()`. `github-copilot`
+1. The provider has no static fallback for `list_models()`. `github-copilot`
    raises `ProviderUnavailableError` if both the SDK and the disk cache are
    unavailable, so glob resolution fails catastrophically when offline. Keep
    all `github-copilot` candidates pinned until the provider gains a fallback.
-3. A specialized model does not follow its family's naming pattern and would
+2. A specialized model does not follow its family's naming pattern and would
    be filtered out of `list_models()`. Example: `nano-banana-pro-preview` is
    excluded from gemini's listing (the provider filters to IDs containing
    "gemini"). Using it as an **exact name** bypasses `list_models()` entirely
    and passes the string directly to the API.
-4. The `*-latest` aliases. Exact names like `gemini-pro-latest` are safer than
+3. The `*-latest` aliases. Exact names like `gemini-pro-latest` are safer than
    globs because they reach the API even when the listing endpoint is
    unreachable.
 
@@ -395,8 +392,7 @@ Different providers use different naming conventions for the **same underlying m
 | Claude Sonnet 4.x | `claude-sonnet-*` (glob) | — | — | `claude-sonnet-4.6` (pin) |
 | Claude Opus 4.x | `claude-opus-*` (glob) | — | — | `claude-opus-4.6` (pin) |
 | Claude Haiku 4.x | `claude-haiku-*` (glob) | — | — | `claude-haiku-4.5` (pin) |
-| GPT-5.x base | — | `gpt-5.4` (pin base) | — | `gpt-5.4` (pin) |
-| GPT-5.x pro | — | `gpt-?.?-pro*` (glob) | — | pinned, e.g. `gpt-5.4-pro` |
+| GPT base (mid-tier) | — | `gpt-[0-9].[0-9]` (glob) | — | pinned, e.g. `gpt-5.5` |
 | GPT-5.x mini | — | `gpt-?.?-mini*` (glob) | — | pinned, e.g. `gpt-5.4-mini` |
 | Gemini Pro | — | — | `gemini-*-pro-preview` (glob) | — |
 | Gemini Flash | — | — | `gemini-*-flash-preview` (glob) | — |

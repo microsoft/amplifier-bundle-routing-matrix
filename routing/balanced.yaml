@@ -8,7 +8,7 @@
 #   provider: Module mount name (e.g., "anthropic", "gemini", "github-copilot")
 #             For multi-instance providers, use the instance id directly.
 #   model:    Exact model name or glob pattern. Class-scoped globs
-#             (claude-opus-*, gemini-*-pro-preview, gpt-?.?-mini*) auto-track
+#             (claude-opus-*, gemini-*-pro-preview, gpt-[0-9].[0-9]) auto-track
 #             within-class version bumps. Copilot candidates stay PINNED because
 #             the github-copilot provider has no static fallback for list_models().
 #   config:   Optional model parameters (e.g., reasoning_effort: high|xhigh)
@@ -24,7 +24,7 @@
 
 name: balanced
 description: "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team."
-updated: "2026-04-22"
+updated: "2026-05-12"
 
 roles:
   # ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.5
+        model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -73,7 +73,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.5
+        model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -89,7 +89,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.5
+        model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -106,9 +106,9 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
-        model: gpt-5.5
+        model: "gpt-[0-9].[0-9]"
         config:
-          reasoning_effort: high
+          reasoning_effort: xhigh
       - provider: gemini
         model: gemini-*-pro-preview
         config:
@@ -130,9 +130,9 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
-        model: gpt-?.?-pro*
+        model: "gpt-[0-9].[0-9]"
         config:
-          reasoning_effort: high
+          reasoning_effort: xhigh
       - provider: gemini
         model: gemini-*-pro-preview
         config:
@@ -143,8 +143,6 @@ roles:
           reasoning_effort: high
       - provider: anthropic
         model: claude-sonnet-*
-      - provider: openai
-        model: gpt-5.5
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
@@ -155,7 +153,7 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: openai
-        model: gpt-5.5
+        model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: xhigh
       - provider: gemini
@@ -173,7 +171,7 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
-        model: gpt-5.5
+        model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -185,7 +183,7 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
-        model: gpt-5.5
+        model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
@@ -199,7 +197,7 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
-        model: gpt-?.?-pro*
+        model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: high
       - provider: gemini
@@ -225,7 +223,7 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
-        model: gpt-5.5
+        model: "gpt-[0-9].[0-9]"
       - provider: github-copilot
         model: gpt-5.5
       - provider: github-copilot
@@ -249,7 +247,9 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
-        model: gpt-?.?-pro*
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
       - provider: gemini
         model: gemini-*-pro-preview
       - provider: github-copilot
