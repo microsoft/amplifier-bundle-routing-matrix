@@ -1,11 +1,11 @@
 # Tier 2 investigation — powered by kenotron-ms/amplifier-app-actions
 #
-# Triggered by two paths — both evaluated by GitHub Actions if: conditions.
-# main.py never sees the command or label name. By the time the action runs,
-# GitHub has already decided the gate passed.
+# Triggered by two paths:
+#   Path A: /investigate comment from a trusted contributor
+#   Path B: needs-investigation label applied (typically by Tier 1 triage)
 #
-# Path A: /investigate comment from a trusted contributor
-# Path B: needs-investigation label applied (typically by Tier 1 triage)
+# enable_reproduction: true — installs Incus on the runner so the agent can
+# call launch_dtu to reproduce issues in an isolated container.
 #
 # Docs: https://github.com/kenotron-ms/amplifier-app-actions
 
@@ -23,8 +23,6 @@ permissions:
 
 jobs:
   investigate:
-    # GitHub evaluates this condition — not the action.
-    # author_association is set by GitHub based on the commenter's repo relationship.
     if: |
       (
         github.event_name == 'issue_comment' &&
@@ -41,9 +39,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: kenotron-ms/amplifier-app-actions@v1
+      - uses: kenotron-ms/amplifier-app-actions@main
         with:
-          mode: recipe
-          recipe_path: .github/amplifier/investigate-recipe.yaml
+          enable_reproduction: true
+          prompt: |
+            You are an expert software engineer investigating a GitHub issue.
+            Proceed through these stages:
+
+            ## Stage 1 — Understand the issue
+            Read the issue title and body carefully. Identify:
+            - What is the reported problem?
+            - Which repos, modules, components, or fromJSON('["OWNER","MEMBER","COLLABORATUY")"�' versions are mentioned?
+            - Are there specific error messages, stack traces, or repro steps?
+            - What is the expected vs actual behaviour?
+
+            ## Stage 2 — Clone relevant repos
+            Use `github_checkout_repo` to clone every repo relevant to this issue.
+            - If the issue mentions a specific version, branch, or tag, use that ref
+              (e.g. owner/repo@v1.2.3 or owner/repo@feat/my-branch).
+            - If no ref is specified, clone at HEAD of the default branch.
+            - Clone all repos that provide context, not just the one where the issue
+              was filed.
+
+            ## Stage 3 — Investigate the code
+            Read the relevant source files from the cloned repos. Focus on:
+            - The files, functions, or modules mentioned in the issue.
+            - The code paths that would be exercised by the reported scenario.
+            - Any recent changes that could have introduced the problem.
+            Form a hypothesis about the root cause with specific file:line references.
+
+            ## Stage 4 — Reproduce the issue
+            If the issue contains repro steps, error messages, or specific commands,
+            use `launch_dtu` to reproduce it in an isolated container:
+            - Specify repos with the exact versions or refs from the issue.
+            - Run the exact commands or scenario described in the issue.
+            - Capture stdout, stderr, and exit code.
+            If the issue does not have clear repro steps, skip this stage and note
+            that reproduction requires more information from the author.
+
+            ## Stage 5 — Post findings
+            Post a comment on the issue with:
+            - A one-paragraph summary of what you found
+            - Root cause hypothesis with specific file:line citations
+            - Reproduction output (if attempted) — include exact command and output
+            - Suggested next steps: fix direction, questions for the author, or
+              labels to apply
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
