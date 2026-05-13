@@ -76,6 +76,32 @@ The system tries `vision` first. If no installed provider matches any candidate 
 
 Every matrix must define at least `general` and `fast`. All other roles are optional — agents fall back through their `model_role` list if a role isn't defined.
 
+## How `model_role` and `provider_preferences` interact (matrix strategy)
+
+This section documents the **matrix strategy's** behavior. Alternative routing-strategy bundles that register the `model_role_resolver` capability MAY define different interaction semantics — what's described here is this bundle's policy, not a kernel contract.
+
+### The rule
+
+When an agent's frontmatter declares **both** `model_role:` and `provider_preferences:`, this bundle's `hooks-routing.on_session_start` hook resolves `model_role` against the active matrix and **overwrites** the hard-pinned `provider_preferences` list with the resolved value. The hard-pinned list is silently discarded.
+
+### Why it works this way
+
+Hard-pinned `provider_preferences` are intended as a fallback for agents that *don't* declare `model_role`. When `model_role` IS declared, the matrix is the authoritative source — that's the whole point of the matrix strategy. Authors who want the matrix-resolved candidates to be the truth should write `model_role` alone. Authors who want a fixed pin should omit `model_role` and use `provider_preferences` alone.
+
+### What this means for agent authors
+
+| Frontmatter declares                              | Result                                                                                                                  |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `model_role:` only                                | Matrix resolves it. Resolved candidates are written into the agent config's `provider_preferences` at `session:start`.  |
+| `provider_preferences:` only                      | Routing hook leaves them alone. They flow through as written — the legitimate fallback case.                            |
+| **Both** `model_role:` and `provider_preferences:` | Matrix wins. The hard-pinned `provider_preferences` is overwritten and never reaches the spawner.                       |
+
+**Per-delegate overrides** (e.g. `delegate(agent="...", model_role="research")` or an explicit `provider_preferences` argument from the caller) take precedence over BOTH the agent's frontmatter and the matrix-resolved agent-config preferences. That precedence is the **spawner's** policy, not this bundle's — see [`amplifier-app-cli/docs/SPAWN_PRECEDENCE.md`](https://github.com/microsoft/amplifier-app-cli/blob/main/docs/SPAWN_PRECEDENCE.md) for the 3-level table.
+
+### Variant note
+
+A future routing-strategy bundle could opt for "append matrix-resolved candidates after hard-pinned ones" or "skip matrix resolution when explicit prefs already exist" — both are defensible policies for different use cases. This bundle made the **matrix-wins** choice deliberately: it keeps the matrix as the single source of truth for any agent that opts into role-based routing.
+
 ## Selecting a Matrix
 
 **Via CLI command:**
