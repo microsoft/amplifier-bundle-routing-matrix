@@ -1,4 +1,4 @@
-name: Issue Investigation
+name: issue-investigation
 version: 1.0.0
 description: >
   Deep-dive issue investigation in five stages: extract structured understanding of
@@ -12,6 +12,7 @@ description: >
 
 steps:
   - id: understand
+    agent: foundation:explorer
     prompt: |
       Analyze GitHub issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
 
@@ -43,6 +44,7 @@ steps:
     parse_json: true
 
   - id: clone
+    agent: triage
     depends_on: [understand]
     prompt: |
       You are investigating issue #{{ context.number }}: {{ context.title }}
@@ -63,6 +65,7 @@ steps:
     parse_json: true
 
   - id: investigate
+    agent: triage
     depends_on: [clone]
     prompt: |
       Investigate the root cause of issue #{{ context.number }}.
@@ -95,6 +98,7 @@ steps:
     parse_json: true
 
   - id: reproduce
+    agent: triage
     depends_on: [investigate]
     prompt: |
       Attempt reproduction via launch_dtu — or document exactly why not.
@@ -150,6 +154,7 @@ steps:
     parse_json: true
 
   - id: report
+    agent: triage
     depends_on: [understand, investigate, reproduce]
     prompt: |
       Post a structured investigation report on issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.

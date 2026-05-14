@@ -8,8 +8,8 @@ description: >
 steps:
   - id: classify
     type: agent
-    description: Classify the issue type and severity, add the appropriate label
-    instruction: |
+    agent: triage
+    prompt: |
       Classify GitHub issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
 
       Title: {{ context.title }}
@@ -30,9 +30,9 @@ steps:
 
   - id: investigate
     type: agent
+    agent: triage
     depends_on: [classify]
-    description: Identify relevant repos from the ecosystem, clone them, read the code
-    instruction: |
+    prompt: |
       You are investigating a {{ classify.type }} in {{ context.owner }}/{{ context.repo }}.
 
       Issue: {{ context.title }}
@@ -53,10 +53,10 @@ steps:
 
   - id: reproduce
     type: agent
+    agent: triage
     depends_on: [investigate]
     condition: "{{ classify.type == 'bug' and classify.has_repro_steps and investigate.needs_reproduction }}"
-    description: Attempt to reproduce the issue in an isolated Digital Twin environment
-    instruction: |
+    prompt: |
       Attempt to reproduce issue #{{ context.number }}.
 
       Hypothesis: {{ investigate.hypothesis }}
@@ -78,9 +78,9 @@ steps:
 
   - id: report
     type: agent
+    agent: triage
     depends_on: [classify, investigate, reproduce]
-    description: Post a structured findings comment on the issue
-    instruction: |
+    prompt: |
       Post a structured triage comment on issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
 
       Use github_post_comment with this structure:

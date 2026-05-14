@@ -8,8 +8,8 @@ description: >
 steps:
   - id: identify
     type: agent
-    description: Understand what the PR changes and which repos are needed for context
-    instruction: |
+    agent: triage
+    prompt: |
       Review PR #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
 
       Title: {{ context.title }}
@@ -32,9 +32,9 @@ steps:
 
   - id: checkout_context
     type: agent
+    agent: triage
     depends_on: [identify]
-    description: Clone relevant repos to provide cross-repo context for the review
-    instruction: |
+    prompt: |
       Clone these repos for review context: {{ identify.relevant_repos }}
 
       For each repo, use github_checkout_repo with the owner and repo name.
@@ -47,9 +47,9 @@ steps:
 
   - id: review
     type: agent
+    agent: triage
     depends_on: [checkout_context]
-    description: Apply the five-check review framework to the PR
-    instruction: |
+    prompt: |
       Review PR #{{ context.number }}: {{ context.title }}
 
       Changed files: {{ identify.changed_files }}
@@ -83,9 +83,9 @@ steps:
 
   - id: post_verdict
     type: agent
+    agent: triage
     depends_on: [review]
-    description: Post the structured review verdict as a comment on the PR
-    instruction: |
+    prompt: |
       Use github_post_comment to post a review on PR #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
 
       Format the comment as:
