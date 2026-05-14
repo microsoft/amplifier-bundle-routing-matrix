@@ -12,8 +12,7 @@ description: >
 
 steps:
   - id: understand
-    type: agent
-    instruction: |
+    prompt: |
       Analyze GitHub issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
 
       Title: {{ context.title }}
@@ -44,9 +43,8 @@ steps:
     parse_json: true
 
   - id: clone
-    type: agent
     depends_on: [understand]
-    instruction: |
+    prompt: |
       You are investigating issue #{{ context.number }}: {{ context.title }}
 
       Repos mentioned in the issue: {{ understand.affected_repos }}
@@ -65,9 +63,8 @@ steps:
     parse_json: true
 
   - id: investigate
-    type: agent
     depends_on: [clone]
-    instruction: |
+    prompt: |
       Investigate the root cause of issue #{{ context.number }}.
 
       Problem: {{ understand.problem_statement }}
@@ -98,9 +95,8 @@ steps:
     parse_json: true
 
   - id: reproduce
-    type: agent
     depends_on: [investigate]
-    instruction: |
+    prompt: |
       Attempt reproduction via launch_dtu — or document exactly why not.
       This step has no condition. It always runs. It always produces structured output.
 
@@ -154,9 +150,8 @@ steps:
     parse_json: true
 
   - id: report
-    type: agent
     depends_on: [understand, investigate, reproduce]
-    instruction: |
+    prompt: |
       Post a structured investigation report on issue #{{ context.number }} in {{ context.owner }}/{{ context.repo }}.
 
       Use github_post_comment to post this comment:
