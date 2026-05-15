@@ -37,6 +37,7 @@ jobs:
         with:
           mode: recipe
           recipe_path: .github/amplifier/pr-review-recipe.yaml
+          model: claude-sonnet-4-6
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
@@ -74,5 +75,6 @@ jobs:
       - uses: kenotron-ms/amplifier-app-actions@main
         with:
           prompt: ${{ steps.prompt.outputs.content }}
+          model: claude-sonnet-4-6
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
