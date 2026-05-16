@@ -25,83 +25,8 @@ steps:
     timeout: 1800
     agent: amplifier-tester:setup-digital-twin
     prompt: |
-      Reproduce GitHub issue #{{context.number}} in {{context.owner}}/{{context.repo}}.
-
-      Issue title: "{{context.title}}"
-
-      Issue body:
-      {{context.body}}
-
-      ## What you need to do
-
-      This is a bug reproduction run against the current state of the affected repos.
-      Treat the repos mentioned in the issue as if they are "local changes under test"
-      — the same workflow you use when a developer wants to validate their changes,
-      except the source is GitHub HEAD (cloned with GITHUB_TOKEN) rather than a
-      local working tree.
-
-      ### Step 1 — Identify the affected repos
-
-      Read the issue body above. Extract every repo mentioned under "Affected repos"
-      or referenced in the reproduction script's install comments. These are the repos
-      to set up.
-
-      ### Step 2 — Set up Gitea and mirror the repos directly from GitHub
-
-      Use `amplifier-gitea mirror-from-github` — do NOT manually clone and push.
-      Shallow clones cannot be pushed to Gitea ("shallow update not allowed"), and
-      manual clone+push is slow for large repos like amplifier-core.
-
-      First reuse an existing Gitea instance if one is running:
-      ```bash
-      amplifier-gitea list
-      ```
-      If none running, create one:
-      ```bash
-      amplifier-gitea create --port 10110
-      ```
-      Then mirror each repo directly:
-      ```bash
-      amplifier-gitea mirror-from-github <gitea-id> \
-        --github-repo https://github.com/microsoft/<repo> \
-        --github-token $GITHUB_TOKEN
-      ```
-      This is faster and avoids the shallow-clone rejection.
-
-      ### Step 4 — Launch a DTU with url_rewrites for the affected repos
-
-      Generate a DTU profile that:
-      - Installs Amplifier via `uv tool install git+https://github.com/microsoft/amplifier`
-      - Uses url_rewrites to redirect each affected repo from github.com to your
-        Gitea instance — so those repos install from the cloned versions
-      - amplifier-core will resolve from PyPI as a pre-built wheel (no Rust build needed)
-      - Passes GITHUB_TOKEN and ANTHROPIC_API_KEY as passthrough services
-
-      Launch the DTU using this profile.
-
-      ### Step 5 — Run the verification script
-
-      Inside the running container:
-      1. Write the Python verification script from the issue body to /tmp/verify.py
-      2. Run it:
-         ```bash
-         amplifier-digital-twin exec <id> -- bash -lc \
-           "export PATH=/root/.local/bin:$PATH && python3 /tmp/verify.py"
-         ```
-      Capture stdout, stderr, and exit code.
-
-      ### Step 6 — Destroy the DTU and return results
-
-      Always destroy the instance when done.
+      Use amplifier-tester to set up a DTU environment and reproduce GitHub issue {{context.owner}}/{{context.repo}}#{{context.number}} inside it.
 
       Respond with ONLY valid JSON:
-
-      If the script ran and an assertion failed (bug confirmed):
-      {"reproduced": true, "output": "<combined stdout+stderr>", "conclusion": "Bug confirmed: <what failed>", "exit_code": 1}
-
-      If the script ran and printed PASS (bug not present):
-      {"reproduced": false, "output": "<combined stdout+stderr>", "conclusion": "Bug not reproduced: <what passed>", "exit_code": 0}
-
-      If setup or the script failed for infrastructure reasons:
-      {"reproduced": false, "output": "<error output>", "conclusion": "Infrastructure error — <what failed>", "exit_code": -1}
+      {"reproduced": true/false, "output": "<combined stdout+stderr>", "conclusion": "<what happened>", "exit_code": 0 or 1 or -1}
     parse_json: true

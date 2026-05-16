@@ -38,7 +38,7 @@ jobs:
       - uses: kenotron-ms/amplifier-app-actions@main
         with:
           enable_reproduction: true
-          recipe_source: .github/amplifier/investigate-recipe.yaml
+          prompt: "use amplifier-tester to try to repro this: https://github.com/${{ github.repository }}/issues/${{ github.event.issue.number }}"
           model: claude-sonnet-4-6
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
