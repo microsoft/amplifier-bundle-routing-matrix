@@ -6,7 +6,8 @@
 // investigation agent is supervised by an ecosystem-aware quality evaluator.
 // The manager (General Contractor) steers the investigator across up to three
 // cycles, ensuring root cause is independently verified at the correct ecosystem
-// layer before a GitHub comment is drafted and posted.
+// layer before a draft comment is posted for human review.
+// Human replies with /approve or /revise [feedback] to complete the triage.
 //
 // Pattern:    Attractor manager-supervisor  (manager shape=house)
 // Trigger:    GitHub issue opened — raw issue body passed as $goal
@@ -70,10 +71,10 @@ digraph triage_review {
     // Runs after the manager exits, regardless of whether max_cycles was hit.
     // No speculation — only independently verified root cause and fix.
     comment_draft [
-        label     = "Draft Comment"
+        label     = "Post Draft for Review"
         shape     = box
         fillcolor = "#E8F0FE"
-        prompt    = "Write a concise, helpful GitHub comment explaining the root cause and recommended fix. Do not post speculation. Only report what was independently verified."
+        prompt    = "Write a draft GitHub comment summarizing the investigation findings: the root cause, which ecosystem layer is affected, and the recommended fix. End the comment with exactly this HTML comment on its own line: <!-- triage-state: awaiting-review --> Then add a final line: 'Reply with `/approve` if this looks right, or `/revise [your feedback]` to request a deeper look.'"
     ]
 
     // Tool node — posts the drafted comment to the GitHub issue via GitHub API
