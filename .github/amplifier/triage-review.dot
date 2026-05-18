@@ -1,0 +1,197 @@
+// triage-review.dot
+//
+// Pipeline: Automated GitHub Issue Triage — Manager-Supervisor Pattern
+//
+// An incoming GitHub issue is routed through an Attractor pipeline where an
+// investigation agent is supervised by an ecosystem-aware quality evaluator.
+// The manager (General Contractor) steers the investigator across up to three
+// cycles, ensuring root cause is independently verified at the correct ecosystem
+// layer before a GitHub comment is drafted and posted.
+//
+// Pattern:    Attractor manager-supervisor  (manager shape=house)
+// Trigger:    GitHub issue opened — raw issue body passed as $goal
+// Thread:     "triage-thread" shared across all nodes so cycle N investigator
+//             can read what cycle N-1 produced before forming new hypotheses
+// Max cycles: 3 — stops early when quality_eval calls report_outcome(success)
+
+digraph triage_review {
+
+    // ── Graph-level attributes ────────────────────────────────────────────────────────────
+
+    label             = "Issue Triage Review"
+    labelloc          = t
+    rankdir           = TB
+    compound          = true
+    fontname          = "Helvetica"
+    nodesep           = 0.6
+    ranksep           = 0.9
+
+    // Attractor pipeline configuration
+    goal              = "Triage the GitHub issue described in the conversation context"
+    default_fidelity  = "full"
+    default_thread_id = "triage-thread"
+
+    // Model stylesheet:
+    //   quality_eval → reasoning model, high effort (deep ecosystem layer analysis)
+    //   investigate  → standard model   (general-purpose investigation)
+    model_stylesheet  = "quality_eval[model_role=reasoning,reasoning_effort=high] investigate[model_role=general]"
+
+    // ── Default node and edge styles ────────────────────────────────────────────────────────
+    node [fontname="Helvetica" fontsize=11 style="filled"]
+    edge [fontname="Helvetica" fontsize=10 color="#555555"]
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+    // OUTER PIPELINE NODES
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+    // Entry point — receives $issue_content as the pipeline goal
+    start [
+        label     = "Start"
+        shape     = Mdiamond
+        fillcolor = "#C8E6C9"
+    ]
+
+    // General Contractor — supervises the investigation loop.
+    // shape=house marks this as the Attractor manager node.
+    // Steers the investigator toward ecosystem-correct, independently verified
+    // root causes; stops early when quality_eval approves (outcome=success).
+    manager [
+        label          = "General Contractor"
+        shape          = house
+        fillcolor      = "#BBDEFB"
+        prompt         = "You are overseeing an issue triage investigation. Evaluate whether the investigator has correctly identified the root cause at the right ecosystem layer. Steer the investigator away from assumption-anchored or single-dimensional conclusions."
+        max_cycles     = 3
+        stop_condition = "outcome=success"
+        actions        = "observe,steer,wait"
+        poll_interval  = "0s"
+    ]
+
+    // Comment drafter — writes the final GitHub comment from approved findings.
+    // Runs after the manager exits, regardless of whether max_cycles was hit.
+    // No speculation — only independently verified root cause and fix.
+    comment_draft [
+        label     = "Draft Comment"
+        shape     = box
+        fillcolor = "#E8F0FE"
+        prompt    = "Write a concise, helpful GitHub comment explaining the root cause and recommended fix. Do not post speculation. Only report what was independently verified."
+    ]
+
+    // Tool node — posts the drafted comment to the GitHub issue via GitHub API
+    post_comment [
+        label     = "Post Comment"
+        shape     = parallelogram
+        fillcolor = "#FFF3E0"
+    ]
+
+    // Pipeline exit
+    done [
+        label     = "Done"
+        shape     = Msquare
+        fillcolor = "#FFCDD2"
+    ]
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+    // CHILD SUBGRAPH — runs once per manager cycle (up to max_cycles=3)
+    //
+    // Ecosystem layer hierarchy the quality gate enforces
+    // (innermost → outermost):
+    //
+    //   amplifier-core  →  amplifier-module-*  →  amplifier-foundation
+    //       →  amplifier-bundle-*  →  amplifier-app-cli
+    //
+    // The investigator must verify root cause at the correct layer.
+    // A provider-scoped fix is wrong when root cause is in amplifier-core.
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+    subgraph cluster_investigation_cycle {
+        label     = "Investigation Cycle  (runs each manager cycle, up to 3×)"
+        style     = filled
+        fillcolor = "#F5F5F5"
+        color     = "#AAAAAA"
+        fontname  = "Helvetica"
+        fontsize  = 10
+
+        // Investigator agent — forms independent hypotheses against code + DTU env.
+        // Must NOT anchor analysis on prior issue-thread comments (proxy principle).
+        investigate [
+            label     = "Investigate"
+            shape     = box
+            fillcolor = "#E8F0FE"
+            timeout   = "5m"
+            prompt    = "Investigate the GitHub issue described in the conversation context above. IMPORTANT: Do not anchor your analysis on any prior comments in the issue thread. Form your own hypotheses and test them independently against the actual code, repository structure, and if needed a DTU environment. Report your findings including: proposed root cause, affected layer/repo, and whether the issue would affect other providers/modules."
+        ]
+
+        // Ecosystem quality gate — validates findings against the layer hierarchy.
+        // goal_gate=true: if max_cycles exhaust without success, pipeline failure is tracked.
+        // reasoning_effort=high: deep multi-step ecosystem analysis (reasoning model).
+        // Layer check: core → modules → foundation → bundles → CLI
+        quality_eval [
+            label            = "Quality Gate"
+            shape            = diamond
+            fillcolor        = "#FFF9C4"
+            goal_gate        = true
+            timeout          = "2m"
+            reasoning_effort = high
+            prompt           = "Evaluate the investigator's findings using the Amplifier ecosystem map. Check: (1) Is the proposed fix at the correct layer? A fix in a single provider module is likely wrong if the root cause is in amplifier-core or would affect all providers. (2) Is the root cause independently verified, or does it restate a prior issue-thread comment? (3) Does the fix scope match the blast radius? Ecosystem layer hierarchy (core → modules → foundation → bundles → CLI): amplifier-core is lowest; amplifier-module-* depend only on core; amplifier-foundation sits above core; amplifier-bundle-* above foundation; amplifier-app-cli at top. Call report_outcome(outcome='success') if analysis is ecosystem-appropriate and independently verified. Call report_outcome(outcome='fail', reason='...specific reason...') if not."
+        ]
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+    // EDGES — OUTER PIPELINE
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+    start -> manager
+
+    // Post-manager path: draft and post the comment regardless of cycle outcome.
+    // weight=0 de-emphasises this edge in rank layout (lateral exit path).
+    manager -> comment_draft [weight=0]
+    comment_draft -> post_comment
+    post_comment  -> done
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+    // EDGES — INVESTIGATION CYCLE (within manager supervision)
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+    // Manager delegates to investigator at the start of each cycle
+    manager -> investigate
+
+    // Investigator delivers findings to the quality gate for ecosystem review
+    investigate -> quality_eval
+
+    // SUCCESS: quality gate approved — child cycle completes, manager stops
+    quality_eval -> done [
+        label     = "outcome=success"
+        condition = "outcome=success"
+        color     = "#43A047"
+        fontcolor = "#43A047"
+    ]
+
+    // FAIL: quality gate rejected — manager steers and investigator retries
+    quality_eval -> investigate [
+        label     = "outcome!=success"
+        condition = "outcome!=success"
+        style     = dashed
+        color     = "#E57373"
+        fontcolor = "#E57373"
+    ]
+
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+    // LEGEND
+    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+    subgraph cluster_legend {
+        label     = "Legend"
+        style     = filled
+        fillcolor = "#FAFAFA"
+        color     = "#CCCCCC"
+        fontname  = "Helvetica"
+        fontsize  = 10
+
+        L_entry   [label="Entry / Exit"    shape=Mdiamond      fillcolor="#C8E6C9"  width=1.5]
+        L_manager [label="Manager (GC)"    shape=house         fillcolor="#BBDEFB"  width=1.5]
+        L_worker  [label="Agent Worker"    shape=box           fillcolor="#E8F0FE"  width=1.5]
+        L_gate    [label="Quality Gate"    shape=diamond       fillcolor="#FFF9C4"  width=1.5]
+        L_tool    [label="Tool Node"       shape=parallelogram fillcolor="#FFF3E0"  width=1.5]
+        L_exit    [label="Pipeline Exit"   shape=Msquare       fillcolor="#FFCDD2"  width=1.5]
+
+        L_entry -> L_manager -> L_worker -> L_gate -> L_tool -> L_exit [style=invis]
+    }
+}
