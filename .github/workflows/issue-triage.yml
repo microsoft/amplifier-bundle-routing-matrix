@@ -1,12 +1,9 @@
 # Issue Triage — powered by kenotron-ms/amplifier-app-actions
 #
-# Triggered when a new issue is opened. The bundle carries all triage context
-# (GUIDANCE, AGENTS principles, ISSUE_HANDLING workflow) — no local prompt files needed.
-#
-# The agent first does a quick check:
-#   - If the issue is requesting a PR review: label it "pr-review-request" and stop.
-#     A team member can then post /pr to trigger the actual review.
-#   - Otherwise: run full triage per bundle context.
+# Triggered when a new issue is opened. Uses an Attractor DOT pipeline
+# (.github/amplifier/triage-review.dot) that runs a manager-supervisor loop:
+# an investigator agent examines the issue independently, and a quality gate
+# validates the root cause is at the correct ecosystem layer before posting.
 #
 # Docs: https://github.com/kenotron-ms/amplifier-app-actions
 
@@ -29,17 +26,7 @@ jobs:
       - uses: kenotron-ms/amplifier-app-actions@main
         with:
           bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/issue-triage.bundle.md
-          prompt: |
-            Triage this issue: https://github.com/${{ github.repository }}/issues/${{ github.event.issue.number }}
-
-            Before doing any investigation: check whether this issue is requesting a PR review
-            (the body mentions a pull request URL, asks to review a PR, or says something like
-            'please review PR #N'). If it is:
-            1. Add the label "pr-review-request" using github_add_label
-            2. Post a comment: "PR review request received. A team member will post `/pr` as a comment to trigger the review."
-            3. Stop — do not investigate further.
-
-            Otherwise: proceed with full triage per the principles in your context.
+          attractor_source: .github/amplifier/triage-review.dot
           model: claude-sonnet-4-6
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
