@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import textwrap
 from pathlib import Path
 from typing import Any
@@ -36,7 +35,6 @@ def _make_coordinator(
         coordinator.config = {"agents": {}}
 
     coordinator.get_capability = MagicMock(return_value=None)
-    coordinator.register_capability = MagicMock()
 
     if has_hooks:
         coordinator.hooks = MagicMock()
@@ -81,23 +79,6 @@ def _write_matrix(tmp_path: Path, name: str = "balanced") -> Path:
 
 # ---------------------------------------------------------------------------
 # mount() tests
-
-
-def _get_resolver(coordinator: Any) -> Any:
-    """Pull the registered ``model_role_resolver`` off a mocked coordinator.
-
-    Mount registers the resolver via ``coordinator.register_capability(
-    "model_role_resolver", resolver)``. Tests inspect the resolver's
-    ``.name`` and (private) ``._matrix_roles`` for the same shape checks
-    that previously read ``_get_resolver(coordinator)``.
-    """
-    for call in coordinator.register_capability.call_args_list:
-        if call.args and call.args[0] == "model_role_resolver":
-            return call.args[1]
-    raise AssertionError(
-        "model_role_resolver capability was not registered; calls=%r"
-        % (coordinator.register_capability.call_args_list,)
-    )
 # ---------------------------------------------------------------------------
 
 
@@ -123,9 +104,7 @@ class TestMount:
 
         # Simpler approach: set up the real directory structure
         bundle_root = tmp_path / "bundle"
-        modules_dir = (
-            bundle_root / "modules" / "hooks-routing" / "amplifier_module_hooks_routing"
-        )
+        modules_dir = bundle_root / "modules" / "hooks-routing" / "amplifier_module_hooks_routing"
         modules_dir.mkdir(parents=True)
         routing_dir = bundle_root / "routing"
         routing_dir.mkdir()
@@ -231,18 +210,18 @@ class TestMount:
         )
 
         # The effective matrix should have the override applied to "fast"
-        stored = _get_resolver(coordinator)
-        assert stored._matrix_roles["fast"]["candidates"] == [
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["roles"]["fast"]["candidates"] == [
             {"provider": "anthropic", "model": "claude-haiku-3"},
         ]
         # "general" should remain unchanged from the base matrix
-        assert stored._matrix_roles["general"]["candidates"] == [
+        assert stored["roles"]["general"]["candidates"] == [
             {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
         ]
 
     @pytest.mark.asyncio
-    async def test_mount_registers_resolver_capability(self, tmp_path: Path) -> None:
-        """Mount registers a model_role_resolver capability with the matrix data."""
+    async def test_mount_stores_session_state(self, tmp_path: Path) -> None:
+        """Mount stores routing matrix info in session_state."""
         bundle_root = tmp_path / "bundle"
         routing_dir = bundle_root / "routing"
         routing_dir.mkdir(parents=True)
@@ -270,8 +249,9 @@ class TestMount:
             config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
         )
 
-        assert _get_resolver(coordinator).name == "balanced"
-        assert "general" in _get_resolver(coordinator)._matrix_roles
+        assert "routing_matrix" in coordinator.session_state
+        assert coordinator.session_state["routing_matrix"]["name"] == "balanced"
+        assert "general" in coordinator.session_state["routing_matrix"]["roles"]
 
 
 # ---------------------------------------------------------------------------
@@ -345,156 +325,6 @@ class TestSessionStartHook:
         # plain should not have provider_preferences
         assert "provider_preferences" not in agents["plain"]
 
-    @pytest.mark.asyncio
-    async def test_on_session_start_includes_config_in_preferences(
-        self, tmp_path: Path
-    ) -> None:
-        """Resolved preferences should include config from matrix candidates."""
-        bundle_root = tmp_path / "bundle"
-        routing_dir = bundle_root / "routing"
-        routing_dir.mkdir(parents=True)
-        content = textwrap.dedent("""\
-            name: balanced
-            description: "Test"
-            updated: "2026-01-01"
-            roles:
-              coding:
-                description: "Code generation"
-                candidates:
-                  - provider: anthropic
-                    model: claude-sonnet-4-6
-                    config:
-                      reasoning_effort: high
-        """)
-        (routing_dir / "balanced.yaml").write_text(content)
-
-        agents: dict[str, Any] = {"coder": {"model_role": "coding"}}
-        providers = {"provider-anthropic": MagicMock()}
-        coordinator = _make_coordinator(providers=providers, agents=agents)
-
-        await mount(
-            coordinator,
-            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
-        )
-
-        # Extract and invoke the session:start handler
-        calls = coordinator.hooks.register.call_args_list
-        session_start_handler = None
-        for call in calls:
-            if call.args[0] == "session:start":
-                session_start_handler = call.args[1]
-                break
-        assert session_start_handler is not None
-
-        await session_start_handler("session:start", {})
-
-        # provider_preferences must include config from the candidate
-        prefs: list[Any] = agents["coder"]["provider_preferences"]
-        assert len(prefs) == 1
-        assert prefs[0]["provider"] == "anthropic"
-        assert prefs[0]["model"] == "claude-sonnet-4-6"
-        assert prefs[0]["config"] == {"reasoning_effort": "high"}
-
-
-class TestCustomMatrixFallback:
-    @pytest.mark.asyncio
-    async def test_mount_loads_custom_matrix_from_user_dir(
-        self, tmp_path: Path
-    ) -> None:
-        """mount() falls back to ~/.amplifier/routing/ for custom matrices not in bundle."""
-        # Bundle root has no balanced-custom.yaml — simulates the cache dir
-        bundle_root = tmp_path / "bundle"
-        (bundle_root / "routing").mkdir(parents=True)
-        # (intentionally do NOT write balanced-custom.yaml in bundle routing dir)
-
-        # Custom matrix lives in the user's ~/.amplifier/routing/
-        custom_dir = tmp_path / "home" / ".amplifier" / "routing"
-        custom_dir.mkdir(parents=True)
-        custom_content = textwrap.dedent("""\
-            name: balanced-custom
-            description: "My custom matrix"
-            updated: "2026-03-07"
-            roles:
-              general:
-                description: "Custom general"
-                candidates:
-                  - provider: anthropic
-                    model: claude-opus-4-6
-        """)
-        (custom_dir / "balanced-custom.yaml").write_text(custom_content)
-
-        coordinator = _make_coordinator()
-
-        # Patch Path.home() so the module finds our fake home dir
-        with patch(
-            "amplifier_module_hooks_routing.Path.home",
-            return_value=tmp_path / "home",
-        ):
-            await mount(
-                coordinator,
-                config={
-                    "default_matrix": "balanced-custom",
-                    "_bundle_root": str(bundle_root),
-                },
-            )
-
-        # Session state must be populated — routing was NOT disabled
-        assert _get_resolver(coordinator).name == "balanced-custom"
-        assert "general" in _get_resolver(coordinator)._matrix_roles
-
-    @pytest.mark.asyncio
-    async def test_mount_prefers_user_dir_over_bundle_matrix(
-        self, tmp_path: Path
-    ) -> None:
-        """User custom dir (~/.amplifier/routing/) takes priority over bundle cache."""
-        # Bundle has the matrix
-        bundle_root = tmp_path / "bundle"
-        routing_dir = bundle_root / "routing"
-        routing_dir.mkdir(parents=True)
-        bundle_content = textwrap.dedent("""            name: balanced
-            description: "Bundle balanced"
-            updated: "2026-01-01"
-            roles:
-              general:
-                description: "From bundle"
-                candidates:
-                  - provider: openai
-                    model: gpt-4o
-        """)
-        (routing_dir / "balanced.yaml").write_text(bundle_content)
-
-        # User dir also has a "balanced.yaml" — should be used (user wins)
-        custom_dir = tmp_path / "home" / ".amplifier" / "routing"
-        custom_dir.mkdir(parents=True)
-        user_content = textwrap.dedent("""            name: balanced
-            description: "User balanced"
-            updated: "2026-01-01"
-            roles:
-              general:
-                description: "From user dir"
-                candidates:
-                  - provider: anthropic
-                    model: claude-sonnet-4-6
-        """)
-        (custom_dir / "balanced.yaml").write_text(user_content)
-
-        coordinator = _make_coordinator()
-
-        with patch(
-            "amplifier_module_hooks_routing.Path.home",
-            return_value=tmp_path / "home",
-        ):
-            await mount(
-                coordinator,
-                config={
-                    "default_matrix": "balanced",
-                    "_bundle_root": str(bundle_root),
-                },
-            )
-
-        # User custom dir should win over bundle cache
-        stored = _get_resolver(coordinator)
-        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "anthropic"
 
 class TestProviderRequestHook:
     @pytest.mark.asyncio
@@ -547,361 +377,92 @@ class TestProviderRequestHook:
         assert "fast" in result.context_injection
 
 
-# ---------------------------------------------------------------------------
-# Project-scoped discovery tests
-# ---------------------------------------------------------------------------
-
-
-class TestProjectScopedDiscovery:
-    """<cwd>/.amplifier/routing/ discovery with precedence project > user-global > bundle."""
-
+class TestSessionStartParallelism:
     @pytest.mark.asyncio
-    async def test_project_scoped_matrix_found_and_used(
+    async def test_session_start_resolves_agents_in_parallel(
         self, tmp_path: Path
     ) -> None:
-        """Happy path: project-local matrix is loaded when cwd has .amplifier/routing/."""
-        project_root = tmp_path / "project"
-        project_routing = project_root / ".amplifier" / "routing"
-        project_routing.mkdir(parents=True)
-        (project_routing / "balanced.yaml").write_text(
-            textwrap.dedent("""\
-                name: balanced
-                description: "Project balanced matrix"
-                updated: "2026-01-01"
-                roles:
-                  general:
-                    description: "Project general"
-                    candidates:
-                      - provider: project-llm
-                        model: project-model-v1
-            """)
-        )
+        """on_session_start must resolve all agents concurrently, not sequentially.
 
-        # Bundle has no balanced.yaml — would cause routing-disabled if used
-        bundle_root = tmp_path / "bundle"
-        (bundle_root / "routing").mkdir(parents=True)
+        With N agents each requiring a provider.list_models() call that takes
+        LATENCY seconds, sequential execution would take N × LATENCY.  Parallel
+        execution via asyncio.gather() takes ≈ LATENCY (plus small overhead).
 
-        coordinator = _make_coordinator()
-
-        with patch(
-            "amplifier_module_hooks_routing.Path.cwd",
-            return_value=project_root,
-        ):
-            with patch(
-                "amplifier_module_hooks_routing.Path.home",
-                return_value=tmp_path / "home",
-            ):
-                await mount(
-                    coordinator,
-                    config={
-                        "default_matrix": "balanced",
-                        "_bundle_root": str(bundle_root),
-                    },
-                )
-
-        stored = _get_resolver(coordinator)
-        assert stored.name == "balanced"
-        assert "general" in stored._matrix_roles
-        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "project-llm"
-
-    @pytest.mark.asyncio
-    async def test_project_beats_user_global(
-        self, tmp_path: Path
-    ) -> None:
-        """Project-scoped matrix wins over user-global (~/.amplifier/routing/).
-
-        Asserts the project > user-global ordering that matches paths.py:72.
+        The test asserts elapsed < LATENCY × 3 to prove parallelism, which
+        gives a safe margin for scheduling overhead while clearly distinguishing
+        from the sequential case (N × LATENCY = 1.2s vs ~0.15s parallel).
         """
-        project_root = tmp_path / "project"
-        project_routing = project_root / ".amplifier" / "routing"
-        project_routing.mkdir(parents=True)
-        (project_routing / "balanced.yaml").write_text(
-            textwrap.dedent("""\
-                name: balanced
-                description: "Project matrix"
-                updated: "2026-01-01"
-                roles:
-                  general:
-                    description: "From project"
-                    candidates:
-                      - provider: project-provider
-                        model: project-model
-            """)
-        )
-
-        home_dir = tmp_path / "home"
-        user_routing = home_dir / ".amplifier" / "routing"
-        user_routing.mkdir(parents=True)
-        (user_routing / "balanced.yaml").write_text(
-            textwrap.dedent("""\
-                name: balanced
-                description: "User-global matrix"
-                updated: "2026-01-01"
-                roles:
-                  general:
-                    description: "From user-global"
-                    candidates:
-                      - provider: user-provider
-                        model: user-model
-            """)
-        )
+        import asyncio
+        import time
 
         bundle_root = tmp_path / "bundle"
-        (bundle_root / "routing").mkdir(parents=True)
+        routing_dir = bundle_root / "routing"
+        routing_dir.mkdir(parents=True)
 
-        coordinator = _make_coordinator()
+        # Use a glob pattern so _resolve_glob() → list_models() is called per agent
+        content = textwrap.dedent("""\
+            name: balanced
+            description: "Parallelism test matrix"
+            updated: "2026-01-01"
+            roles:
+              general:
+                description: "General purpose"
+                candidates:
+                  - provider: anthropic
+                    model: claude-sonnet-*
+              fast:
+                description: "Fast tasks"
+                candidates:
+                  - provider: openai
+                    model: gpt-4o-mini
+        """)
+        (routing_dir / "balanced.yaml").write_text(content)
 
-        with patch(
-            "amplifier_module_hooks_routing.Path.cwd",
-            return_value=project_root,
-        ):
-            with patch(
-                "amplifier_module_hooks_routing.Path.home",
-                return_value=home_dir,
-            ):
-                await mount(
-                    coordinator,
-                    config={
-                        "default_matrix": "balanced",
-                        "_bundle_root": str(bundle_root),
-                    },
-                )
+        LATENCY = 0.15  # seconds per list_models() call
+        AGENT_COUNT = 8
+        SEQUENTIAL_FLOOR = AGENT_COUNT * LATENCY  # 1.2s — fail threshold
 
-        # Project must win — NOT user-global
-        stored = _get_resolver(coordinator)
-        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "project-provider"
+        async def slow_list_models() -> list[str]:
+            await asyncio.sleep(LATENCY)
+            return ["claude-sonnet-4-20250514", "claude-sonnet-3-5-20241022"]
 
-    @pytest.mark.asyncio
-    async def test_project_beats_bundle(
-        self, tmp_path: Path
-    ) -> None:
-        """Project-scoped matrix shadows a bundled matrix of the same name."""
-        bundle_root = tmp_path / "bundle"
-        bundle_routing = bundle_root / "routing"
-        bundle_routing.mkdir(parents=True)
-        (bundle_routing / "balanced.yaml").write_text(
-            textwrap.dedent("""\
-                name: balanced
-                description: "Bundle matrix"
-                updated: "2026-01-01"
-                roles:
-                  general:
-                    description: "From bundle"
-                    candidates:
-                      - provider: bundle-provider
-                        model: bundle-model
-            """)
+        mock_provider = MagicMock()
+        mock_provider.list_models = slow_list_models
+        providers = {"provider-anthropic": mock_provider}
+
+        agents = {
+            f"agent-{i:02d}": {"model_role": "general"}
+            for i in range(AGENT_COUNT)
+        }
+
+        coordinator = _make_coordinator(providers=providers, agents=agents)
+
+        await mount(
+            coordinator,
+            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
         )
 
-        project_root = tmp_path / "project"
-        project_routing = project_root / ".amplifier" / "routing"
-        project_routing.mkdir(parents=True)
-        (project_routing / "balanced.yaml").write_text(
-            textwrap.dedent("""\
-                name: balanced
-                description: "Project matrix"
-                updated: "2026-01-01"
-                roles:
-                  general:
-                    description: "From project"
-                    candidates:
-                      - provider: project-provider
-                        model: project-model
-            """)
+        # Extract the registered session:start handler
+        calls = coordinator.hooks.register.call_args_list
+        handler = next(
+            call.args[1] for call in calls if call.args[0] == "session:start"
         )
 
-        coordinator = _make_coordinator()
+        t0 = time.perf_counter()
+        await handler("session:start", {})
+        elapsed = time.perf_counter() - t0
 
-        with patch(
-            "amplifier_module_hooks_routing.Path.cwd",
-            return_value=project_root,
-        ):
-            with patch(
-                "amplifier_module_hooks_routing.Path.home",
-                return_value=tmp_path / "home",
-            ):
-                await mount(
-                    coordinator,
-                    config={
-                        "default_matrix": "balanced",
-                        "_bundle_root": str(bundle_root),
-                    },
-                )
-
-        # Project must shadow bundle
-        stored = _get_resolver(coordinator)
-        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "project-provider"
-
-    @pytest.mark.asyncio
-    async def test_graceful_fallback_when_no_project_matrix(
-        self, tmp_path: Path
-    ) -> None:
-        """No project file, no user-global: bundle matrix loads normally (regression guard)."""
-        bundle_root = tmp_path / "bundle"
-        bundle_routing = bundle_root / "routing"
-        bundle_routing.mkdir(parents=True)
-        (bundle_routing / "balanced.yaml").write_text(
-            textwrap.dedent("""\
-                name: balanced
-                description: "Bundle matrix"
-                updated: "2026-01-01"
-                roles:
-                  general:
-                    description: "From bundle"
-                    candidates:
-                      - provider: bundle-provider
-                        model: bundle-model
-            """)
+        # Parallel: ~LATENCY (0.15s).  Sequential: AGENT_COUNT × LATENCY (1.2s).
+        assert elapsed < LATENCY * 3, (
+            f"on_session_start appears sequential: took {elapsed:.2f}s "
+            f"for {AGENT_COUNT} agents × {LATENCY}s latency "
+            f"(sequential would be {SEQUENTIAL_FLOOR:.2f}s, "
+            f"parallel should be <{LATENCY * 3:.2f}s)"
         )
 
-        # cwd has no .amplifier/routing/ at all
-        empty_cwd = tmp_path / "empty-cwd"
-        empty_cwd.mkdir()
-
-        coordinator = _make_coordinator()
-
-        with patch(
-            "amplifier_module_hooks_routing.Path.cwd",
-            return_value=empty_cwd,
-        ):
-            with patch(
-                "amplifier_module_hooks_routing.Path.home",
-                return_value=tmp_path / "home",
-            ):
-                await mount(
-                    coordinator,
-                    config={
-                        "default_matrix": "balanced",
-                        "_bundle_root": str(bundle_root),
-                    },
-                )
-
-        stored = _get_resolver(coordinator)
-        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "bundle-provider"
-
-    @pytest.mark.asyncio
-    async def test_filename_mismatch_falls_through(
-        self, tmp_path: Path
-    ) -> None:
-        """Project dir has .amplifier/routing/ but a differently-named matrix; falls through to bundle."""
-        project_root = tmp_path / "project"
-        project_routing = project_root / ".amplifier" / "routing"
-        project_routing.mkdir(parents=True)
-        # Write a DIFFERENT matrix name in the project routing dir
-        (project_routing / "custom.yaml").write_text(
-            textwrap.dedent("""\
-                name: custom
-                description: "A different matrix"
-                updated: "2026-01-01"
-                roles:
-                  special:
-                    description: "Special role"
-                    candidates:
-                      - provider: special-provider
-                        model: special-model
-            """)
-        )
-        # "balanced.yaml" is intentionally absent from the project routing dir
-
-        bundle_root = tmp_path / "bundle"
-        bundle_routing = bundle_root / "routing"
-        bundle_routing.mkdir(parents=True)
-        (bundle_routing / "balanced.yaml").write_text(
-            textwrap.dedent("""\
-                name: balanced
-                description: "Bundle matrix"
-                updated: "2026-01-01"
-                roles:
-                  general:
-                    description: "From bundle"
-                    candidates:
-                      - provider: bundle-provider
-                        model: bundle-model
-            """)
-        )
-
-        coordinator = _make_coordinator()
-
-        with patch(
-            "amplifier_module_hooks_routing.Path.cwd",
-            return_value=project_root,
-        ):
-            with patch(
-                "amplifier_module_hooks_routing.Path.home",
-                return_value=tmp_path / "home",
-            ):
-                await mount(
-                    coordinator,
-                    config={
-                        "default_matrix": "balanced",
-                        "_bundle_root": str(bundle_root),
-                    },
-                )
-
-        # Falls through project (filename mismatch) and user-global (absent) to bundle
-        stored = _get_resolver(coordinator)
-        assert stored._matrix_roles["general"]["candidates"][0]["provider"] == "bundle-provider"
-
-    @pytest.mark.asyncio
-    async def test_cwd_subdirectory_misses_project_matrix_and_warns(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """COE-added: cwd=<project>/src/ misses the project matrix; routing disabled with warning.
-
-        Flat cwd discovery (no walk-up) means running from a subdirectory of
-        the project root will NOT find <project>/.amplifier/routing/.  The
-        failure must be loud (warning logged), not silent.
-        """
-        # Project matrix exists at the real project root (not visible from src/)
-        project_root = tmp_path / "project"
-        project_routing = project_root / ".amplifier" / "routing"
-        project_routing.mkdir(parents=True)
-        (project_routing / "balanced.yaml").write_text(
-            textwrap.dedent("""\
-                name: balanced
-                description: "Project matrix"
-                updated: "2026-01-01"
-                roles:
-                  general:
-                    description: "From project"
-                    candidates:
-                      - provider: project-provider
-                        model: project-model
-            """)
-        )
-
-        # Simulate launching from a subdirectory
-        src_dir = project_root / "src"
-        src_dir.mkdir()
-
-        # Bundle has no balanced.yaml — ensures bundle fallback also misses
-        bundle_root = tmp_path / "bundle"
-        (bundle_root / "routing").mkdir(parents=True)
-
-        coordinator = _make_coordinator()
-
-        with caplog.at_level(logging.WARNING, logger="amplifier_module_hooks_routing"):
-            with patch(
-                "amplifier_module_hooks_routing.Path.cwd",
-                return_value=src_dir,
-            ):
-                with patch(
-                    "amplifier_module_hooks_routing.Path.home",
-                    return_value=tmp_path / "home",
-                ):
-                    await mount(
-                        coordinator,
-                        config={
-                            "default_matrix": "balanced",
-                            "_bundle_root": str(bundle_root),
-                        },
-                    )
-
-        # Warning must be logged — failure is loud, not silent
-        warning_messages = [
-            r.message for r in caplog.records if r.levelno >= logging.WARNING
-        ]
-        assert any("Matrix file not found" in msg for msg in warning_messages)
-
-        # Routing is disabled — roles dict is empty
-        assert _get_resolver(coordinator)._matrix_roles == {}
+        # Correctness: every agent must still get resolved
+        for name, agent_cfg in agents.items():
+            assert "provider_preferences" in agent_cfg, (
+                f"Agent '{name}' missing provider_preferences after parallel resolution"
+            )
+            assert agent_cfg["provider_preferences"][0]["provider"] == "anthropic"

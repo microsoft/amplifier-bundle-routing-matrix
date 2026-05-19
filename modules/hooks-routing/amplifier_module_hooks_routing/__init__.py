@@ -5,6 +5,7 @@ Provides model routing based on curated role-to-provider matrices.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import Any
@@ -41,32 +42,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
 
     # --- Load default matrix ---
     default_matrix_name = config.get("default_matrix", "balanced")
-
-    # Project-scoped matrices (<cwd>/.amplifier/routing/) have the highest
-    # runtime priority, after the _bundle_root escape hatch.  This matches the
-    # convention documented at amplifier-app-cli/amplifier_app_cli/paths.py:72
-    # where _get_user_and_project_paths() uses project > user-global for
-    # bundles, agents, and skills.  Routing follows the same rule so that a
-    # project-local matrix is picked up automatically when amplifier is launched
-    # from the project root — no ~/.amplifier symlink required.
-    #
-    # Discovery is flat (no walk-up): cwd must be exactly the project root.
-    # Running from a subdirectory will miss the project matrix and fall through
-    # to the next level — consistent with paths.py:72-75 and intentional.
-    #
-    # User custom matrices (~/.amplifier/routing/) take priority over bundled
-    # matrices in the cache.  The CLI matrix editor saves customizations here,
-    # so runtime must honour them first to stay consistent with what the user
-    # sees in `amplifier routing manage`.
-    project_matrix_path = Path.cwd() / ".amplifier" / "routing" / f"{default_matrix_name}.yaml"
-    custom_routing_dir = Path.home() / ".amplifier" / "routing"
-    custom_matrix_path = custom_routing_dir / f"{default_matrix_name}.yaml"
-    if project_matrix_path.exists():
-        matrix_path = project_matrix_path
-    elif custom_matrix_path.exists():
-        matrix_path = custom_matrix_path
-    else:
-        matrix_path = routing_dir / f"{default_matrix_name}.yaml"
+    matrix_path = routing_dir / f"{default_matrix_name}.yaml"
 
     base_matrix: dict[str, Any] = {}
     if matrix_path.exists():
@@ -97,21 +73,12 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         if capability_overrides:
             effective_matrix = compose_matrix(effective_matrix, capability_overrides)
 
-    # --- Register the model_role_resolver capability ---
-    # Generic capability key. Other routing strategies (cost-aware, latency-aware,
-    # availability-aware, etc.) may register their own implementation under the
-    # same key; only one is active per session. Consumers (tool-delegate,
-    # hooks-session-naming, tool-recipes, tool-skills) duck-type against the
-    # async ``.resolve(role) -> list[ProviderPreference]`` contract.
-    from .resolver_class import MatrixModelRoleResolver
-
-    resolver = MatrixModelRoleResolver(
-        matrix_roles=effective_matrix,
-        providers=coordinator.get("providers") or {},
-        matrix_name=base_matrix.get("name", default_matrix_name),
-    )
-    if hasattr(coordinator, "register_capability"):
-        coordinator.register_capability("model_role_resolver", resolver)
+    # --- Store in session state (modes pattern) ---
+    if hasattr(coordinator, "session_state"):
+        coordinator.session_state["routing_matrix"] = {
+            "name": base_matrix.get("name", default_matrix_name),
+            "roles": effective_matrix,
+        }
 
     # ------------------------------------------------------------------
     # Hook 1: session:start — resolve model_role for all agents
@@ -126,25 +93,24 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
 
         from .resolver import resolve_model_role
 
-        for _agent_name, agent_cfg in agents.items():
+        async def _resolve_one(agent_cfg: dict[str, Any]) -> None:
+            """Resolve model_role for a single agent and patch agent_cfg in-place."""
             model_role = agent_cfg.get("model_role")
             if not model_role:
-                continue
-
+                return
             # Normalise to list
             if isinstance(model_role, str):
                 model_role = [model_role]
-
             resolved = await resolve_model_role(model_role, effective_matrix, providers)
             if resolved:
                 agent_cfg["provider_preferences"] = [
-                    {
-                        "provider": r["provider"],
-                        "model": r["model"],
-                        "config": r.get("config", {}),
-                    }
-                    for r in resolved
+                    {"provider": r["provider"], "model": r["model"]} for r in resolved
                 ]
+
+        # Resolve all agents concurrently — wall-time becomes single longest
+        # latency rather than sum of all latencies.  Each coroutine writes only
+        # its own agent_cfg dict, so there is no shared mutable state.
+        await asyncio.gather(*(_resolve_one(cfg) for cfg in agents.values()))
 
         from amplifier_core.models import HookResult
 
