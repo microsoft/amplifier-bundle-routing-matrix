@@ -1,20 +1,15 @@
 # Triage Continue — powered by kenotron-ms/amplifier-app-actions
 #
-# Fires on any issue comment. Uses LLM judgment to decide whether the comment
-# is steering guidance for the triage agent (re-investigate) or a conversation
-# between collaborators (stay silent).
+# Fires on any issue comment from a non-bot user.
 #
-# Steering guidance examples: adding error logs, correcting the layer assignment,
-# providing reproduction details, noting the issue also affects other providers.
+# Explicit commands (always get a response):
+#   /dig [area]    — Re-investigate the issue focused on a specific area or question.
+#                    E.g. "/dig is this a core issue or provider-level?"
+#   /ask [prompt]  — Direct escape hatch. Whatever you write after /ask, the bot responds.
+#                    E.g. "/ask why did you conclude the fix belongs in amplifier-core?"
 #
-# Collaborator conversation examples: @mention asking a teammate to look,
-# thanking for a quick response, confirming they'll try the fix.
-#
-# Implementation note: resolve_instruction() in wrapper.py is exclusive —
-# exactly one of prompt/prompt_source/recipe_source/attractor_source may be set.
-# We use prompt: only and embed the attractor-equivalent investigation instruction
-# directly, telling the agent to use github_checkout_repo when re-investigation
-# is warranted.
+# Everything else — LLM judges whether the comment is steering guidance for the
+# triage agent (re-investigate) or a conversation between collaborators (stay silent).
 #
 # Docs: https://github.com/kenotron-ms/amplifier-app-actions
 
@@ -40,28 +35,20 @@ jobs:
         with:
           bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/issue-triage.bundle.md
           prompt: |
-            Context: You are monitoring the issue thread for ${{ github.event.issue.html_url }}
-
-            A new comment was just posted by @${{ github.event.comment.user.login }}:
+            Issue: ${{ github.event.issue.html_url }}
+            Comment by @${{ github.event.comment.user.login }}:
             "${{ github.event.comment.body }}"
 
-            First, judge whether this comment is steering guidance for the triage investigation.
+            Route this comment as follows:
 
-            It IS steering guidance if it:
-            - Adds technical context the original analysis may have missed (error logs, environment details, version info)
-            - Corrects or challenges the triage findings (wrong layer, wrong root cause, missed a related module)
-            - Provides reproduction details or a test case
-            - Notes the issue affects more components than originally identified
+            If it starts with /dig:
+            The text after "/dig" is what to focus on. Re-investigate the issue with that area as your primary lens. Use github_checkout_repo to examine relevant code. Apply full triage standards: root cause at a specific file:line, correct ecosystem layer (amplifier-core → modules → foundation → bundles → cli), concrete recommendation. Post your findings. You MUST respond.
 
-            It is NOT steering guidance if it:
-            - Asks a collaborator or teammate to look at something
-            - Thanks someone or acknowledges the analysis
-            - Confirms they will try the suggested fix
-            - Is general discussion not changing the technical picture
+            If it starts with /ask:
+            The text after "/ask" is a direct question or prompt for you. Answer it directly, drawing on the issue context and your knowledge of the Amplifier ecosystem. You MUST respond.
 
-            If it IS steering guidance: Re-run the full triage investigation of this issue, incorporating the new information from this comment. Use the github_checkout_repo tool to examine the relevant source code directly — do not anchor your analysis on prior comments or the reporter's framing. Apply the same standards as the original triage — root cause at a specific file:line, fix at the correct ecosystem layer, concrete recommendation. Post the updated analysis as a new comment. Do NOT ask for further approval.
-
-            If it is NOT steering guidance: Do nothing. Post no comment. Stay silent.
+            Otherwise:
+            Judge whether this comment is providing steering guidance that would change the triage analysis — new technical context, a correction to the root cause or layer assignment, reproduction details, or evidence the issue affects more components than identified. If it IS steering guidance, re-investigate and post updated findings. If it is NOT (collaborator conversation, thanks, confirming they'll try the fix), stay silent and post nothing.
           model: claude-sonnet-4-6
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
