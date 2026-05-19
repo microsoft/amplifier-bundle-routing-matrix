@@ -36,7 +36,6 @@ digraph triage_review {
     //                    not the full reasoning chain; enables genuine adversarial independence)
 
     // reasoning_effort and model_role are set per-node directly (quality_eval has reasoning_effort=high).
-    // model_stylesheet removed — node-ID selectors are invalid; only shape/class selectors work.
 
     // ── Default node and edge styles ──────────────────────────────────────────
     node [fontname="Helvetica", fontsize=11, style="filled"]

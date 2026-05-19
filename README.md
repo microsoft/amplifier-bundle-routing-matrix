@@ -9,14 +9,15 @@ for automated issue triage, deep investigation, and PR review on Amplifier ecosy
 
 ## What's here
 
-Just three workflow files. No local context files. No recipes. All agent knowledge lives in the bundle.
+Just four workflow files. No local context files. No recipes. All agent knowledge lives in the bundle.
 
 ```
 .github/
   workflows/
     issue-triage.yml    ← fires on issues: opened
-    investigate.yml     ← fires on /investigate comment or needs-investigation label
+    investigate.yml     ← fires on /repro comment or needs-investigation label
     pr-review.yml       ← fires on pull_request: opened or /pr comment
+    triage-continue.yml ← fires on any issue comment (continues/re-investigates)
 ```
 
 ---

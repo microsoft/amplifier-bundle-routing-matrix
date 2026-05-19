@@ -9,7 +9,7 @@
 #
 # Docs: https://github.com/kenotron-ms/amplifier-app-actions
 
-name: Repro
+name: Investigate
 
 on:
   issue_comment:
