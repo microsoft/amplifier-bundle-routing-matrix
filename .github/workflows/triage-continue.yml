@@ -1,10 +1,20 @@
-# Triage Continuation — powered by kenotron-ms/amplifier-app-actions
+# Triage Continue — powered by kenotron-ms/amplifier-app-actions
 #
-# Fires when a human replies /approve or /revise [feedback] on an issue
-# that has a triage draft comment (contains <!-- triage-state: awaiting-review -->).
+# Fires on any issue comment. Uses LLM judgment to decide whether the comment
+# is steering guidance for the triage agent (re-investigate) or a conversation
+# between collaborators (stay silent).
 #
-# /approve  — confirms the analysis; the agent posts a final summary comment
-# /revise   — provides feedback; the agent revises its analysis and updates the comment
+# Steering guidance examples: adding error logs, correcting the layer assignment,
+# providing reproduction details, noting the issue also affects other providers.
+#
+# Collaborator conversation examples: @mention asking a teammate to look,
+# thanking for a quick response, confirming they'll try the fix.
+#
+# Implementation note: resolve_instruction() in wrapper.py is exclusive —
+# exactly one of prompt/prompt_source/recipe_source/attractor_source may be set.
+# We use prompt: only and embed the attractor-equivalent investigation instruction
+# directly, telling the agent to use github_checkout_repo when re-investigation
+# is warranted.
 #
 # Docs: https://github.com/kenotron-ms/amplifier-app-actions
 
@@ -21,12 +31,8 @@ permissions:
 jobs:
   continue:
     runs-on: ubuntu-latest
-    # Only run when the comment starts with /approve or /revise
-    # and the commenter is the repo owner, member, or collaborator
-    if: |
-      (startsWith(github.event.comment.body, '/approve') ||
-       startsWith(github.event.comment.body, '/revise')) &&
-      github.event.comment.author_association != 'NONE'
+    # Skip bot comments to prevent infinite loops
+    if: "!endsWith(github.event.comment.user.login, '[bot]')"
     steps:
       - uses: actions/checkout@v4
 
@@ -34,18 +40,28 @@ jobs:
         with:
           bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/issue-triage.bundle.md
           prompt: |
-            Review this issue: https://github.com/${{ github.repository }}/issues/${{ github.event.issue.number }}
+            Context: You are monitoring the issue thread for ${{ github.event.issue.html_url }}
 
-            The human reviewer has responded to the triage draft with:
+            A new comment was just posted by @${{ github.event.comment.user.login }}:
             "${{ github.event.comment.body }}"
 
-            If the response starts with `/approve`:
-            - Post a final comment confirming the analysis is approved and summarizing the root cause and fix in 2-3 sentences.
-            - Add the label "triaged" using github_add_label.
+            First, judge whether this comment is steering guidance for the triage investigation.
 
-            If the response starts with `/revise`:
-            - The text after "/revise" is the human's feedback. Use it to post an updated analysis comment, revising the root cause or fix recommendation accordingly.
-            - End the revised comment with: "Updated based on reviewer feedback. Reply with `/approve` to confirm or `/revise [more feedback]` for another round."
+            It IS steering guidance if it:
+            - Adds technical context the original analysis may have missed (error logs, environment details, version info)
+            - Corrects or challenges the triage findings (wrong layer, wrong root cause, missed a related module)
+            - Provides reproduction details or a test case
+            - Notes the issue affects more components than originally identified
+
+            It is NOT steering guidance if it:
+            - Asks a collaborator or teammate to look at something
+            - Thanks someone or acknowledges the analysis
+            - Confirms they will try the suggested fix
+            - Is general discussion not changing the technical picture
+
+            If it IS steering guidance: Re-run the full triage investigation of this issue, incorporating the new information from this comment. Use the github_checkout_repo tool to examine the relevant source code directly — do not anchor your analysis on prior comments or the reporter's framing. Apply the same standards as the original triage — root cause at a specific file:line, fix at the correct ecosystem layer, concrete recommendation. Post the updated analysis as a new comment. Do NOT ask for further approval.
+
+            If it is NOT steering guidance: Do nothing. Post no comment. Stay silent.
           model: claude-sonnet-4-6
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
