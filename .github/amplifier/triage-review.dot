@@ -6,8 +6,7 @@
 // investigation agent is supervised by an ecosystem-aware quality evaluator.
 // The manager (General Contractor) steers the investigator across up to three
 // cycles, ensuring root cause is independently verified at the correct ecosystem
-// layer before a draft comment is posted for human review.
-// Human replies with /approve or /revise [feedback] to complete the triage.
+// layer before the final analysis is posted as a GitHub comment.
 //
 // Pattern:    Attractor manager-supervisor  (manager shape=house)
 // Trigger:    GitHub issue opened — raw issue body passed as $goal
@@ -71,10 +70,10 @@ digraph triage_review {
     // Runs after the manager exits, regardless of whether max_cycles was hit.
     // No speculation — only independently verified root cause and fix.
     comment_draft [
-        label     = "Post Draft for Review"
+        label     = "Post Analysis"
         shape     = box
         fillcolor = "#E8F0FE"
-        prompt    = "Write a draft GitHub comment summarizing the investigation findings: the root cause, which ecosystem layer is affected, and the recommended fix. End the comment with exactly this HTML comment on its own line: <!-- triage-state: awaiting-review --> Then add a final line: 'Reply with `/approve` if this looks right, or `/revise [your feedback]` to request a deeper look.'"
+        prompt    = "Write a final GitHub comment with the triage findings. Structure it inductively: lead with a 2-3 sentence plain-English summary of the root cause and recommended fix (no jargon), then provide supporting evidence. Be direct — give a recommendation, not a menu of options. Only report what was independently verified through code, not what prior comments suggested."
     ]
 
     // Tool node — posts the drafted comment to the GitHub issue via GitHub API
@@ -132,7 +131,7 @@ digraph triage_review {
             goal_gate        = true
             timeout          = "2m"
             reasoning_effort = high
-            prompt           = "Evaluate the investigator's findings using the Amplifier ecosystem map. Check: (1) Is the proposed fix at the correct layer? A fix in a single provider module is likely wrong if the root cause is in amplifier-core or would affect all providers. (2) Is the root cause independently verified, or does it restate a prior issue-thread comment? (3) Does the fix scope match the blast radius? Ecosystem layer hierarchy (core → modules → foundation → bundles → CLI): amplifier-core is lowest; amplifier-module-* depend only on core; amplifier-foundation sits above core; amplifier-bundle-* above foundation; amplifier-app-cli at top. Call report_outcome(outcome='success') if analysis is ecosystem-appropriate and independently verified. Call report_outcome(outcome='fail', reason='...specific reason...') if not."
+            prompt           = "You are an adversarial reviewer. Your job is to disagree with the investigator and find what they got wrong. You have no ability to generate your own findings — only to evaluate whether the investigator's findings hold up. Check ALL of the following before calling report_outcome: (1) PROXY CHECK: Did the investigator anchor conclusions on prior issue comments, the reporter's framing, or agent summaries? If the conclusion just restates what was already in the issue thread without independent code verification, that is a proxy conclusion — FAIL. (2) SPECIFICITY: Is the root cause pinned to a specific file:line? 'Probably in this function' or 'likely related to' is not a root cause — FAIL. (3) LAYER CHECK — Ecosystem hierarchy (innermost to outermost): amplifier-core → amplifier-module-* → amplifier-foundation → amplifier-bundle-* → amplifier-app-cli. If the proposed fix is in a single provider module but the root cause would affect all providers, the fix belongs in amplifier-core — FAIL. Ask: who does this NOT protect? (4) DIMENSIONALITY: Did the investigator compare a working vs broken scenario to find the divergence point? Did they check sibling modules for the same issue? Or did they only investigate the single broken path? Single-dimensional investigation = FAIL. (5) RECOMMENDATION: Does the output have a concrete recommendation, or just a list of options for the user to decide? Analysis without a recommendation is incomplete — FAIL. (6) STRUCTURE: Does the output lead with the conclusion in plain English, or does it bury the finding after pages of investigation detail? If you cannot state the root cause in 2-3 sentences without jargon, it is not ready — FAIL. Call report_outcome(outcome='success') only if ALL six checks pass. Call report_outcome(outcome='fail', reason='[specific criterion that failed and why]') if any check fails. Be specific in the reason — the manager will use it to steer the investigator."
         ]
     }
 
