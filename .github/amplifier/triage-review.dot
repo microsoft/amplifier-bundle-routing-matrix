@@ -35,14 +35,12 @@ digraph triage_review {
     //   quality-thread — fresh thread for quality_eval each cycle (sees compact summary only,
     //                    not the full reasoning chain; enables genuine adversarial independence)
 
-    // Model stylesheet — CSS-like rules: shape or node-id selectors
-    //   quality_eval → reasoning model, high effort (deep ecosystem layer analysis)
-    //   investigate  → standard model   (general-purpose investigation)
-    model_stylesheet  = "quality_eval { reasoning_effort: high } investigate { model_role: general }"
+    // reasoning_effort and model_role are set per-node directly (quality_eval has reasoning_effort=high).
+    // model_stylesheet removed — node-ID selectors are invalid; only shape/class selectors work.
 
     // ── Default node and edge styles ────────────────────────────────────────────────────────
-    node [fontname="Helvetica" fontsize=11 style="filled"]
-    edge [fontname="Helvetica" fontsize=10 color="#555555"]
+    node [fontname="Helvetica", fontsize=11, style="filled"]
+    edge [fontname="Helvetica", fontsize=10, color="#555555"]
 
     // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
     // OUTER PIPELINE NODES
@@ -50,8 +48,8 @@ digraph triage_review {
 
     // Entry point — receives $issue_content as the pipeline goal
     start [
-        label     = "Start"
-        shape     = Mdiamond
+        label     = "Start",
+        shape     = Mdiamond,
         fillcolor = "#C8E6C9"
     ]
 
@@ -82,8 +80,8 @@ digraph triage_review {
 
     // Pipeline exit
     done [
-        label     = "Done"
-        shape     = Msquare
+        label     = "Done",
+        shape     = Msquare,
         fillcolor = "#FFCDD2"
     ]
 
