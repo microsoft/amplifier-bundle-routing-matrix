@@ -35,10 +35,10 @@ digraph triage_review {
     //   quality-thread — fresh thread for quality_eval each cycle (sees compact summary only,
     //                    not the full reasoning chain; enables genuine adversarial independence)
 
-    // Model stylesheet:
+    // Model stylesheet — CSS-like rules: shape or node-id selectors
     //   quality_eval → reasoning model, high effort (deep ecosystem layer analysis)
     //   investigate  → standard model   (general-purpose investigation)
-    model_stylesheet  = "quality_eval[model_role=reasoning,reasoning_effort=high] investigate[model_role=general]"
+    model_stylesheet  = "quality_eval { reasoning_effort: high } investigate { model_role: general }"
 
     // ── Default node and edge styles ────────────────────────────────────────────────────────
     node [fontname="Helvetica" fontsize=11 style="filled"]
@@ -60,31 +60,24 @@ digraph triage_review {
     // Steers the investigator toward ecosystem-correct, independently verified
     // root causes; stops early when quality_eval approves (outcome=success).
     manager [
-        label          = "General Contractor"
-        shape          = house
-        fillcolor      = "#BBDEFB"
-        prompt         = "You are overseeing an issue triage investigation. Evaluate whether the investigator has correctly identified the root cause at the right ecosystem layer. Steer the investigator away from assumption-anchored or single-dimensional conclusions."
-        max_cycles     = 3
-        stop_condition = "outcome=success"
-        actions        = "observe,steer,wait"
-        poll_interval  = "0s"
+        label                  = "General Contractor",
+        shape                  = house,
+        fillcolor              = "#BBDEFB",
+        prompt                 = "You are overseeing an issue triage investigation. Evaluate whether the investigator has correctly identified the root cause at the right ecosystem layer. Steer the investigator away from assumption-anchored or single-dimensional conclusions.",
+        manager.max_cycles     = 3,
+        manager.stop_condition = "outcome=success",
+        manager.actions        = "observe,steer,wait",
+        manager.poll_interval  = "0s"
     ]
 
-    // Comment drafter — writes the final GitHub comment from approved findings.
+    // Drafter + poster — writes and posts the final GitHub comment.
     // Runs after the manager exits, regardless of whether max_cycles was hit.
     // No speculation — only independently verified root cause and fix.
     comment_draft [
-        label     = "Post Analysis"
-        shape     = box
-        fillcolor = "#E8F0FE"
-        prompt    = "Write a final GitHub comment with the triage findings. Structure it inductively: lead with a 2-3 sentence plain-English summary of the root cause and recommended fix (no jargon), then provide supporting evidence. Be direct — give a recommendation, not a menu of options. Only report what was independently verified through code, not what prior comments suggested."
-    ]
-
-    // Tool node — posts the drafted comment to the GitHub issue via GitHub API
-    post_comment [
-        label     = "Post Comment"
-        shape     = parallelogram
-        fillcolor = "#FFF3E0"
+        label     = "Post Analysis",
+        shape     = box,
+        fillcolor = "#E8F0FE",
+        prompt    = "The GitHub issue is described in $goal — extract the owner, repo name, and issue number from it. Write a final triage comment and post it to that issue using github_post_comment. Structure it inductively: lead with a 2-3 sentence plain-English summary of the root cause and recommended fix (no jargon), then provide supporting evidence. Be direct — give a recommendation, not a menu of options. Only report what was independently verified through code, not what prior comments suggested."
     ]
 
     // Pipeline exit
@@ -121,7 +114,7 @@ digraph triage_review {
             shape     = box
             fillcolor = "#E8F0FE"
             timeout   = "5m"
-            prompt    = "Investigate the GitHub issue described in the conversation context above. IMPORTANT: Do not anchor your analysis on any prior comments in the issue thread. Form your own hypotheses and test them independently against the actual code, repository structure, and if needed a DTU environment. All Amplifier ecosystem repos are under the 'microsoft' GitHub organization — use github_checkout_repo with owner='microsoft' (e.g. owner='microsoft', repo='amplifier-core'). Report your findings including: proposed root cause, affected layer/repo, and whether the issue would affect other providers/modules."
+            prompt    = "Investigate the GitHub issue in $goal. IMPORTANT: Do not anchor your analysis on any prior comments in the issue thread. Form your own hypotheses and test them independently against the actual code, repository structure, and if needed a DTU environment. All Amplifier ecosystem repos are under the 'microsoft' GitHub organization — use github_checkout_repo with owner='microsoft' (e.g. owner='microsoft', repo='amplifier-core'). Report your findings including: proposed root cause, affected layer/repo, and whether the issue would affect other providers/modules."
         ]
 
         // Ecosystem quality gate — validates findings against the layer hierarchy.
@@ -148,8 +141,7 @@ digraph triage_review {
     // Post-manager path: draft and post the comment regardless of cycle outcome.
     // weight=0 de-emphasises this edge in rank layout (lateral exit path).
     manager -> comment_draft [weight=0]
-    comment_draft -> post_comment
-    post_comment  -> done
+    comment_draft -> done
 
     // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
     // EDGES — INVESTIGATION CYCLE (within manager supervision)
@@ -187,24 +179,4 @@ digraph triage_review {
         fontcolor = "#E57373"
     ]
 
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-    // LEGEND
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-    subgraph cluster_legend {
-        label     = "Legend"
-        style     = filled
-        fillcolor = "#FAFAFA"
-        color     = "#CCCCCC"
-        fontname  = "Helvetica"
-        fontsize  = 10
-
-        L_entry   [label="Entry / Exit"    shape=Mdiamond      fillcolor="#C8E6C9"  width=1.5]
-        L_manager [label="Manager (GC)"    shape=house         fillcolor="#BBDEFB"  width=1.5]
-        L_worker  [label="Agent Worker"    shape=box           fillcolor="#E8F0FE"  width=1.5]
-        L_gate    [label="Quality Gate"    shape=diamond       fillcolor="#FFF9C4"  width=1.5]
-        L_tool    [label="Tool Node"       shape=parallelogram fillcolor="#FFF3E0"  width=1.5]
-        L_exit    [label="Pipeline Exit"   shape=Msquare       fillcolor="#FFCDD2"  width=1.5]
-
-        L_entry -> L_manager -> L_worker -> L_gate -> L_tool -> L_exit [style=invis]
-    }
 }
