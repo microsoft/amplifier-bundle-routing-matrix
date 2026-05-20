@@ -1,22 +1,24 @@
 // triage-review.dot
 //
-// Pipeline: Automated GitHub Issue Triage — Manager-Supervisor Pattern
+// Pipeline: Automated GitHub Issue Triage — Flat Supervisor-Free Pattern
 //
-// An incoming GitHub issue is routed through an Attractor pipeline where an
-// investigation agent is supervised by an ecosystem-aware quality evaluator.
-// The manager (General Contractor) steers the investigator across up to three
-// cycles, ensuring root cause is independently verified at the correct ecosystem
-// layer before the final analysis is posted as a GitHub comment.
+// ARCHITECTURE: Each node is a top-level pipeline node with its own spawned
+// child session. No shape=house manager. This gives full visibility:
+//   [PIPELINE] ▶ investigate [box]
+//   [PIPELINE] ▶ quality_eval [diamond]
+//   [PIPELINE] -> edge: quality_eval --[outcome!=success]--> investigate  (retry)
+//   [PIPELINE] -> edge: quality_eval --[outcome=success]--> comment_draft (pass)
 //
-// Pattern:    Attractor manager-supervisor  (manager shape=house)
-// Trigger:    GitHub issue opened — raw issue body passed as $goal
-// Threads:    "triage-thread" — investigator across cycles (sees prior cycle history + steering)
-//             "quality-thread" — quality_eval sees compact summary only (adversarial independence)
-// Max cycles: 3 — stops early when quality_eval calls report_outcome(success)
+// Threads:
+//   triage-thread  — investigate + comment_draft (context accumulates across cycles)
+//   quality-thread — quality_eval only (fresh adversarial context each cycle)
+//
+// Cycle limit: quality_eval.timeout=2m + investigate.timeout=5m naturally
+// bounds each cycle. goal_gate=true on quality_eval tracks overall success.
 
 digraph triage_review {
 
-    // ── Graph-level attributes ────────────────────────────────────────────────
+    // ── Graph-level attributes ───────────────────────────────────────────────
 
     label             = "Issue Triage Review"
     labelloc          = t
@@ -30,46 +32,49 @@ digraph triage_review {
     goal              = "Triage the GitHub issue described in the conversation context"
     default_fidelity  = "full"
     default_thread_id = "triage-thread"
-    // Thread design:
-    //   triage-thread  — shared by investigate across cycles (sees steering from prior cycles)
-    //   quality-thread — fresh thread for quality_eval each cycle (sees compact summary only,
-    //                    not the full reasoning chain; enables genuine adversarial independence)
 
-    // reasoning_effort and model_role are set per-node directly (quality_eval has reasoning_effort=high).
-
-    // ── Default node and edge styles ──────────────────────────────────────────
+    // ── Default node and edge styles ─────────────────────────────────────────
     node [fontname="Helvetica", fontsize=11, style="filled"]
     edge [fontname="Helvetica", fontsize=10, color="#555555"]
 
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-    // OUTER PIPELINE NODES
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
+    // PIPELINE NODES — all top-level, each gets its own child session
+    // ═══════════════════════════════════════════════════════════════════════
 
-    // Entry point — receives $issue_content as the pipeline goal
+    // Entry point
     start [
         label     = "Start",
         shape     = Mdiamond,
         fillcolor = "#C8E6C9"
     ]
 
-    // General Contractor — supervises the investigation loop.
-    // shape=house marks this as the Attractor manager node.
-    // Steers the investigator toward ecosystem-correct, independently verified
-    // root causes; stops early when quality_eval approves (outcome=success).
-    manager [
-        label                  = "General Contractor",
-        shape                  = house,
-        fillcolor              = "#BBDEFB",
-        prompt                 = "You are overseeing an issue triage investigation. Evaluate whether the investigator has correctly identified the root cause at the right ecosystem layer. Steer the investigator away from assumption-anchored or single-dimensional conclusions.",
-        manager.max_cycles     = 3,
-        manager.stop_condition = "outcome=success",
-        manager.actions        = "observe,steer,wait",
-        manager.poll_interval  = "0s"
+    // Investigator — independent root-cause analysis against actual code.
+    // Runs on triage-thread so it sees steering from prior quality_eval cycles.
+    // MUST NOT post any GitHub comment — findings go to quality_eval only.
+    investigate [
+        label     = "Investigate",
+        shape     = box,
+        fillcolor = "#E8F0FE",
+        timeout   = "5m",
+        prompt    = "IMPORTANT: Do NOT post any comments to GitHub via any mechanism (github_post_comment, gh CLI, bash, curl, or any other tool). Output your findings as text only — quality_eval will evaluate them. Investigate the GitHub issue in $goal. Do not anchor your analysis on any prior comments in the issue thread. Form your own hypotheses and test them independently against the actual code. All Amplifier ecosystem repos are under the 'microsoft' GitHub organization — use github_checkout_repo with owner='microsoft' (e.g. owner='microsoft', repo='amplifier-core'). Report: proposed root cause with file:line, affected ecosystem layer/repo, and whether the issue would affect other providers/modules."
+    ]
+
+    // Adversarial quality gate — evaluates investigate findings.
+    // Runs on quality-thread (fresh context) for genuine independence.
+    // Calls report_outcome(outcome='success'|'fail', reason='...').
+    quality_eval [
+        label            = "Quality Gate",
+        shape            = diamond,
+        fillcolor        = "#FFF9C4",
+        goal_gate        = true,
+        timeout          = "2m",
+        reasoning_effort = high,
+        prompt           = "You are an adversarial reviewer. Your job is to disagree with the investigator and find what they got wrong. You have no ability to generate your own findings — only to evaluate whether the investigator's findings hold up. Check ALL of the following before calling report_outcome: (1) PROXY CHECK: Did the investigator anchor conclusions on prior issue comments, the reporter's framing, or agent summaries? If the conclusion just restates what was already in the issue thread without independent code verification, that is a proxy conclusion — FAIL. (2) SPECIFICITY: Is the root cause pinned to a specific file:line? 'Probably in this function' or 'likely related to' is not a root cause — FAIL. (3) LAYER CHECK — Ecosystem hierarchy (innermost to outermost): amplifier-core → amplifier-module-* → amplifier-foundation → amplifier-bundle-* → amplifier-app-cli. If the proposed fix is in a single provider module but the root cause would affect all providers, the fix belongs in amplifier-core — FAIL. Ask: who does this NOT protect? (4) DIMENSIONALITY: Did the investigator compare a working vs broken scenario to find the divergence point? Did they check sibling modules for the same issue? Or did they only investigate the single broken path? Single-dimensional investigation = FAIL. (5) RECOMMENDATION: Does the output have a concrete recommendation, or just a list of options for the user to decide? Analysis without a recommendation is incomplete — FAIL. (6) STRUCTURE: Does the output lead with the conclusion in plain English, or does it bury the finding after pages of investigation detail? If you cannot state the root cause in 2-3 sentences without jargon, it is not ready — FAIL. Call report_outcome(outcome='success') only if ALL six checks pass. Call report_outcome(outcome='fail', reason='[specific criterion that failed and why]') if any check fails."
     ]
 
     // Drafter + poster — writes and posts the final GitHub comment.
-    // Runs after the manager exits, regardless of whether max_cycles was hit.
-    // No speculation — only independently verified root cause and fix.
+    // Uses commenter profile (has github_post_comment).
+    // Runs on triage-thread so it sees the full investigation history.
     comment_draft [
         label        = "Post Analysis",
         shape        = box,
@@ -85,89 +90,29 @@ digraph triage_review {
         fillcolor = "#FFCDD2"
     ]
 
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-    // CHILD SUBGRAPH — runs once per manager cycle (up to max_cycles=3)
-    //
-    // Ecosystem layer hierarchy the quality gate enforces
-    // (innermost → outermost):
-    //
-    //   amplifier-core  →  amplifier-module-*  →  amplifier-foundation
-    //       →  amplifier-bundle-*  →  amplifier-app-cli
-    //
-    // The investigator must verify root cause at the correct layer.
-    // A provider-scoped fix is wrong when root cause is in amplifier-core.
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-    subgraph cluster_investigation_cycle {
-        label     = "Investigation Cycle  (runs each manager cycle, up to 3×)"
-        style     = filled
-        fillcolor = "#F5F5F5"
-        color     = "#AAAAAA"
-        fontname  = "Helvetica"
-        fontsize  = 10
+    // ═══════════════════════════════════════════════════════════════════════
+    // EDGES
+    // ═══════════════════════════════════════════════════════════════════════
 
-        // Investigator agent — forms independent hypotheses against code + DTU env.
-        // Must NOT anchor analysis on prior issue-thread comments (proxy principle).
-        investigate [
-            label     = "Investigate",
-            shape     = box,
-            fillcolor = "#E8F0FE",
-            timeout   = "5m",
-            prompt    = "IMPORTANT: Do NOT post any comments to GitHub via any mechanism (github_post_comment, gh CLI, bash, curl, or any other tool). Output your findings as text only for the manager to evaluate. Investigate the GitHub issue in $goal. Do not anchor your analysis on any prior comments in the issue thread. Form your own hypotheses and test them independently against the actual code, repository structure, and if needed a DTU environment. All Amplifier ecosystem repos are under the 'microsoft' GitHub organization — use github_checkout_repo with owner='microsoft' (e.g. owner='microsoft', repo='amplifier-core'). Report your findings including: proposed root cause, affected layer/repo, and whether the issue would affect other providers/modules."
-        ]
+    start -> investigate
 
-        // Ecosystem quality gate — validates findings against the layer hierarchy.
-        // goal_gate=true: if max_cycles exhaust without success, pipeline failure is tracked.
-        // reasoning_effort=high: deep multi-step ecosystem analysis (reasoning model).
-        // Layer check: core → modules → foundation → bundles → CLI
-        quality_eval [
-            label            = "Quality Gate",
-            shape            = diamond,
-            fillcolor        = "#FFF9C4",
-            goal_gate        = true,
-            timeout          = "2m",
-            reasoning_effort = high,
-            prompt           = "You are an adversarial reviewer. Your job is to disagree with the investigator and find what they got wrong. You have no ability to generate your own findings — only to evaluate whether the investigator's findings hold up. Check ALL of the following before calling report_outcome: (1) PROXY CHECK: Did the investigator anchor conclusions on prior issue comments, the reporter's framing, or agent summaries? If the conclusion just restates what was already in the issue thread without independent code verification, that is a proxy conclusion — FAIL. (2) SPECIFICITY: Is the root cause pinned to a specific file:line? 'Probably in this function' or 'likely related to' is not a root cause — FAIL. (3) LAYER CHECK — Ecosystem hierarchy (innermost to outermost): amplifier-core → amplifier-module-* → amplifier-foundation → amplifier-bundle-* → amplifier-app-cli. If the proposed fix is in a single provider module but the root cause would affect all providers, the fix belongs in amplifier-core — FAIL. Ask: who does this NOT protect? (4) DIMENSIONALITY: Did the investigator compare a working vs broken scenario to find the divergence point? Did they check sibling modules for the same issue? Or did they only investigate the single broken path? Single-dimensional investigation = FAIL. (5) RECOMMENDATION: Does the output have a concrete recommendation, or just a list of options for the user to decide? Analysis without a recommendation is incomplete — FAIL. (6) STRUCTURE: Does the output lead with the conclusion in plain English, or does it bury the finding after pages of investigation detail? If you cannot state the root cause in 2-3 sentences without jargon, it is not ready — FAIL. Call report_outcome(outcome='success') only if ALL six checks pass. Call report_outcome(outcome='fail', reason='[specific criterion that failed and why]') if any check fails. Be specific in the reason — the manager will use it to steer the investigator."
-        ]
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-    // EDGES — OUTER PIPELINE
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-
-    start -> manager
-
-    // Post-manager path: draft and post the comment regardless of cycle outcome.
-    // weight=0 de-emphasises this edge in rank layout (lateral exit path).
-    manager -> comment_draft [weight=0]
-    comment_draft -> done
-
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-    // EDGES — INVESTIGATION CYCLE (within manager supervision)
-    // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-
-    // Manager delegates to investigator at the start of each cycle
-    manager -> investigate
-
-    // Investigator delivers findings to the quality gate for ecosystem review.
-    // thread_id="quality-thread" gives quality_eval a fresh context — it sees only
-    // a compact summary of the investigation, NOT the full reasoning chain.
-    // This is the adversarial independence: different thread, different model,
-    // no access to the investigator's working memory.
+    // Investigator delivers findings to quality gate.
+    // quality-thread = fresh adversarial context (compact summary only).
     investigate -> quality_eval [
         thread_id = "quality-thread",
         fidelity  = "compact"
     ]
 
-    // SUCCESS: quality gate approved — child cycle completes, manager stops
-    quality_eval -> done [
+    // SUCCESS: quality approved — move to drafting and posting the comment.
+    quality_eval -> comment_draft [
         label     = "outcome=success",
         condition = "outcome=success",
         color     = "#43A047",
         fontcolor = "#43A047"
     ]
 
-    // FAIL: quality gate rejected — manager steers and investigator retries.
-    // Returns to triage-thread so the investigator sees the steering critique.
+    // FAIL: quality rejected — investigator retries with critique in context.
+    // triage-thread: investigator sees the quality_eval failure reason.
     quality_eval -> investigate [
         label     = "outcome!=success",
         condition = "outcome!=success",
@@ -176,5 +121,7 @@ digraph triage_review {
         color     = "#E57373",
         fontcolor = "#E57373"
     ]
+
+    comment_draft -> done
 
 }
