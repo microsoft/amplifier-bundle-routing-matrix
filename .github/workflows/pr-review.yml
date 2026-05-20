@@ -1,4 +1,4 @@
-# PR Review — powered by kenotron-ms/amplifier-app-actions
+# PR Review — powered by microsoft/amplifier-app-actions
 #
 # Triggered by two paths:
 #   Path A: pull_request opened — reads the full diff and every changed file,
@@ -10,7 +10,7 @@
 # The bundle carries all PR review context (five checks, read-full-files protocol,
 # DM routing rules) — no local prompt files or recipes needed.
 #
-# Docs: https://github.com/kenotron-ms/amplifier-app-actions
+# Docs: https://github.com/microsoft/amplifier-app-actions
 
 name: PR Review
 
@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: kenotron-ms/amplifier-app-actions@main
+      - uses: microsoft/amplifier-app-actions@main
         with:
           bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/pr-review.bundle.md
           prompt: |
@@ -63,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: kenotron-ms/amplifier-app-actions@main
+      - uses: microsoft/amplifier-app-actions@main
         with:
           bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/pr-review.bundle.md
           prompt: |

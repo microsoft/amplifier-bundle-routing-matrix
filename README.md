@@ -1,7 +1,7 @@
 # amplifier-actions-example
 
 Reference configuration showing how to use
-[`kenotron-ms/amplifier-app-actions`](https://github.com/kenotron-ms/amplifier-app-actions)
+[`microsoft/amplifier-app-actions`](https://github.com/microsoft/amplifier-app-actions)
 with [`kenotron-ms/amplifier-bundle-dev-support`](https://github.com/kenotron-ms/amplifier-bundle-dev-support)
 for automated issue triage, deep investigation, and PR review on Amplifier ecosystem repos.
 

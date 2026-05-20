@@ -1,11 +1,11 @@
-# Issue Triage — powered by kenotron-ms/amplifier-app-actions
+# Issue Triage — powered by microsoft/amplifier-app-actions
 #
 # Triggered when a new issue is opened. Uses an Attractor DOT pipeline
 # (.github/amplifier/triage-review.dot) that runs a manager-supervisor loop:
 # an investigator agent examines the issue independently, and a quality gate
 # validates the root cause is at the correct ecosystem layer before posting.
 #
-# Docs: https://github.com/kenotron-ms/amplifier-app-actions
+# Docs: https://github.com/microsoft/amplifier-app-actions
 
 name: Issue Triage
 
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: kenotron-ms/amplifier-app-actions@main
+      - uses: microsoft/amplifier-app-actions@main
         with:
           bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/issue-triage.bundle.md
           attractor_source: .github/amplifier/triage-review.dot
