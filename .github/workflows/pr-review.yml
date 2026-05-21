@@ -56,7 +56,7 @@ jobs:
   review-from-issue:
     if: >-
       github.event_name == 'issue_comment' &&
-      contains(github.event.comment.body, '/pr') &&
+      contains(github.event.comment.body, '/review-pr') &&
       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
 
     runs-on: ubuntu-latest

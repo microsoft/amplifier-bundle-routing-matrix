@@ -51,7 +51,7 @@ jobs:
       !endsWith(github.event.comment.user.login, '[bot]') &&
       !startsWith(github.event.comment.body, '/triage') &&
       !startsWith(github.event.comment.body, '/repro') &&
-      !startsWith(github.event.comment.body, '/pr')
+      !startsWith(github.event.comment.body, '/review-pr')
     steps:
       - uses: actions/checkout@v4
 
