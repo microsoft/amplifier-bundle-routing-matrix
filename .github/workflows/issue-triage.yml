@@ -9,9 +9,9 @@
 
 name: Issue Triage
 
-on:
-  issues:
-    types: [opened]
+#on:
+#  issues:
+#    types: [opened]
 
 permissions:
   issues: write
