@@ -7,7 +7,7 @@
 //   2. Simple:              manager drafts quick summary → comment_draft (skip investigation)
 //   3. Needs clarification: manager → refine_question → ask_human → process_answer →
 //                           check_clarify_done loop until READY_TO_INVESTIGATE sentinel
-//   4. Default (fallback):  manager → discover_repos → investigate → quality_eval loop
+//   4. Default (fallback):  manager → refine_question (clarify is the safe default for vague issues)
 //   5. comment_draft always runs last — writes bridge.* output for GitHub
 //
 // Key differences from triage-review-resolve-hitl.dot:
@@ -18,7 +18,7 @@
 //   - process_answer reads ${human.gate.text} and integrates the reply
 //   - check_clarify_done uses a tool_command to grep for READY_TO_INVESTIGATE sentinel
 //   - discover_repos is an explicit node that reads $goal and runs git clone
-//   - manager routes to discover_repos as the unconditional fallback (not clarify)
+//   - manager routes to refine_question as the unconditional fallback (clarify is the safe default)
 //
 // Adapted for Resolve-hosted execution:
 //   - Repos are in workspace via Gitea mirrors (no checkout tools)
@@ -70,8 +70,8 @@ digraph triage_dynamic {
 
     // Manager — reads the issue, decides complexity, routes accordingly.
     // SIMPLE:              manager writes triage_summary and skips to comment_draft.
-    // NEEDS_CLARIFICATION: routes to refine_question to begin the clarification loop.
-    // FALLBACK (default):  routes to discover_repos for immediate investigation.
+    // COMPLEX:             routes to discover_repos for deep investigation.
+    // FALLBACK (default):  routes to refine_question — asking for clarification is the safe default.
     manager [
         label      = "Manager",
         shape      = house,
@@ -201,20 +201,21 @@ digraph triage_dynamic {
         fontcolor = "#43A047"
     ]
 
-    // NEEDS CLARIFICATION: route to the clarification loop.
-    // Only fires when manager explicitly sets context.complexity=needs_clarification.
-    manager -> refine_question [
-        label     = "needs_clarification",
-        condition = "context.complexity=needs_clarification",
-        color     = "#FF9800",
-        fontcolor = "#FF9800"
+    // COMPLEX: route to discover_repos for deep investigation.
+    // Only fires when manager explicitly sets context.complexity=complex.
+    manager -> discover_repos [
+        label     = "complex",
+        condition = "context.complexity=complex",
+        color     = "#1565C0",
+        fontcolor = "#1565C0"
     ]
 
-    // FALLBACK: discover_repos is the safe default for complex issues.
-    // Unconditional — catches explicit "complex" routing AND
+    // FALLBACK: refine_question is the safe default for ambiguous issues.
+    // Unconditional — catches explicit "needs_clarification" routing AND
     // cases where the LLM output wasn't parsed as structured JSON.
-    manager -> discover_repos [
-        label = "complex (fallback)"
+    // Asking for clarification is always safer than diving into code.
+    manager -> refine_question [
+        label = "clarify (fallback)"
     ]
 
     // ── Clarification loop edges ──────────────────────────────────────
