@@ -5,8 +5,8 @@
 // Flow:
 //   1. Manager reads the issue and decides: simple, needs_clarification, or complex?
 //   2. Simple:              manager drafts quick summary → comment_draft (skip investigation)
-//   3. Needs Clarification: manager → clarify (hexagon HITL pause) → investigate
-//   4. Complex (default):   investigate → quality_eval loop (max 3 cycles)
+//   3. Complex:             manager → investigate → quality_eval loop (max 3 cycles)
+//   4. Default (fallback):  manager → clarify (hexagon HITL pause) → investigate
 //   5. comment_draft always runs last — writes bridge.* output for GitHub
 //
 // Variant of: triage-review-resolve.dot
@@ -16,8 +16,8 @@
 //   - Added clarify node (shape=hexagon, mode=freeform) — HITL pause point
 //   - manager now routes to THREE outcomes instead of two:
 //       (1) simple              → comment_draft  (unchanged)
-//       (2) needs_clarification → clarify         (new HITL path)
-//       (3) complex (fallback)  → investigate     (unchanged)
+//       (2) complex             → investigate      (conditional)
+//       (3) fallback            → clarify          (unconditional — catches unstructured output)
 //   - investigate now accepts optional $clarify_response context variable
 //
 // No bridge changes required:
@@ -68,8 +68,8 @@ digraph triage_review_hitl {
 
     // Manager — reads the issue, decides complexity, routes accordingly.
     // SIMPLE:              manager writes triage_summary and skips to comment_draft.
-    // NEEDS_CLARIFICATION: manager writes clarify_prompt; routed to clarify (HITL pause).
-    // COMPLEX (fallback):  routes to investigation cycle for deep analysis.
+    // COMPLEX:             manager sets context.complexity=complex; routed to investigate.
+    // FALLBACK (default):  routes to clarify (HITL pause) — catches ambiguous output too.
     manager [
         label      = "Manager",
         shape      = house,
@@ -153,20 +153,21 @@ digraph triage_review_hitl {
         fontcolor = "#43A047"
     ]
 
-    // NEEDS_CLARIFICATION: pause for human input from the reporter.
-    // Only fires when manager explicitly sets context.complexity=needs_clarification.
-    manager -> clarify [
-        label     = "needs_clarification",
-        condition = "context.complexity=needs_clarification",
-        color     = "#FB8C00",
-        fontcolor = "#FB8C00"
+    // COMPLEX: deep investigation needed — code verification required.
+    // Only fires when manager explicitly sets context.complexity=complex.
+    manager -> investigate [
+        label     = "complex",
+        condition = "context.complexity=complex",
+        color     = "#1565C0",
+        fontcolor = "#1565C0"
     ]
 
-    // COMPLEX or fallback: investigate is the safe default.
-    // Unconditional — catches both explicit "complex" routing AND
-    // cases where the LLM output wasn't parsed as structured JSON.
-    manager -> investigate [
-        label = "complex"
+    // FALLBACK: clarify is the safe default.
+    // Unconditional — catches needs_clarification, unstructured LLM output,
+    // and any other case where the manager didn't explicitly route.
+    // Asking the human is always safer than silently investigating.
+    manager -> clarify [
+        label = "needs_clarification"
     ]
 
     // After human replies, proceed to investigation with $clarify_response injected.
