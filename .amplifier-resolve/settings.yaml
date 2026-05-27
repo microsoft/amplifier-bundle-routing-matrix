@@ -2,3 +2,4 @@ resolver: dot-graph
 resolvers:
   dot-graph:
     pipeline: .amplifier-resolve/triage-dynamic.dot
+branch: main
