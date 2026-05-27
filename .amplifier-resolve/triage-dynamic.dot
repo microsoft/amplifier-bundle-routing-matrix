@@ -127,7 +127,7 @@ digraph triage_dynamic {
             label        = "Check Clarify Done",
             shape        = parallelogram,
             fillcolor    = "#E1BEE7",
-            tool_command = "grep -q READY_TO_INVESTIGATE docs/triage/clarify.md && echo done || echo more_questions"
+            tool_command = "#!/bin/sh\nif grep -q READY_TO_INVESTIGATE docs/triage/clarify.md 2>/dev/null; then\n  printf 'done'\nelse\n  printf 'more_questions'\nfi"
         ]
     }
 
