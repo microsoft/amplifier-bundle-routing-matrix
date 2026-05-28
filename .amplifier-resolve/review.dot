@@ -88,7 +88,7 @@ digraph code_review {
         label     = "Draft Comment",
         shape     = box,
         fillcolor = "#E8F0FE",
-        prompt    = "Draft a GitHub issue comment summarizing the code review.\n\nInclude:\n- Review verdict: ${review_verdict}\n- Summary: ${review_summary}\n- Link to the PR: ${review.pr_url}\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR COMMENT IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE REVIEW SUMMARY\", \"bridge.labels\": [\"reviewed\"]}}"
+        prompt    = "Draft a GitHub issue comment summarizing the code review.\n\nInclude:\n- Review verdict: ${review_verdict}\n- Summary: ${review_summary}\n- Link to the PR: ${review.pr_url}\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR COMMENT IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE REVIEW SUMMARY\", \"bridge.labels\": [\"reviewed\"]}}\n\nCRITICAL: Your ENTIRE response must be ONLY the JSON object above. No preamble, no explanation, no markdown code fences, no text before or after. Just the raw JSON."
     ]
 
     // Pipeline exit
