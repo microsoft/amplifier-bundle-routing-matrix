@@ -3,7 +3,7 @@
 Reference configuration showing how to use
 [`microsoft/amplifier-app-actions`](https://github.com/microsoft/amplifier-app-actions)
 with [`kenotron-ms/amplifier-bundle-dev-support`](https://github.com/kenotron-ms/amplifier-bundle-dev-support)
-for automated issue triage, deep investigation, and PR review on Amplifier ecosystem repos.
+for automated issue triage, deep investigation, and PR review on Amplifer ecosystem repos.
 
 ---
 
