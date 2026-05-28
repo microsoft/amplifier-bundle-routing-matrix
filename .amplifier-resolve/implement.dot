@@ -88,7 +88,7 @@ digraph implement_fix {
         label     = "Draft Comment",
         shape     = box,
         fillcolor = "#E8F0FE",
-        prompt    = "Draft a GitHub issue comment summarizing the implementation.\n\nRead $implementation_summary for what was done.\nPR URL (if created): $delivery.pr_url\n\nInclude:\n- Brief summary of what was fixed and how\n- Which files were changed\n- Link to PR if available: $delivery.pr_url\n- Suggest: /resolve review to review the changes\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR COMMENT IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE FIX SUMMARY\", \"bridge.labels\": [\"fix-implemented\"]}}"
+        prompt    = "Draft a GitHub issue comment summarizing the implementation.\n\nRead $implementation_summary for what was done.\nPR URL (if created): $delivery.pr_url\n\nInclude:\n- Brief summary of what was fixed and how\n- Which files were changed\n- Link to PR if available: $delivery.pr_url\n- Suggest: /resolve review to review the changes\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR COMMENT IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE FIX SUMMARY\", \"bridge.labels\": [\"fix-implemented\"]}}\n\nCRITICAL: Your ENTIRE response must be ONLY the JSON object above. No preamble, no explanation, no markdown code fences, no text before or after. Just the raw JSON."
     ]
 
     // Pipeline exit
