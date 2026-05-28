@@ -6,13 +6,13 @@
 //   1. Planner reads issue + triage, writes fix plan to docs/fix-plan.md
 //   2. Checkout a resolve/fix-N branch
 //   3. Implement fix using strict TDD (failing test first)
-//   4. Run tests — pass → push, fail → retry implement_fix
+//   4. Run tests — pass → push, fail → retry (max 3 retries, then report failure)
 //   5. Push branch, create PR, draft GitHub comment
 //
 
 digraph implement_fix {
 
-    // — Graph-level attributes ————————————————————————————————
+    // — Graph-level attributes ————————————————————————————————————
 
     label             = "Implement Fix"
     description       = "Plan and implement a code fix using TDD, run tests, and deliver via PR"
@@ -26,7 +26,7 @@ digraph implement_fix {
     default_thread_id = "implement-fix-thread"
 
     // — Model stylesheet ——————————————————————————————————————
-    model_stylesheet  = "planner: model_role=reasoning; implement_fix: model_role=coding; comment_draft: model_role=general"
+    model_stylesheet  = "planner: model_role=reasoning; implement_fix: model_role=coding; comment_draft: model_role=general; report_failure: model_role=general"
 
     // — Default node and edge styles —————————————————————————
     node [fontname="Helvetica", fontsize=11, style="filled"]
@@ -71,12 +71,25 @@ digraph implement_fix {
         prompt     = "You are implementing a code fix using strict TDD.\n\nIRON LAW: No production code without a failing test first.\n\nRead the fix plan from docs/fix-plan.md.\nIf prior attempts exist, review $test_output and $build_errors.\n\nProcess:\n1. Write a failing test that reproduces the bug\n2. Run the test — confirm it fails for the right reason\n3. Write the minimal production code to make the test pass\n4. Run all tests — confirm no regressions\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"implementation_summary\": \"YOUR SUMMARY OF CHANGES\"}}"
     ]
 
-    // Run tests — auto-detect project type and run appropriate test command
+    // Run tests — auto-detect project type and run appropriate test command.
+    // Checks that the required tool exists before running it.
+    // Installs make if a Makefile is present but make is missing.
     run_tests [
         label        = "Run Tests",
         shape        = parallelogram,
         fillcolor    = "#E1BEE7",
-        tool_command = "if [ -f pyproject.toml ]; then pytest; elif [ -f package.json ]; then npm test; elif [ -f Makefile ]; then make test; elif [ -f Cargo.toml ]; then cargo test; else echo 'No test runner detected' && exit 1; fi"
+        tool_command = "if [ -f pyproject.toml ]; then if command -v pytest >/dev/null 2>&1; then pytest; elif command -v python3 >/dev/null 2>&1; then python3 -m pytest; else printf 'no pytest available' && exit 1; fi; elif [ -f package.json ]; then if command -v npm >/dev/null 2>&1; then npm test; else printf 'no npm available' && exit 1; fi; elif [ -f Makefile ]; then if ! command -v make >/dev/null 2>&1; then apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq make >/dev/null 2>&1; fi; if command -v make >/dev/null 2>&1; then make test; else printf 'make install failed' && exit 1; fi; elif [ -f Cargo.toml ]; then if command -v cargo >/dev/null 2>&1; then cargo test; else printf 'no cargo available' && exit 1; fi; else printf 'no test runner detected' && exit 1; fi"
+    ]
+
+    // Retry counter — tracks test retry attempts and caps at 3.
+    // Writes a counter file; when retries exhausted, exits non-zero
+    // so the condition edge routes to report_failure instead of
+    // looping back to implement_fix.
+    retry_gate [
+        label        = "Retry Gate",
+        shape        = diamond,
+        fillcolor    = "#FFF9C4",
+        tool_command = "COUNTER_FILE=.resolve-retry-count; COUNT=0; if [ -f $COUNTER_FILE ]; then COUNT=$(cat $COUNTER_FILE); fi; COUNT=$((COUNT + 1)); printf '%d' $COUNT > $COUNTER_FILE; if [ $COUNT -ge 3 ]; then printf 'retries_exhausted(%d)' $COUNT; exit 1; else printf 'retry(%d/3)' $COUNT; exit 0; fi"
     ]
 
     // Push branch to remote
@@ -105,6 +118,16 @@ digraph implement_fix {
         prompt    = "Draft a GitHub issue comment summarizing the fix.\n\nInclude:\n- Brief summary of what was fixed and how\n- Link to the PR: $delivery.pr_url\n- Suggest next step: /resolve review to review the changes\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR COMMENT IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE FIX SUMMARY\", \"bridge.labels\": [\"bug\", \"fix-delivered\"]}}"
     ]
 
+    // Report failure — reached when test retries are exhausted.
+    // Posts a bridge.comment explaining what went wrong so the user
+    // sees actionable feedback on the GitHub issue.
+    report_failure [
+        label     = "Report Failure",
+        shape     = box,
+        fillcolor = "#FFCDD2",
+        prompt    = "The implement-fix pipeline has exhausted its test retries (3 attempts).\n\nSummarize what happened:\n- What was attempted (from $implementation_summary)\n- What tests failed and why (from $test_output)\n- Suggest what the user can try next\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"## \u274c Implementation failed after 3 attempts\\n\\nYOUR FAILURE SUMMARY IN MARKDOWN\", \"bridge.summary\": \"Fix failed after 3 test retries\", \"bridge.labels\": [\"bug\", \"fix-failed\"]}}"
+    ]
+
     // Pipeline exit
     done [
         label     = "Done",
@@ -129,11 +152,28 @@ digraph implement_fix {
         fontcolor = "#43A047"
     ]
 
-    // Tests fail — retry implementation
-    run_tests -> implement_fix [
-        label     = "fail (retry)",
+    // Tests fail — check retry gate
+    run_tests -> retry_gate [
+        label     = "fail",
         condition = "outcome!=success",
         style     = dashed,
+        color     = "#E57373",
+        fontcolor = "#E57373"
+    ]
+
+    // Retries remaining — loop back to implement_fix
+    retry_gate -> implement_fix [
+        label     = "retry",
+        condition = "outcome=success",
+        style     = dashed,
+        color     = "#FFA726",
+        fontcolor = "#FFA726"
+    ]
+
+    // Retries exhausted — report failure
+    retry_gate -> report_failure [
+        label     = "exhausted",
+        condition = "outcome!=success",
         color     = "#E57373",
         fontcolor = "#E57373"
     ]
@@ -141,5 +181,6 @@ digraph implement_fix {
     push_branch -> create_pr
     create_pr -> comment_draft
     comment_draft -> done
+    report_failure -> done
 
 }
