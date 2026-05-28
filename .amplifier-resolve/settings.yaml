@@ -3,4 +3,5 @@ resolvers:
     pipelines:
       - .amplifier-resolve/triage-dynamic.dot
       - .amplifier-resolve/implement.dot
+      - .amplifier-resolve/review.dot
 branch: main
