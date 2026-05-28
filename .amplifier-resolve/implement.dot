@@ -1,21 +1,18 @@
 // implement.dot
 //
-// Pipeline: TDD-Based Code Fix with PR Delivery
+// Pipeline: Code Fix Demo
 //
-// Flow:
-//   1. Planner reads issue + triage, writes fix plan to docs/fix-plan.md
-//   2. Checkout a resolve/fix-N branch
-//   3. Implement fix using strict TDD (failing test first)
-//   4. Run tests — pass → push, fail → retry (max 3 retries, then report failure)
-//   5. Push branch, create PR, draft GitHub comment
-//
+// Simple flow for demonstrating issue -> fix -> results:
+//   1. Planner reads issue + triage findings, writes fix plan
+//   2. Implement the fix (LLM handles TDD, tests, commits internally)
+//   3. Comment draft posts results back to the GitHub issue via bridge.*
 
 digraph implement_fix {
 
     // — Graph-level attributes ————————————————————————————————————
 
     label             = "Implement Fix"
-    description       = "Plan and implement a code fix using TDD, run tests, and deliver via PR"
+    description       = "Plan and implement a code fix or feature, then report results"
     labelloc          = t
     rankdir           = TB
     compound          = true
@@ -25,16 +22,16 @@ digraph implement_fix {
     default_fidelity  = "full"
     default_thread_id = "implement-fix-thread"
 
-    // — Model stylesheet ——————————————————————————————————————
-    model_stylesheet  = "planner: model_role=reasoning; implement_fix: model_role=coding; comment_draft: model_role=general; report_failure: model_role=general"
+    // — Model stylesheet ——————————————————————————————————————————
+    model_stylesheet  = "planner: model_role=reasoning; implement_fix: model_role=coding; comment_draft: model_role=general"
 
-    // — Default node and edge styles —————————————————————————
+    // — Default node and edge styles —————————————————————————————
     node [fontname="Helvetica", fontsize=11, style="filled"]
     edge [fontname="Helvetica", fontsize=10, color="#555555"]
 
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
     // PIPELINE NODES
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
 
     // Entry point
     start [
@@ -49,18 +46,12 @@ digraph implement_fix {
         shape      = box,
         fillcolor  = "#E8F0FE",
         max_cycles = 2,
-        prompt     = "You are a fix planner. Read the issue and triage analysis from $goal.\n\nWrite a concise fix plan to docs/fix-plan.md with these sections:\n- ROOT CAUSE: What is broken and why\n- FILES TO CHANGE: Exact files and what changes in each\n- TEST STRATEGY: What tests to write/modify to verify the fix\n- VERIFICATION: How to confirm the fix works end-to-end\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"fix_plan\": \"docs/fix-plan.md written\"}}"
+        prompt     = "You are a fix planner. Read the issue and any triage analysis from $goal.\n\nWrite a concise fix plan to docs/fix-plan.md with these sections:\n- ROOT CAUSE: What is broken and why\n- FILES TO CHANGE: Exact files and what changes in each\n- TEST STRATEGY: What tests to write/modify to verify the fix\n- VERIFICATION: How to confirm the fix works end-to-end\n\nThen git add and git commit the plan.\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"fix_plan\": \"docs/fix-plan.md written\"}}"
     ]
 
-    // Checkout branch — extracts issue number, creates resolve/fix-N branch
-    checkout_branch [
-        label        = "Checkout Branch",
-        shape        = parallelogram,
-        fillcolor    = "#E1BEE7",
-        tool_command = "ISSUE_NUM=$(echo \"$goal\" | grep -oP '(?<=#)\\d+' | head -1) && git checkout -b resolve/fix-${ISSUE_NUM}"
-    ]
-
-    // Implement fix — strict TDD with failing test first
+    // Implement fix — the LLM handles everything: write tests, write code,
+    // run tests, fix failures, git add, git commit. Same pattern as
+    // dotpowers' ImplementTask.
     implement_fix [
         label      = "Implement Fix",
         shape      = box,
@@ -68,47 +59,7 @@ digraph implement_fix {
         max_cycles = 3,
         goal_gate  = true,
         fidelity   = "full",
-        prompt     = "You are implementing a code fix using strict TDD.\n\nIRON LAW: No production code without a failing test first.\n\nRead the fix plan from docs/fix-plan.md.\nIf prior attempts exist, review $test_output and $build_errors.\n\nProcess:\n1. Write a failing test that reproduces the bug\n2. Run the test — confirm it fails for the right reason\n3. Write the minimal production code to make the test pass\n4. Run all tests — confirm no regressions\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"implementation_summary\": \"YOUR SUMMARY OF CHANGES\"}}"
-    ]
-
-    // Run tests — tries test runners in priority order.
-    // The implement_fix LLM node does TDD internally, so this is a
-    // verification step. If no standard test runner is found, passes
-    // (the LLM already ran tests during implementation).
-    run_tests [
-        label        = "Run Tests",
-        shape        = parallelogram,
-        fillcolor    = "#E1BEE7",
-        tool_command = "#!/bin/sh\ncd /project/workspace 2>/dev/null || cd .\nif [ -f pyproject.toml ] && command -v pytest >/dev/null 2>&1; then\n  pytest\nelif [ -f pyproject.toml ] && command -v python3 >/dev/null 2>&1; then\n  python3 -m pytest\nelif [ -f package.json ] && command -v npm >/dev/null 2>&1; then\n  npm test\nelif [ -f Cargo.toml ] && command -v cargo >/dev/null 2>&1; then\n  cargo test\nelif [ -f Makefile ]; then\n  if ! command -v make >/dev/null 2>&1; then\n    apt-get update -qq && apt-get install -y -qq make >/dev/null 2>&1 || true\n  fi\n  if command -v make >/dev/null 2>&1; then\n    if make -n test >/dev/null 2>&1; then\n      make test\n    else\n      printf 'Makefile found but no test target -- skipping'\n    fi\n  fi\nelse\n  printf 'no standard test runner found -- relying on TDD from implement_fix'\nfi"
-    ]
-
-    // Retry counter — tracks test retry attempts and caps at 3.
-    // Writes a counter file; when retries exhausted, exits non-zero
-    // so the condition edge routes to report_failure instead of
-    // looping back to implement_fix.
-    retry_gate [
-        label        = "Retry Gate",
-        shape        = diamond,
-        fillcolor    = "#FFF9C4",
-        tool_command = "COUNTER_FILE=.resolve-retry-count; COUNT=0; if [ -f $COUNTER_FILE ]; then COUNT=$(cat $COUNTER_FILE); fi; COUNT=$((COUNT + 1)); printf '%d' $COUNT > $COUNTER_FILE; if [ $COUNT -ge 3 ]; then printf 'retries_exhausted(%d)' $COUNT; exit 1; else printf 'retry(%d/3)' $COUNT; exit 0; fi"
-    ]
-
-    // Push branch to remote
-    push_branch [
-        label        = "Push Branch",
-        shape        = parallelogram,
-        fillcolor    = "#E1BEE7",
-        tool_command = "git push -u origin HEAD"
-    ]
-
-    // Create PR — extract title from fix-plan.md, create PR via gh CLI
-    create_pr [
-        label        = "Create PR",
-        shape        = parallelogram,
-        fillcolor    = "#E1BEE7",
-        parse_json   = true,
-        tool_command = "PR_TITLE=$(head -1 docs/fix-plan.md | sed 's/^#* *//') && gh pr create --title \"${PR_TITLE}\" --body \"Automated fix PR. See docs/fix-plan.md for details.\" --json url",
-        context_updates = "{\"delivery.pr_url\": \"$pr_url\", \"pr_created\": true}"
+        prompt     = "You are implementing a code fix.\n\nRead the fix plan from docs/fix-plan.md.\n\nProcess:\n1. Write a test that reproduces the bug (if applicable)\n2. Run the test to confirm it fails\n3. Write the minimal code to fix the issue\n4. Run tests to confirm the fix works and no regressions\n5. git add the changed files (specific files, not -A)\n6. git commit with a descriptive message\n\nIf tests fail, debug and fix. You have 3 attempts.\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"implementation_summary\": \"YOUR SUMMARY: what files changed, what tests pass, what was fixed\"}}"
     ]
 
     // Comment draft — writes bridge.* output for GitHub comment
@@ -116,17 +67,7 @@ digraph implement_fix {
         label     = "Draft Comment",
         shape     = box,
         fillcolor = "#E8F0FE",
-        prompt    = "Draft a GitHub issue comment summarizing the fix.\n\nInclude:\n- Brief summary of what was fixed and how\n- Link to the PR: $delivery.pr_url\n- Suggest next step: /resolve review to review the changes\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR COMMENT IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE FIX SUMMARY\", \"bridge.labels\": [\"bug\", \"fix-delivered\"]}}"
-    ]
-
-    // Report failure — reached when test retries are exhausted.
-    // Posts a bridge.comment explaining what went wrong so the user
-    // sees actionable feedback on the GitHub issue.
-    report_failure [
-        label     = "Report Failure",
-        shape     = box,
-        fillcolor = "#FFCDD2",
-        prompt    = "The implement-fix pipeline has exhausted its test retries (3 attempts).\n\nSummarize what happened:\n- What was attempted (from $implementation_summary)\n- What tests failed and why (from $test_output)\n- Suggest what the user can try next\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"## \u274c Implementation failed after 3 attempts\\n\\nYOUR FAILURE SUMMARY IN MARKDOWN\", \"bridge.summary\": \"Fix failed after 3 test retries\", \"bridge.labels\": [\"bug\", \"fix-failed\"]}}"
+        prompt    = "Draft a GitHub issue comment summarizing the implementation.\n\nRead $implementation_summary for what was done.\n\nInclude:\n- Brief summary of what was fixed and how\n- Which files were changed\n- Test results\n- Suggest next step: the user can review the changes in the Resolve workspace\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR COMMENT IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE FIX SUMMARY\", \"bridge.labels\": [\"fix-implemented\"]}}"
     ]
 
     // Pipeline exit
@@ -136,52 +77,13 @@ digraph implement_fix {
         fillcolor = "#FFCDD2"
     ]
 
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
     // EDGES
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
 
     start -> planner
-    planner -> checkout_branch
-    checkout_branch -> implement_fix
-    implement_fix -> run_tests
-
-    // Tests pass — proceed to push
-    run_tests -> push_branch [
-        label     = "pass",
-        condition = "outcome=success",
-        color     = "#43A047",
-        fontcolor = "#43A047"
-    ]
-
-    // Tests fail — check retry gate
-    run_tests -> retry_gate [
-        label     = "fail",
-        condition = "outcome!=success",
-        style     = dashed,
-        color     = "#E57373",
-        fontcolor = "#E57373"
-    ]
-
-    // Retries remaining — loop back to implement_fix
-    retry_gate -> implement_fix [
-        label     = "retry",
-        condition = "outcome=success",
-        style     = dashed,
-        color     = "#FFA726",
-        fontcolor = "#FFA726"
-    ]
-
-    // Retries exhausted — report failure
-    retry_gate -> report_failure [
-        label     = "exhausted",
-        condition = "outcome!=success",
-        color     = "#E57373",
-        fontcolor = "#E57373"
-    ]
-
-    push_branch -> create_pr
-    create_pr -> comment_draft
+    planner -> implement_fix
+    implement_fix -> comment_draft
     comment_draft -> done
-    report_failure -> done
 
 }
