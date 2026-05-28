@@ -72,12 +72,15 @@ digraph implement_fix {
         prompt     = "You are implementing a code fix.\n\nRead the fix plan from docs/fix-plan.md.\n\nProcess:\n1. Write a test that reproduces the bug (if applicable)\n2. Run the test to confirm it fails\n3. Write the minimal code to fix the issue\n4. Run tests to confirm the fix works and no regressions\n5. git add the changed files (specific files, not -A)\n6. git commit with a descriptive message\n\nIf tests fail, debug and fix. You have 3 attempts.\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"implementation_summary\": \"YOUR SUMMARY: what files changed, what tests pass, what was fixed\"}}"
     ]
 
-    // Push branch — push the working branch to origin (Gitea mirror)
-    push_branch [
-        label      = "Push Branch",
+    // Push branch + create PR — push directly to GitHub using GH_TOKEN
+    // (Gitea promotion has a known Incus/Docker runtime mismatch bug,
+    //  so we bypass it and push to GitHub directly)
+    push_and_pr [
+        label      = "Push & PR",
         shape      = parallelogram,
         fillcolor  = "#FFF9C4",
-        tool_command = "git push -u origin HEAD"
+        parse_json = true,
+        tool_command = "#!/bin/sh\nset -e\nBRANCH=$(git rev-parse --abbrev-ref HEAD)\nREPO_URL=$(echo \"$goal\" | grep -oP 'https://github.com/[^/]+/[^/# ]+' | head -1)\nif [ -z \"$REPO_URL\" ]; then\n  printf '{\"error\": \"no repo URL found in goal\"}'\n  exit 1\nfi\nOWNER_REPO=$(echo \"$REPO_URL\" | sed 's|https://github.com/||')\ngit remote add github \"https://x-access-token:${GH_TOKEN}@github.com/${OWNER_REPO}.git\" 2>/dev/null || git remote set-url github \"https://x-access-token:${GH_TOKEN}@github.com/${OWNER_REPO}.git\"\ngit push -u github \"$BRANCH\" 2>&1\nPR_TITLE=$(head -1 docs/fix-plan.md 2>/dev/null | sed 's/^#* *//' || echo \"Automated fix\")\nPR_URL=$(curl -s -X POST \\\n  -H \"Authorization: token ${GH_TOKEN}\" \\\n  -H \"Accept: application/vnd.github+json\" \\\n  \"https://api.github.com/repos/${OWNER_REPO}/pulls\" \\\n  -d \"{\\\"title\\\": \\\"${PR_TITLE}\\\", \\\"head\\\": \\\"${BRANCH}\\\", \\\"base\\\": \\\"main\\\", \\\"body\\\": \\\"Automated fix. See docs/fix-plan.md for details.\\\"}\" \\\n  | grep -o '\"html_url\": \"[^\"]*\"' | head -1 | cut -d'\"' -f4)\nif [ -n \"$PR_URL\" ]; then\n  printf '{\"delivery.pr_url\": \"%s\", \"pr_created\": \"true\"}' \"$PR_URL\"\nelse\n  printf '{\"delivery.pr_url\": \"\", \"pr_created\": \"false\", \"note\": \"push succeeded but PR creation failed\"}'\nfi"
     ]
 
     // Comment draft — writes bridge.* output for GitHub comment
@@ -85,7 +88,7 @@ digraph implement_fix {
         label     = "Draft Comment",
         shape     = box,
         fillcolor = "#E8F0FE",
-        prompt    = "Draft a GitHub issue comment summarizing the implementation.\n\nRead $implementation_summary for what was done.\nThe branch has been pushed and a PR will be created automatically.\n\nInclude:\n- Brief summary of what was fixed and how\n- Which files were changed\n- Test results\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR COMMENT IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE FIX SUMMARY\", \"bridge.labels\": [\"fix-implemented\"]}}"
+        prompt    = "Draft a GitHub issue comment summarizing the implementation.\n\nRead $implementation_summary for what was done.\nPR URL (if created): $delivery.pr_url\n\nInclude:\n- Brief summary of what was fixed and how\n- Which files were changed\n- Link to PR if available: $delivery.pr_url\n- Suggest: /resolve review to review the changes\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR COMMENT IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE FIX SUMMARY\", \"bridge.labels\": [\"fix-implemented\"]}}"
     ]
 
     // Pipeline exit
@@ -102,8 +105,8 @@ digraph implement_fix {
     start -> planner
     planner -> checkout_branch
     checkout_branch -> implement_fix
-    implement_fix -> push_branch
-    push_branch -> comment_draft
+    implement_fix -> push_and_pr
+    push_and_pr -> comment_draft
     comment_draft -> done
 
 }
