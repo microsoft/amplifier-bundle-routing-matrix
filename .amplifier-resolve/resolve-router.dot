@@ -1,0 +1,118 @@
+// resolve-router.dot
+//
+// Pipeline: Resolve Router — dispatches to triage, implement, or review sub-pipelines
+//
+// Flow:
+//   1. Router LLM reads $goal and decides: triage, implement, or review
+//   2. Dispatches to the chosen folder-based sub-pipeline
+//   3. Unconditional fallback defaults to triage_leg
+//
+// Each folder leg delegates to a separate .dot pipeline and surfaces
+// bridge.* outputs back to the parent pipeline.
+
+digraph resolve_router {
+
+    // — Graph-level attributes ——————————————————————————————————
+
+    label       = "Resolve Router"
+    description = "Route incoming requests to the appropriate sub-pipeline based on intent analysis"
+    goal        = "$goal"
+    rankdir     = TB
+
+    // — Default node and edge styles ————————————————————————————
+
+    node [fontname="Helvetica", fontsize=11, style="filled"]
+    edge [fontname="Helvetica", fontsize=10, color="#555555"]
+
+    // ═══════════════════════════════════════════════════════════
+    // PIPELINE NODES
+    // ═══════════════════════════════════════════════════════════
+
+    // Entry point
+    start [
+        label     = "Start",
+        shape     = Mdiamond,
+        fillcolor = "#C8E6C9"
+    ]
+
+    // Router — reads the goal and chooses triage, implement, or review
+    router [
+        label     = "Router",
+        shape     = box,
+        fillcolor = "#E8F0FE",
+        prompt    = "You are a routing agent. Read the goal described in $goal.\n\nYour job is to decide which sub-pipeline should handle this request.\n\nChoose ONE of:\n- triage: The request is about triaging an issue (understanding, analyzing, categorizing)\n- implement: The request is about implementing a fix or feature (code changes, PRs)\n- review: The request is about reviewing code or a PR\n\nOutput ONLY this JSON:\n{\"status\": \"success\", \"context_updates\": {\"preferred_label\": \"YOUR_CHOICE\"}}\n\nWhere YOUR_CHOICE is one of: triage, implement, review"
+    ]
+
+    // Triage sub-pipeline
+    triage_leg [
+        label     = "Triage",
+        shape     = folder,
+        fillcolor = "#C8E6C9",
+        dot_file  = "triage-dynamic.dot",
+        outputs   = "bridge.comment,bridge.summary,bridge.labels"
+    ]
+
+    // Implement sub-pipeline
+    implement_leg [
+        label     = "Implement",
+        shape     = folder,
+        fillcolor = "#BBDEFB",
+        dot_file  = "implement.dot",
+        outputs   = "bridge.comment,bridge.summary,bridge.labels,delivery.pr_url"
+    ]
+
+    // Review sub-pipeline
+    review_leg [
+        label     = "Review",
+        shape     = folder,
+        fillcolor = "#F8BBD0",
+        dot_file  = "review.dot",
+        outputs   = "bridge.comment,bridge.summary,bridge.labels"
+    ]
+
+    // Pipeline exit
+    done [
+        label     = "Done",
+        shape     = Msquare,
+        fillcolor = "#FFCDD2"
+    ]
+
+    // ═══════════════════════════════════════════════════════════
+    // EDGES
+    // ═══════════════════════════════════════════════════════════
+
+    start -> router
+
+    // Conditional edges based on router decision
+    router -> triage_leg [
+        label     = "triage",
+        condition = "outcome=triage",
+        color     = "#43A047",
+        fontcolor = "#43A047"
+    ]
+
+    router -> implement_leg [
+        label     = "implement",
+        condition = "outcome=implement",
+        color     = "#1565C0",
+        fontcolor = "#1565C0"
+    ]
+
+    router -> review_leg [
+        label     = "review",
+        condition = "outcome=review",
+        color     = "#AD1457",
+        fontcolor = "#AD1457"
+    ]
+
+    // Unconditional fallback — default to triage
+    router -> triage_leg [
+        label = "fallback"
+    ]
+
+    // All legs lead to done
+    triage_leg -> done
+    implement_leg -> done
+    review_leg -> done
+
+}
