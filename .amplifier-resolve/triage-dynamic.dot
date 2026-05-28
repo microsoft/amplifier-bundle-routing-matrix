@@ -31,6 +31,7 @@ digraph triage_dynamic {
     // — Graph-level attributes ——————————————————————————————————————————
 
     label             = "Issue Triage Review (Dynamic HITL)"
+    description       = "Investigate and analyze an issue -- identify root cause, check sibling modules, and post findings with optional multi-turn clarification"
     labelloc          = t
     rankdir           = TB
     compound          = true
