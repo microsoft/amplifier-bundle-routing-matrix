@@ -1,4 +1,4 @@
 resolver: dot-graph
-pipeline: .amplifier-resolve/triage-dynamic.dot
+pipeline: .amplifier-resolve/resolve-router.dot
 auto_triage: true
 branch: main
