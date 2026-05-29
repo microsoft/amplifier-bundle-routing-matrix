@@ -83,11 +83,13 @@ digraph resolve_router {
 
     start -> router
 
-    // Edges matched via preferred_label from the router's output.
-    // The engine matches outcome.preferred_label against edge labels
-    // (step 2 of edge selection). No condition= needed.
+    // Route based on the context variable set by the router LLM.
+    // The router outputs: {"context_updates": {"preferred_label": "triage|implement|review"}}
+    // The engine applies context_updates to the pipeline context, then
+    // evaluates edge conditions against that context.
     router -> triage_leg [
         label     = "triage",
+        condition = "context.preferred_label=triage",
         color     = "#43A047",
         fontcolor = "#43A047",
         weight    = 2
@@ -95,6 +97,7 @@ digraph resolve_router {
 
     router -> implement_leg [
         label     = "implement",
+        condition = "context.preferred_label=implement",
         color     = "#1565C0",
         fontcolor = "#1565C0",
         weight    = 2
@@ -102,18 +105,16 @@ digraph resolve_router {
 
     router -> review_leg [
         label     = "review",
+        condition = "context.preferred_label=review",
         color     = "#AD1457",
         fontcolor = "#AD1457",
         weight    = 2
     ]
 
-    // Safety fallback — if preferred_label doesn't match any edge label,
-    // the engine falls through to the highest-weight unconditional edge.
-    // All three above are weight=2 with labels; this unlabeled weight=1
-    // ensures triage is the default if nothing matches.
+    // Unconditional fallback — default to triage when the router
+    // fails to produce a valid preferred_label
     router -> triage_leg [
         label  = "fallback",
-        weight = 1,
         style  = dashed,
         color  = "#999999"
     ]
