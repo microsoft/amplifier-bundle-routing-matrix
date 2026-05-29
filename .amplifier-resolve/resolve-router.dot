@@ -1,18 +1,18 @@
 // resolve-router.dot
 //
-// Pipeline: Resolve Router — dispatches to triage, implement, or review sub-pipelines
+// Pipeline: Resolve Router — dispatches to triage, implement, review, or answer sub-pipelines
 //
 // Flow:
-//   1. Router LLM reads $goal and decides: triage, implement, or review
-//   2. Dispatches to the chosen folder-based sub-pipeline
-//   3. Unconditional fallback defaults to triage_leg
+//   1. Router LLM reads $goal (includes issue body + full comment thread) and writes its decision
+//   2. Extractor (tool_command) reads the response file and outputs a clean routing token
+//   3. Edge conditions on context.tool.output dispatch to the right folder leg
 //
-// Each folder leg delegates to a separate .dot pipeline and surfaces
-// bridge.* outputs back to the parent pipeline.
+// Uses the proven CheckBrainstormDone pattern from dotpowers:
+// LLM writes to file → tool_command greps file → clean routing token
 
 digraph resolve_router {
 
-    // — Graph-level attributes ——————————————————————————————————
+    // — Graph-level attributes ————————————————————————————————————
 
     label       = "Resolve Router"
     description = "Route incoming requests to the appropriate sub-pipeline based on intent analysis"
@@ -24,9 +24,9 @@ digraph resolve_router {
     node [fontname="Helvetica", fontsize=11, style="filled"]
     edge [fontname="Helvetica", fontsize=10, color="#555555"]
 
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
     // PIPELINE NODES
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
 
     // Entry point
     start [
@@ -35,12 +35,27 @@ digraph resolve_router {
         fillcolor = "#C8E6C9"
     ]
 
-    // Router — reads the goal and chooses triage, implement, or review
+    // Router — LLM reads the goal (which includes the issue body and
+    // the full comment thread) and writes its routing decision.
+    // The decision MUST be on its own line as one of:
+    //   ROUTE: triage
+    //   ROUTE: implement
+    //   ROUTE: review
+    //   ROUTE: answer
     router [
         label     = "Router",
         shape     = box,
         fillcolor = "#E8F0FE",
-        prompt    = "You are a routing agent. Read the goal described in $goal.\n\nYour job is to decide which sub-pipeline should handle this request.\n\nChoose ONE of:\n- triage: The request is about triaging an issue (understanding, analyzing, categorizing)\n- implement: The request is about implementing a fix or feature (code changes, PRs)\n- review: The request is about reviewing code or a PR\n\nOutput ONLY this JSON:\n{\"status\": \"success\", \"context_updates\": {\"preferred_label\": \"YOUR_CHOICE\"}}\n\nWhere YOUR_CHOICE is one of: triage, implement, review"
+        prompt    = "You are a routing agent. Read the request and conversation in $goal.\n\nDecide which pipeline should handle this request:\n- triage: Investigate, analyze, or categorize an issue to understand what's wrong\n- implement: Propose a change to the code in this repository — fix a bug, add a feature, or make an improvement and open a PR\n- review: Review an existing pull request for code quality, correctness, and test coverage\n- answer: Answer a question, provide information, or respond to a follow-up that doesn't require code changes or investigation\n\nConsider the FULL conversation thread in $goal — not just the latest message. Previous comments provide important context about what has already been done.\n\nWrite your brief reasoning (1-2 sentences), then on a NEW LINE write EXACTLY one of:\nROUTE: triage\nROUTE: implement\nROUTE: review\nROUTE: answer\n\nThe ROUTE: line MUST appear in your response."
+    ]
+
+    // Extractor — reads the router's output and produces a clean routing token.
+    // Uses the proven dotpowers pattern: grep the file for a known sentinel.
+    extract_route [
+        label        = "Extract Route",
+        shape        = parallelogram,
+        fillcolor    = "#FFF9C4",
+        tool_command = "#!/bin/sh\nROUTE=$(cat /project/.resolve/pipeline_logs/router/response.md 2>/dev/null | grep -oP 'ROUTE:\\s*\\K\\w+' | tail -1)\nif [ -z \"$ROUTE\" ]; then\n  printf 'triage'\nelse\n  printf '%s' \"$ROUTE\"\nfi"
     ]
 
     // Triage sub-pipeline
@@ -70,6 +85,16 @@ digraph resolve_router {
         outputs   = "bridge.comment,bridge.summary,bridge.labels"
     ]
 
+    // Answer — a simple LLM node that responds directly without
+    // a sub-pipeline. For questions, follow-ups, or requests that
+    // don't need investigation or code changes.
+    answer_leg [
+        label     = "Answer",
+        shape     = box,
+        fillcolor = "#FFF3E0",
+        prompt    = "Read the conversation in $goal. The user is asking a question or making a follow-up request that doesn't require code investigation or changes.\n\nProvide a helpful, direct answer based on the conversation context and any prior triage/implement results visible in the thread.\n\nOutput:\n{\"status\": \"success\", \"context_updates\": {\"bridge.comment\": \"YOUR ANSWER IN MARKDOWN\", \"bridge.summary\": \"ONE-LINE SUMMARY\", \"bridge.labels\": [\"answered\"]}}\n\nCRITICAL: Your ENTIRE response must be ONLY the JSON object. No preamble, no explanation, no code fences."
+    ]
+
     // Pipeline exit
     done [
         label     = "Done",
@@ -77,43 +102,48 @@ digraph resolve_router {
         fillcolor = "#FFCDD2"
     ]
 
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
     // EDGES
-    // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
 
     start -> router
+    router -> extract_route
 
-    // Route based on the context variable set by the router LLM.
-    // The router outputs: {"context_updates": {"preferred_label": "triage|implement|review"}}
-    // The engine applies context_updates to the pipeline context, then
-    // evaluates edge conditions against that context.
-    router -> triage_leg [
+    // Route based on the clean token from the extractor
+    extract_route -> triage_leg [
         label     = "triage",
-        condition = "context.preferred_label=triage",
+        condition = "context.tool.output=triage",
         color     = "#43A047",
         fontcolor = "#43A047",
         weight    = 2
     ]
 
-    router -> implement_leg [
+    extract_route -> implement_leg [
         label     = "implement",
-        condition = "context.preferred_label=implement",
+        condition = "context.tool.output=implement",
         color     = "#1565C0",
         fontcolor = "#1565C0",
         weight    = 2
     ]
 
-    router -> review_leg [
+    extract_route -> review_leg [
         label     = "review",
-        condition = "context.preferred_label=review",
+        condition = "context.tool.output=review",
         color     = "#AD1457",
         fontcolor = "#AD1457",
         weight    = 2
     ]
 
-    // Unconditional fallback — default to triage when the router
-    // fails to produce a valid preferred_label
-    router -> triage_leg [
+    extract_route -> answer_leg [
+        label     = "answer",
+        condition = "context.tool.output=answer",
+        color     = "#E65100",
+        fontcolor = "#E65100",
+        weight    = 2
+    ]
+
+    // Unconditional fallback — default to triage
+    extract_route -> triage_leg [
         label  = "fallback",
         style  = dashed,
         color  = "#999999"
@@ -123,5 +153,6 @@ digraph resolve_router {
     triage_leg -> done
     implement_leg -> done
     review_leg -> done
+    answer_leg -> done
 
 }
