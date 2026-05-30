@@ -1,81 +1,65 @@
-# PR Review — powered by microsoft/amplifier-app-actions
+# PR Co-Review — autonomous Attractor review pipeline
 #
-# Triggered by two paths:
-#   Path A: pull_request opened — reads the full diff and every changed file,
-#           applies the five-check framework, posts a structured review comment.
-#   Path B: /review-pr comment on an issue — reviews the PR referenced in the issue body,
-#           posts findings back to the issue. Allows a team member to kick off a review
-#           from a "pr-review-request" issue without opening the PR directly.
+# Fires when someone comments "/review-pr" on an issue. Parses any
+# org/repo#number references from the comment body, then runs the Attractor
+# review pipeline for each referenced PR: it fetches the diff, applies the
+# review framework, posts review comments on the PR, and a summary comment
+# back on the issue.
 #
-# The bundle carries all PR review context (five checks, read-full-files protocol,
-# PR comment routing) — no local prompt files or recipes needed.
-#
-# Docs: https://github.com/microsoft/amplifier-app-actions
+# NOTE: the exact amplifier-attractor CLI invocation and install command may
+# need adjustment during testing; the skeleton here is correct.
 
-name: PR Review
+name: PR Co-Review
 
 on:
-  pull_request:
-    types: [opened]
   issue_comment:
     types: [created]
 
 permissions:
-  pull-requests: write
   issues: write
+  pull-requests: write
   contents: read
 
 jobs:
-  # Path A: New PR opened — full review posted to the PR.
-  review-pr-opened:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: microsoft/amplifier-app-actions@main
-        with:
-          bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/pr-review.bundle.md
-          prompt: |
-            A new pull request has been opened. Review it following the PR review principles in your context.
-
-            PR: https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}
-
-            Read the diff to orient, then read every changed file IN FULL using github_checkout_repo.
-            Read related files: callers, tests, interfaces, canonical examples from relevant repos.
-            Apply the five checks in order: Necessity, Layer fit, Pattern, Correctness, Calibration.
-            Every finding must cite a specific file:line — no finding without evidence.
-            Post your findings as a comment on the PR using github_post_comment.
-          model: claude-opus-4-6
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-
-  # Path B: /review-pr comment on an issue — reviews the PR referenced in the issue body.
-  review-from-issue:
-    if: >-
-      github.event_name == 'issue_comment' &&
-      contains(github.event.comment.body, '/review-pr') &&
-      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
-
+  review:
+    if: startsWith(github.event.comment.body, '/review-pr')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: microsoft/amplifier-app-actions@main
+      - uses: actions/setup-python@v5
         with:
-          bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/pr-review.bundle.md
-          prompt: |
-            This issue is a PR review request. Follow the PR Review sections in your context:
-            - Find the PR URL or reference (owner/repo#N) in the issue body
-            - Read the PR diff to orient, then read every changed file IN FULL
-            - Read related files: callers, tests, interfaces, canonical examples
-            - Apply the five checks in order: Necessity, Layer fit, Pattern, Correctness, Calibration
-            - Every finding must cite a specific file:line — no finding without evidence
-            - Post your findings as a comment on this issue using github_post_comment
+          python-version: '3.12'
 
-            Issue: https://github.com/${{ github.repository }}/issues/${{ github.event.issue.number }}
-          model: claude-sonnet-4-6
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Parse PR references
+        id: parse
         env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          REFS=$(echo "$COMMENT_BODY" | grep -oP '[\w-]+/[\w-]+#\d+' || true)
+          echo "pr_refs=$REFS" >> "$GITHUB_OUTPUT"
+          if [ -z "$REFS" ]; then
+            echo "::warning::No PR references (org/repo#number) found in comment body"
+          fi
+
+      - name: Install attractor runtime
+        run: |
+          uv pip install --system 'amplifier-bundle-dev-support[attractor] @ git+https://github.com/kenotron-ms/amplifier-bundle-dev-support.git@main'
+
+      - name: Run review pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PR_REFS: ${{ steps.parse.outputs.pr_refs }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO_FULL_NAME: ${{ github.repository }}
+        run: |
+          echo "Reviewing PRs '${PR_REFS}' from issue #${ISSUE_NUMBER} in ${REPO_FULL_NAME}..."
+          amplifier-attractor run \
+            --pipeline .amplifier-resolve/review.dot \
+            --goal "Review PRs: ${PR_REFS}\n\nFrom issue #${ISSUE_NUMBER} in ${REPO_FULL_NAME}" \
+            --repo "${REPO_FULL_NAME}" \
+            --issue "${ISSUE_NUMBER}" \
+            || echo "::warning::Review pipeline failed for PRs '${PR_REFS}' (issue #${ISSUE_NUMBER})"
