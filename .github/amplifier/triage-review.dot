@@ -2,44 +2,41 @@
 //
 // Pipeline: Automated GitHub Issue Triage — Flat Supervisor-Free Pattern
 //
-// ARCHITECTURE: Each node is a top-level pipeline node with its own spawned
-// child session. No shape=house manager. This gives full visibility:
-//   [PIPELINE] ▶ investigate [box]
-//   [PIPELINE] ▶ quality_eval [diamond]
-//   [PIPELINE] -> edge: quality_eval --[outcome!=success]--> investigate  (retry)
-//   [PIPELINE] -> edge: quality_eval --[outcome=success]--> comment_draft (pass)
+// ARCHITECTURE (microsoft-amplifier / amplifier-support pattern):
+//   - Flat: every node is a top-level pipeline node, no shape=house supervisor.
+//   - Adversarial quality gate: quality_eval independently verifies the
+//     investigation before any comment is posted.
+//   - NO HITL: the pipeline runs end-to-end with no human approval gates.
 //
-// Threads:
-//   triage-thread  — investigate + comment_draft (context accumulates across cycles)
-//   quality-thread — quality_eval only (fresh adversarial context each cycle)
+//   start -> investigate -> quality_eval -> comment_draft -> done
 //
-// Cycle limit: quality_eval.timeout=2m + investigate.timeout=5m naturally
-// bounds each cycle. goal_gate=true on quality_eval tracks overall success.
+// The quality gate retries the investigator via retry_target="investigate"
+// when any of the six criteria fail (bounded by max_cycles).
 
 digraph triage_review {
 
-    // ── Graph-level attributes ───────────────────────────────────────────────
-
+    // ── Graph-level attributes ──────────────────────────────────────────────
     label             = "Issue Triage Review"
+    description       = "Investigate an issue, verify claims against actual code, post triage findings"
     labelloc          = t
     rankdir           = TB
     compound          = true
-    fontname          = "Helvetica"
-    nodesep           = 0.6
-    ranksep           = 0.9
 
     // Attractor pipeline configuration
-    goal              = "Triage the GitHub issue described in the conversation context"
-    default_fidelity  = "compact"
+    goal              = "$goal"
+    default_fidelity  = "full"
     default_thread_id = "triage-thread"
 
-    // ── Default node and edge styles ─────────────────────────────────────────
+    // Per-node model role assignment
+    model_stylesheet  = "investigate: model_role=reasoning; quality_eval: model_role=critique; comment_draft: model_role=general"
+
+    // ── Default node and edge styles ────────────────────────────────────────
     node [fontname="Helvetica", fontsize=11, style="filled"]
     edge [fontname="Helvetica", fontsize=10, color="#555555"]
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     // PIPELINE NODES — all top-level, each gets its own child session
-    // ═══════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
 
     // Entry point
     start [
@@ -48,39 +45,33 @@ digraph triage_review {
         fillcolor = "#C8E6C9"
     ]
 
-    // Investigator — independent root-cause analysis against actual code.
-    // Runs on triage-thread so it sees steering from prior quality_eval cycles.
-    // MUST NOT post any GitHub comment — findings go to quality_eval only.
+    // Investigator — senior-engineer root-cause analysis against actual code.
     investigate [
-        label     = "Investigate",
+        label      = "Investigate",
+        shape      = box,
+        fillcolor  = "#E8F0FE",
+        max_cycles = 3,
+        prompt     = "You are a senior engineer investigating the GitHub issue described in $goal.\n\nQUALITY GATE FEEDBACK FROM PREVIOUS CYCLE (empty on first run):\ncontext.quality_feedback\nIf the above is non-empty, address every listed failure explicitly this cycle.\n\nRULES:\n- NEVER trust the reporter's framing. The reporter can be wrong.\n- Verify every claim against the actual source code before repeating it.\n- Check that every file/symbol the reporter mentions actually exists.\n- Identify the root cause (specific file:line), the affected files, and the blast radius (who else is impacted).\n- If the issue is vague, state exactly what information is missing.\n\nSTEP 1 - LOAD THE RUBRIC:\n  read_file .github/amplifier/triage-context.md\nThis file contains the full investigation rubric and the six quality criteria. Follow it.\n\nSTEP 2 - INVESTIGATE the issue from $goal, verifying claims against real code.\n\nSTEP 3 - WRITE FINDINGS to docs/triage/investigation.md with EXACTLY these sections:\n  ## SUMMARY        - 2-3 sentence plain-English conclusion (written FIRST)\n  ## ROOT CAUSE     - specific file:line, no hedging\n  ## AFFECTED FILES - list of files/modules impacted (blast radius)\n  ## SEVERITY       - low | medium | high | critical, with one-line justification\n  ## RECOMMENDATION - one of: simple-fix | needs-dotpowers | needs-investigation | wontfix\n  ## SUGGESTED FIX  - concrete next step (or what is missing, if needs-investigation)\n\nSTEP 4 - COMMIT the findings:\n  git add docs/triage/investigation.md && git commit -m \"docs(triage): record investigation findings\"\n\nSTEP 5 - FINAL OUTPUT (CRITICAL):\nYour entire response must be ONLY this JSON object — no prose, no markdown:\n{\"status\": \"success\", \"context_updates\": {\"investigation_summary\": \"<the full SUMMARY + ROOT CAUSE + AFFECTED FILES + SEVERITY block as one string, using \\n for newlines>\", \"recommendation\": \"<simple-fix|needs-dotpowers|needs-investigation|wontfix>\"}}"
+    ]
+
+    // Adversarial quality gate — verifies the investigation against all six
+    // criteria before any comment is posted. Retries investigate on failure.
+    quality_eval [
+        label        = "Quality Gate",
+        shape        = box,
+        fillcolor    = "#FFF9C4",
+        goal_gate    = true,
+        retry_target = "investigate",
+        max_cycles   = 2,
+        prompt       = "YOUR RESPONSE MUST START WITH { — no preamble, no text before the opening brace. The pipeline JSON-parses the first character.\n\nYou are an adversarial quality reviewer. Do all reasoning in thinking/tool calls, then output ONLY the JSON object.\n\nINVESTIGATION UNDER REVIEW:\ncontext.investigation_summary\n(The full report is in docs/triage/investigation.md — read it if needed.)\n\nCheck the investigation against ALL SIX criteria:\n(1) PROXY CHECK   - Did the investigator verify from code independently, or just restate the reporter's description? FAIL if no independent verification.\n(2) SPECIFICITY   - Is the root cause a specific file:line? Vague = FAIL.\n(3) LAYER CHECK   - Is the fix at the correct ecosystem layer (core -> module-* -> foundation -> bundle-* -> app-cli)? A fix that misses siblings = FAIL.\n(4) DIMENSIONALITY - Were sibling modules explicitly checked? Only one checked = FAIL.\n(5) RECOMMENDATION valid - Is RECOMMENDATION exactly one of simple-fix|needs-dotpowers|needs-investigation|wontfix, and is it the right call? A menu of options = FAIL.\n(6) STRUCTURE     - Are ALL required sections present (SUMMARY, ROOT CAUSE, AFFECTED FILES, SEVERITY, RECOMMENDATION, SUGGESTED FIX)? Missing/truncated = FAIL.\n\nYour ENTIRE response must be ONLY one of these two JSON objects:\n\nOn FAIL (any criterion):\n{\"status\": \"fail\", \"context_updates\": {\"quality_feedback\": \"QUALITY GATE FAILED. Fix these issues:\\n- [criterion]: [what was wrong and exactly what to do]\"}}\n\nOn SUCCESS (all six pass):\n{\"status\": \"success\", \"context_updates\": {\"quality_verdict\": \"PASS: all six criteria satisfied\"}}\n\nNo prose. No markdown. Just the JSON."
+    ]
+
+    // Drafter + poster — writes and posts the final GitHub comment(s).
+    comment_draft [
+        label     = "Post Triage",
         shape     = box,
         fillcolor = "#E8F0FE",
-        timeout   = "7m",
-        prompt    = "IMPORTANT: Do NOT post any comments to GitHub via any mechanism.\n\nQUALITY GATE FEEDBACK FROM PREVIOUS CYCLE (empty on first run):\ncontext.quality_feedback\n\nIf the above feedback is non-empty, address each failure explicitly this cycle.\n\nSTEP 1 - LOAD CONTEXT FIRST:\n  a) curl -s https://raw.githubusercontent.com/microsoft/amplifier/main/context/ecosystem-overview.md\n  b) curl -s https://raw.githubusercontent.com/microsoft/amplifier/main/docs/MODULES.md\n  c) read_file /tmp/workspace/amplifier-actions-example/.github/amplifier/triage-context.md\n     (fallback: github_checkout_repo owner=kenotron-ms repo=amplifier-actions-example then read triage-context.md)\nThe triage-context.md has the full investigation rubric — follow it.\n\nSTEP 2 - INVESTIGATE the issue in $goal:\n  - Read the issue. Verify every claim against actual code. Do NOT trust the reporter's framing.\n  - VERIFY CALL CHAIN: before calling anything unhandled, trace upward — does the CALLER already have try/except?\n  - Use github_checkout_repo with owner='microsoft' for relevant repos.\n\nSTEP 3 - CHECK ALL SIBLINGS (mandatory for any module-type issue):\n  For provider issues: checkout amplifier-module-provider-openai, provider-gemini, provider-azure-openai, provider-vllm, provider-ollama. Check each for the same gap.\n\nSTEP 4 - FINAL OUTPUT (CRITICAL):\nYour entire response must be ONLY this JSON — no prose, no markdown, nothing else:\n{\"status\": \"success\", \"context_updates\": {\"context.investigation_summary\": \"PASTE YOUR COMPLETE FINDINGS HERE AS A SINGLE STRING\"}}\n\nThe investigation_summary value must contain your full ## Summary block (Root cause file:line, Ecosystem layer, Sibling modules checked, Recommended fix, Fix layer) plus supporting evidence. Use \\n for newlines inside the JSON string.\n\nDo NOT output anything outside the JSON. The pipeline passes investigation_summary directly to quality_eval — if the JSON is malformed or missing, quality_eval sees nothing."
-    ]
-
-    // Adversarial quality gate — evaluates investigate findings.
-    // Runs on quality-thread (fresh context) for genuine independence.
-    // Calls report_outcome(outcome='success'|'fail', reason='...').
-    quality_eval [
-        label            = "Quality Gate",
-        shape            = diamond,
-        fillcolor        = "#FFF9C4",
-        goal_gate        = true,
-        retry_target     = "investigate",
-        timeout          = "3m",
-        prompt           = "YOUR RESPONSE MUST START WITH { — no preamble, no explanation, no text before the opening brace. The pipeline JSON-parses the first character; anything other than { causes automatic success routing and bypasses the gate.\n\nYou are an adversarial quality gate. Do ALL reasoning in thinking/tool calls. Then output ONLY the JSON object — nothing else, not even a newline before it.\n\nINVESTIGATION SUMMARY:\ncontext.investigation_summary\n\nEvaluate these findings against ALL six criteria:\n(1) PROXY CHECK: Did the investigator verify from code independently, or just restate the issue description? FAIL if no independent verification.\n(2) SPECIFICITY: Is root cause a specific file:line? Vague = FAIL.\n(3) LAYER CHECK: Hierarchy: amplifier-core -> amplifier-module-* -> amplifier-foundation -> amplifier-bundle-* -> amplifier-app-cli. Fix scoped to one provider but affects all = wrong layer = FAIL.\n(4) DIMENSIONALITY: Were sibling modules explicitly checked? Only one provider checked = FAIL.\n(5) RECOMMENDATION: One concrete recommendation. Menu of options = FAIL.\n(6) STRUCTURE: Does the summary lead with a clear conclusion? Truncated or missing summary = FAIL.\n\nYOUR FIRST CHARACTER MUST BE `{`. No prose, no analysis, no preamble.\n\nYour ENTIRE response must be ONLY one of these two JSON objects:\n\nOn FAIL:\n{\"status\": \"fail\", \"failure_reason\": \"Criterion N: specific reason\", \"context_updates\": {\"context.quality_feedback\": \"QUALITY GATE FAILED. Fix these issues:\\n- [criterion]: [what was wrong and exactly what to do]\"}}\n\nOn SUCCESS:\n{\"status\": \"success\"}\n\nNo prose. No markdown. No report_outcome tool call. Just the JSON."
-    ]
-
-    // Drafter + poster — writes and posts the final GitHub comment.
-    // Uses commenter profile (has github_post_comment).
-    // Runs on triage-thread so it sees the full investigation history.
-    comment_draft [
-        label        = "Post Analysis",
-        shape        = box,
-        fillcolor    = "#E8F0FE",
-        llm_provider = "anthropic-commenter",
-        prompt       = "The investigation findings are in context.investigation_summary. The GitHub issue is described in $goal — extract the owner, repo name, and issue number from it.\n\nWrite a final triage comment and post it to that issue using github_post_comment. Structure it as follows:\n- Lead with a 2-3 sentence plain-English summary of the root cause and recommended fix (no jargon)\n- Show which sibling modules were checked and what was found\n- Give a single concrete recommendation, not options\n- Only report what was independently verified from code\n\nBase the comment on context.investigation_summary. Do not add speculation beyond what the investigation found."
+        prompt    = "Read the verified findings from docs/triage/investigation.md. The GitHub issue is described in $goal — extract the owner, repo, and issue number from it.\n\nSTEP 1 - POST THE TRIAGE COMMENT using the github_post_comment tool. The comment must include:\n  - Summary (2-3 sentence plain-English conclusion)\n  - Root cause (file:line)\n  - Affected files (blast radius)\n  - Severity\n  - Recommendation\nBase everything strictly on investigation.md — no speculation.\n\nSTEP 2 - ACT ON THE RECOMMENDATION (value is in context.recommendation):\n  - 'simple-fix': post a SECOND comment via github_post_comment containing exactly:\n      /resolve new_instance(resolver=\"dot-graph\", pipeline=\"custom\", path=\"./.amplifier-resolve/simple-fix.dot\")\n    then apply the label 'ready-to-implement'.\n  - 'needs-dotpowers': post a SECOND comment via github_post_comment containing exactly:\n      /resolve new_instance(resolver=\"dot-graph\", pipeline=\"dotpowers\")\n    then apply the label 'ready-to-implement'.\n  - 'needs-investigation': apply the label 'needs-investigation'. Do NOT post a /resolve comment.\n  - 'wontfix': apply the label 'wontfix'. Do NOT post a /resolve comment.\n\nSTEP 3 - FINAL OUTPUT (CRITICAL):\nYour entire response must be ONLY this JSON object:\n{\"status\": \"success\", \"context_updates\": {\"triage_posted\": true}}"
     ]
 
     // Pipeline exit
@@ -90,39 +81,13 @@ digraph triage_review {
         fillcolor = "#FFCDD2"
     ]
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // EDGES
-    // ═══════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
+    // EDGES — flat chain; quality_eval retries investigate via retry_target
+    // ════════════════════════════════════════════════════════════════════════
 
-    start -> investigate
-
-    // Investigator delivers findings to quality gate.
-    // quality-thread = fresh adversarial context (compact summary only).
-    investigate -> quality_eval [
-        thread_id = "quality-thread",
-        fidelity  = "compact"
-    ]
-
-    // SUCCESS: quality approved — move to drafting and posting the comment.
-    quality_eval -> comment_draft [
-        label     = "outcome=success",
-        condition = "outcome=success",
-        fidelity  = "compact",
-        color     = "#43A047",
-        fontcolor = "#43A047"
-    ]
-
-    // FAIL: quality rejected — investigator retries with critique in context.
-    // triage-thread: investigator sees the quality_eval failure reason.
-    quality_eval -> investigate [
-        label     = "outcome!=success",
-        condition = "outcome!=success",
-        fidelity  = "compact",
-        style     = dashed,
-        color     = "#E57373",
-        fontcolor = "#E57373"
-    ]
-
+    start         -> investigate
+    investigate   -> quality_eval
+    quality_eval  -> comment_draft
     comment_draft -> done
 
 }
