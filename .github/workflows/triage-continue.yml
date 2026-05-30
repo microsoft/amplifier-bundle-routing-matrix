@@ -1,19 +1,15 @@
-# Triage Continue — powered by kenotron-ms/amplifier-app-actions
+# Triage Continue — powered by microsoft/amplifier-app-actions
 #
-# Fires on any issue comment from a non-bot user.
+# Manual investigation trigger. A trusted contributor comments /investigate on an
+# issue to (re-)run the Attractor triage pipeline in investigate mode. This drives
+# the same manager-supervisor loop as the initial triage (triage-review.dot): an
+# investigator agent re-examines the issue independently and a quality gate validates
+# the root cause is at the correct ecosystem layer before posting.
 #
-# Explicit commands (always get a response):
-#   /triage        — Re-run the full Attractor triage pipeline from scratch.
-#                    Uses triage-review.dot — same manager-supervisor loop as the initial triage.
-#   /dig [area]    — Re-investigate focused on a specific area or question.
-#   /ask [prompt]  — Direct escape hatch. Whatever you write after /ask, the bot responds.
+# Restricted to OWNER / MEMBER / COLLABORATOR author associations so only trusted
+# contributors can kick off an investigation run.
 #
-# Everything else — LLM judges whether the comment is steering guidance (re-investigate)
-# or collaborator conversation (stay silent).
-#
-# Note: /repro and /pr are handled by investigate.yml and pr-review.yml respectively.
-#
-# Docs: https://github.com/kenotron-ms/amplifier-app-actions
+# Docs: https://github.com/microsoft/amplifier-app-actions
 
 name: Triage Continue
 
@@ -26,53 +22,21 @@ permissions:
   contents: read
 
 jobs:
-  # /triage — re-run the full Attractor pipeline via attractor_source
-  # (wrapper.py only accepts one instruction type at a time)
-  retriage:
+  # /investigate — re-run the full Attractor pipeline (triage-review.dot) in
+  # investigate mode via attractor_source.
+  investigate:
     runs-on: ubuntu-latest
-    if: |
-      !endsWith(github.event.comment.user.login, '[bot]') &&
-      startsWith(github.event.comment.body, '/triage')
+    if: >-
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '/investigate') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
     steps:
       - uses: actions/checkout@v4
 
-      - uses: kenotron-ms/amplifier-app-actions@main
+      - uses: microsoft/amplifier-app-actions@main
         with:
           bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/issue-triage.bundle.md
           attractor_source: .github/amplifier/triage-review.dot
-          model: claude-sonnet-4-6
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-
-  # /dig, /ask, and LLM-judged steering — handled via prompt
-  continue:
-    runs-on: ubuntu-latest
-    if: |
-      !endsWith(github.event.comment.user.login, '[bot]') &&
-      !startsWith(github.event.comment.body, '/triage') &&
-      !startsWith(github.event.comment.body, '/repro') &&
-      !startsWith(github.event.comment.body, '/pr')
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: kenotron-ms/amplifier-app-actions@main
-        with:
-          bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/issue-triage.bundle.md
-          prompt: |
-            Issue: ${{ github.event.issue.html_url }}
-            Comment by @${{ github.event.comment.user.login }}:
-            "${{ github.event.comment.body }}"
-
-            Route this comment as follows:
-
-            If it starts with /dig:
-            The text after "/dig" is what to focus on. Re-investigate the issue with that area as your primary lens. Use github_checkout_repo to examine relevant code. Apply full triage standards: root cause at a specific file:line, correct ecosystem layer (amplifier-core → modules → foundation → bundles → cli), concrete recommendation. Post your findings. You MUST respond.
-
-            If it starts with /ask:
-            The text after "/ask" is a direct question or prompt for you. Answer it directly, drawing on the issue context and your knowledge of the Amplifier ecosystem. You MUST respond.
-
-            Otherwise:
-            Judge whether this comment is providing steering guidance that would change the triage analysis — new technical context, a correction to the root cause or layer assignment, reproduction details, or evidence the issue affects more components than identified. If it IS steering guidance, re-investigate and post updated findings. If it is NOT (collaborator conversation, thanks, confirming they'll try the fix), stay silent and post nothing.
           model: claude-sonnet-4-6
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
