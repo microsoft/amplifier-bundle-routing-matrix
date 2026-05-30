@@ -1,4 +1,4 @@
-# Tier 2 investigation — powered by microsoft/amplifier-app-actions
+# Tier 2 investigation — powered by kenotron-ms/amplifier-app-actions
 #
 # Triggered by two paths:
 #   Path A: /repro comment from a trusted contributor
@@ -7,7 +7,7 @@
 # enable_reproduction: true installs Incus on the runner so the agent can
 # use amplifier-tester to reproduce issues in an isolated container.
 #
-# Docs: https://github.com/microsoft/amplifier-app-actions
+# Docs: https://github.com/kenotron-ms/amplifier-app-actions
 
 name: Investigate
 
@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: microsoft/amplifier-app-actions@main
+      - uses: kenotron-ms/amplifier-app-actions@main
         with:
           bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/investigate.bundle.md
           enable_reproduction: true

@@ -1,21 +1,17 @@
-# Issue Triage — autonomous Attractor triage pipeline
+# Issue Triage — powered by kenotron-ms/amplifier-app-actions
 #
-# Fires when a new issue is opened, or when someone comments "/triage" on an
-# existing issue. Runs the Attractor triage-review pipeline fully autonomously
-# (no human-in-the-loop): it reads the issue, investigates the codebase,
-# quality-gates the root cause, then posts a triage comment + labels and a
-# `/resolve new_instance(...)` command.
+# Triggered when a new issue is opened. Uses an Attractor DOT pipeline
+# (.github/amplifier/triage-review.dot) that runs a manager-supervisor loop:
+# an investigator agent examines the issue independently, and a quality gate
+# validates the root cause is at the correct ecosystem layer before posting.
 #
-# NOTE: the exact amplifier-attractor CLI invocation and install command may
-# need adjustment during testing; the skeleton here is correct.
+# Docs: https://github.com/kenotron-ms/amplifier-app-actions
 
 name: Issue Triage
 
 on:
   issues:
     types: [opened]
-  issue_comment:
-    types: [created]
 
 permissions:
   issues: write
@@ -23,37 +19,14 @@ permissions:
 
 jobs:
   triage:
-    if: |
-      github.event_name == 'issues' ||
-      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/triage'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: kenotron-ms/amplifier-app-actions@main
         with:
-          python-version: '3.12'
-
-      - uses: astral-sh/setup-uv@v6
-
-      - name: Install attractor runtime
-        run: |
-          uv pip install --system 'amplifier-bundle-dev-support[attractor] @ git+https://github.com/kenotron-ms/amplifier-bundle-dev-support.git@main'
-
-      - name: Run triage pipeline
+          bundle: git+https://github.com/kenotron-ms/amplifier-bundle-dev-support@main#subdirectory=bundles/issue-triage.bundle.md
+          attractor_source: .github/amplifier/triage-review.dot
+          model: claude-sonnet-4-6
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          REPO_FULL_NAME: ${{ github.repository }}
-        run: |
-          echo "Triaging issue #${ISSUE_NUMBER} in ${REPO_FULL_NAME}..."
-          amplifier-attractor run \
-            --pipeline .github/amplifier/triage-review.dot \
-            --context .github/amplifier/triage-context.md \
-            --goal "Triage issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}\n\n${ISSUE_BODY}" \
-            --repo "${REPO_FULL_NAME}" \
-            --issue "${ISSUE_NUMBER}" \
-            || echo "::warning::Triage pipeline failed for issue #${ISSUE_NUMBER}"
