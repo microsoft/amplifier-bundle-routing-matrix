@@ -1,4 +1,5 @@
-resolver: dot-graph
-pipeline: .amplifier-resolve/resolve-router.dot
-auto_triage: true
+# Triage and PR review are now handled by GitHub Actions workflows
+# (.github/workflows/issue-triage.yml and .github/workflows/pr-review.yml),
+# NOT by the bridge. The bridge only handles /resolve commands for implementation.
+default_resolver: dot-graph
 branch: main
