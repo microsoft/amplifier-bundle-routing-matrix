@@ -100,26 +100,30 @@ digraph simple_fix {
         tool_command = "#!/bin/sh
 set -e
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-REPO_URL=$(echo \"$goal\" | grep -oE 'https://github.com/[^/]+/[^/# ]+' | head -1)
-if [ -z \"$REPO_URL\" ]; then printf '{\"error\": \"no repo URL in goal\"}'; exit 1; fi
-OWNER_REPO=$(echo \"$REPO_URL\" | sed 's|https://github.com/||')
-git remote add github \"https://x-access-token:${GH_TOKEN}@github.com/${OWNER_REPO}.git\" 2>/dev/null || git remote set-url github \"https://x-access-token:${GH_TOKEN}@github.com/${OWNER_REPO}.git\"
-git push -u github \"$BRANCH\" 2>&1
+ORIGIN=$(git remote get-url origin 2>/dev/null || echo '')
+OWNER_REPO=$(echo \"$ORIGIN\" | sed -E 's#.*github.com[:/]##; s#\\.git$##')
+if [ -z \"$OWNER_REPO\" ]; then printf '{\"error\": \"no github origin remote\"}'; exit 1; fi
+git remote set-url origin \"https://x-access-token:${GH_TOKEN}@github.com/${OWNER_REPO}.git\"
+git push -u origin \"$BRANCH\" 2>&1
 PR_TITLE=$(head -1 docs/fix-design.md 2>/dev/null | sed 's/^#* *//')
 if [ -z \"$PR_TITLE\" ]; then PR_TITLE=\"Automated fix from triage\"; fi
 python3 - \"$PR_TITLE\" \"$BRANCH\" > /tmp/pr_body.json <<'PYJSON'
 import json, sys
-title, branch = sys.argv[1], sys.argv[2]
-print(json.dumps({\"title\": title, \"head\": branch, \"base\": \"main\", \"body\": \"Automated fix from triage findings. See docs/fix-design.md and docs/fix-plan.md.\"}))
+print(json.dumps({\"title\": sys.argv[1], \"head\": sys.argv[2], \"base\": \"main\", \"body\": \"Automated fix from triage findings. See docs/fix-design.md and docs/fix-plan.md.\"}))
 PYJSON
 RESP=$(curl -s -X POST -H \"Authorization: token ${GH_TOKEN}\" -H \"Accept: application/vnd.github+json\" \"https://api.github.com/repos/${OWNER_REPO}/pulls\" --data @/tmp/pr_body.json)
-PR_URL=$(echo \"$RESP\" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get(\"html_url\",\"\"))' 2>/dev/null || echo '')
-PR_NUMBER=$(echo \"$RESP\" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get(\"number\",\"\"))' 2>/dev/null || echo '')
-if [ -n \"$PR_URL\" ]; then
-  printf '{\"delivery.pr_url\": \"%s\", \"delivery.pr_number\": \"%s\", \"delivery.owner_repo\": \"%s\"}' \"$PR_URL\" \"$PR_NUMBER\" \"$OWNER_REPO\"
-else
-  printf '{\"delivery.pr_url\": \"\", \"delivery.owner_repo\": \"%s\", \"note\": \"push ok, PR creation failed\"}' \"$OWNER_REPO\"
-fi"
+echo \"$RESP\" > /tmp/pr_resp.json
+python3 - \"$OWNER_REPO\" <<'PYOUT'
+import json, sys
+owner_repo = sys.argv[1]
+try:
+    d = json.load(open('/tmp/pr_resp.json'))
+except Exception:
+    d = {}
+url = d.get('html_url', '') if isinstance(d, dict) else ''
+num = d.get('number', '') if isinstance(d, dict) else ''
+print(json.dumps({'delivery.pr_url': url, 'delivery.pr_number': str(num), 'delivery.owner_repo': owner_repo}))
+PYOUT"
     ]
 
     // Comment draft — writes bridge.* output and triggers /review-pr
