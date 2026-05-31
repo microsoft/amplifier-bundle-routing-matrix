@@ -97,7 +97,29 @@ digraph simple_fix {
         shape      = parallelogram,
         fillcolor  = "#FFF9C4",
         parse_json = true,
-        tool_command = "#!/bin/sh\nset -e\nBRANCH=$(git rev-parse --abbrev-ref HEAD)\nREPO_URL=$(echo \"$goal\" | grep -oP 'https://github.com/[^/]+/[^/# ]+' | head -1)\nif [ -z \"$REPO_URL\" ]; then\n  printf '{\"error\": \"no repo URL found in goal\"}'\n  exit 1\nfi\nOWNER_REPO=$(echo \"$REPO_URL\" | sed 's|https://github.com/||')\ngit remote add github \"https://x-access-token:${GH_TOKEN}@github.com/${OWNER_REPO}.git\" 2>/dev/null || git remote set-url github \"https://x-access-token:${GH_TOKEN}@github.com/${OWNER_REPO}.git\"\ngit push -u github \"$BRANCH\" 2>&1\nPR_TITLE=$(head -1 docs/fix-design.md 2>/dev/null | sed 's/^#* *//' || echo \"Automated fix\")\nRESP=$(curl -s -X POST \\\n  -H \"Authorization: token ${GH_TOKEN}\" \\\n  -H \"Accept: application/vnd.github+json\" \\\n  \"https://api.github.com/repos/${OWNER_REPO}/pulls\" \\\n  -d \"{\\\"title\\\": \\\"${PR_TITLE}\\\", \\\"head\\\": \\\"${BRANCH}\\\", \\\"base\\\": \\\"main\\\", \\\"body\\\": \\\"Automated fix from triage findings. See docs/fix-design.md and docs/fix-plan.md for details.\\\"}\")\nPR_URL=$(echo \"$RESP\" | grep -o '\"html_url\": \"[^\"]*\"' | head -1 | cut -d'\"' -f4)\nPR_NUMBER=$(echo \"$RESP\" | grep -o '\"number\": *[0-9]*' | head -1 | grep -o '[0-9]*')\nif [ -n \"$PR_URL\" ]; then\n  printf '{\"delivery.pr_url\": \"%s\", \"delivery.pr_number\": \"%s\", \"delivery.owner_repo\": \"%s\"}' \"$PR_URL\" \"$PR_NUMBER\" \"$OWNER_REPO\"\nelse\n  printf '{\"delivery.pr_url\": \"\", \"delivery.pr_number\": \"\", \"delivery.owner_repo\": \"%s\", \"note\": \"push succeeded but PR creation failed\"}' \"$OWNER_REPO\"\nfi"
+        tool_command = "#!/bin/sh
+set -e
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+REPO_URL=$(echo \"$goal\" | grep -oE 'https://github.com/[^/]+/[^/# ]+' | head -1)
+if [ -z \"$REPO_URL\" ]; then printf '{\"error\": \"no repo URL in goal\"}'; exit 1; fi
+OWNER_REPO=$(echo \"$REPO_URL\" | sed 's|https://github.com/||')
+git remote add github \"https://x-access-token:${GH_TOKEN}@github.com/${OWNER_REPO}.git\" 2>/dev/null || git remote set-url github \"https://x-access-token:${GH_TOKEN}@github.com/${OWNER_REPO}.git\"
+git push -u github \"$BRANCH\" 2>&1
+PR_TITLE=$(head -1 docs/fix-design.md 2>/dev/null | sed 's/^#* *//')
+if [ -z \"$PR_TITLE\" ]; then PR_TITLE=\"Automated fix from triage\"; fi
+python3 - \"$PR_TITLE\" \"$BRANCH\" > /tmp/pr_body.json <<'PYJSON'
+import json, sys
+title, branch = sys.argv[1], sys.argv[2]
+print(json.dumps({\"title\": title, \"head\": branch, \"base\": \"main\", \"body\": \"Automated fix from triage findings. See docs/fix-design.md and docs/fix-plan.md.\"}))
+PYJSON
+RESP=$(curl -s -X POST -H \"Authorization: token ${GH_TOKEN}\" -H \"Accept: application/vnd.github+json\" \"https://api.github.com/repos/${OWNER_REPO}/pulls\" --data @/tmp/pr_body.json)
+PR_URL=$(echo \"$RESP\" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get(\"html_url\",\"\"))' 2>/dev/null || echo '')
+PR_NUMBER=$(echo \"$RESP\" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get(\"number\",\"\"))' 2>/dev/null || echo '')
+if [ -n \"$PR_URL\" ]; then
+  printf '{\"delivery.pr_url\": \"%s\", \"delivery.pr_number\": \"%s\", \"delivery.owner_repo\": \"%s\"}' \"$PR_URL\" \"$PR_NUMBER\" \"$OWNER_REPO\"
+else
+  printf '{\"delivery.pr_url\": \"\", \"delivery.owner_repo\": \"%s\", \"note\": \"push ok, PR creation failed\"}' \"$OWNER_REPO\"
+fi"
     ]
 
     // Comment draft — writes bridge.* output and triggers /review-pr
