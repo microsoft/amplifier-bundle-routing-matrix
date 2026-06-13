@@ -109,11 +109,15 @@ def validate_matrix(matrix: dict[str, Any]) -> list[str]:
 
     for required_role in ("general", "fast"):
         if required_role not in roles:
-            errors.append(f"Required role '{required_role}' is missing from the matrix.")
+            errors.append(
+                f"Required role '{required_role}' is missing from the matrix."
+            )
 
     for role_name, role_data in roles.items():
         if not isinstance(role_data, dict):
-            errors.append(f"Role '{role_name}': expected a mapping, got {type(role_data).__name__}.")
+            errors.append(
+                f"Role '{role_name}': expected a mapping, got {type(role_data).__name__}."
+            )
             continue
 
         if "description" not in role_data:

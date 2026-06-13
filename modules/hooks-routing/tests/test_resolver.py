@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from amplifier_module_hooks_routing.resolver import (
+    _resolve_glob,
     find_provider_by_type,
     resolve_model_role,
 )
@@ -478,3 +479,106 @@ class TestExactNameBypassesListModels:
         # an exact name, not a glob. This means the API gets the name directly
         # even if list_models would have filtered it out.
         provider.list_models.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# preresolved_models — skip list_models() when models are already known
+# ---------------------------------------------------------------------------
+
+
+class TestPreresolvedModels:
+    """When a parent session has already fetched model lists, child sessions
+    pass those lists via preresolved_models to skip list_models() HTTP calls.
+    """
+
+    @pytest.mark.asyncio
+    async def test_resolve_glob_uses_preresolved_list(self) -> None:
+        """_resolve_glob does not call list_models() when provider_key is in dict."""
+        provider = _make_provider(models=["claude-sonnet-4-20250514"])
+        preresolved = {"anthropic": ["claude-sonnet-4-20250514", "claude-haiku-3"]}
+
+        result = await _resolve_glob(
+            "claude-sonnet-*",
+            provider,
+            provider_key="anthropic",
+            preresolved_models=preresolved,
+        )
+
+        assert result == "claude-sonnet-4-20250514"
+        provider.list_models.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_resolve_glob_populates_dict_on_fetch(self) -> None:
+        """_resolve_glob writes the fetched list into preresolved_models."""
+        models = ["claude-sonnet-4-20250514", "claude-haiku-3"]
+        provider = _make_provider(models=models)
+        preresolved: dict[str, list[str]] = {}
+
+        await _resolve_glob(
+            "claude-sonnet-*",
+            provider,
+            provider_key="anthropic",
+            preresolved_models=preresolved,
+        )
+
+        assert "anthropic" in preresolved
+        assert preresolved["anthropic"] == models
+        assert provider.list_models.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_resolve_glob_skips_fetch_on_second_call(self) -> None:
+        """Once preresolved_models is populated, subsequent calls skip list_models()."""
+        models = ["claude-sonnet-4-20250514"]
+        provider = _make_provider(models=models)
+        preresolved: dict[str, list[str]] = {}
+
+        # First call — fetches and populates
+        await _resolve_glob("claude-sonnet-*", provider, "anthropic", preresolved)
+        assert provider.list_models.call_count == 1
+
+        # Second call — uses stored list, no HTTP
+        await _resolve_glob("claude-sonnet-*", provider, "anthropic", preresolved)
+        assert provider.list_models.call_count == 1  # still 1
+
+    @pytest.mark.asyncio
+    async def test_resolve_model_role_passes_preresolved_through(self) -> None:
+        """resolve_model_role passes preresolved_models to _resolve_glob."""
+        models = ["claude-sonnet-4-20250514"]
+        provider = _make_provider(models=models)
+        providers = {"provider-anthropic": provider}
+        roles = {
+            "coding": {
+                "description": "Code gen",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-sonnet-*"},
+                ],
+            },
+        }
+        preresolved = {"anthropic": models}
+
+        result = await resolve_model_role(
+            ["coding"], roles, providers, preresolved_models=preresolved
+        )
+
+        assert result[0]["model"] == "claude-sonnet-4-20250514"
+        provider.list_models.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_resolve_model_role_without_preresolved_still_works(self) -> None:
+        """Omitting preresolved_models preserves original behaviour."""
+        models = ["claude-sonnet-4-20250514"]
+        provider = _make_provider(models=models)
+        providers = {"provider-anthropic": provider}
+        roles = {
+            "coding": {
+                "description": "Code gen",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-sonnet-*"},
+                ],
+            },
+        }
+
+        result = await resolve_model_role(["coding"], roles, providers)
+
+        assert result[0]["model"] == "claude-sonnet-4-20250514"
+        provider.list_models.assert_called_once()

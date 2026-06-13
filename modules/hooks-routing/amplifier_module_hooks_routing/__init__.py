@@ -54,6 +54,11 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     config_overrides: dict[str, Any] = config.get("overrides", {})
 
     # --- User overrides from routing capability (if any) ---
+    # NOTE: session.routing is registered by session_spawner.py AFTER initialize()
+    # but BEFORE execute(), so it is NOT yet available here at mount() time.
+    # Matrix overrides are read here for config-driven overrides only.
+    # The preresolved_models key is read inside on_session_start where timing is
+    # correct (session:start fires after session.routing is registered).
     capability_overrides: dict[str, Any] = {}
     routing_capability = (
         coordinator.get_capability("session.routing")
@@ -93,6 +98,26 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
 
         from .resolver import resolve_model_role
 
+        # Read preresolved model lists from session.routing.  session_spawner.py
+        # registers session.routing AFTER initialize() (so it is not available at
+        # mount() time above) but BEFORE execute() — meaning it IS available when
+        # session:start fires here.
+        #
+        # A parent session populates session.routing["preresolved_models"] at the
+        # end of its own on_session_start (see below).  session_spawner.py then
+        # forwards the parent's session.routing to the child coordinator before
+        # execute() runs, so the child's on_session_start finds those lists here
+        # and can skip list_models() HTTP calls for providers already resolved.
+        routing_cap = (
+            coordinator.get_capability("session.routing")
+            if hasattr(coordinator, "get_capability")
+            else None
+        )
+        # Shallow-copy so mutations below don't alias the registered capability dict.
+        preresolved_models: dict[str, list[str]] = dict(
+            (routing_cap or {}).get("preresolved_models", {})
+        )
+
         async def _resolve_one(agent_cfg: dict[str, Any]) -> None:
             """Resolve model_role for a single agent and patch agent_cfg in-place."""
             model_role = agent_cfg.get("model_role")
@@ -101,7 +126,12 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             # Normalise to list
             if isinstance(model_role, str):
                 model_role = [model_role]
-            resolved = await resolve_model_role(model_role, effective_matrix, providers)
+            resolved = await resolve_model_role(
+                model_role,
+                effective_matrix,
+                providers,
+                preresolved_models=preresolved_models,
+            )
             if resolved:
                 agent_cfg["provider_preferences"] = [
                     {"provider": r["provider"], "model": r["model"]} for r in resolved
@@ -109,8 +139,24 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
 
         # Resolve all agents concurrently — wall-time becomes single longest
         # latency rather than sum of all latencies.  Each coroutine writes only
-        # its own agent_cfg dict, so there is no shared mutable state.
+        # its own agent_cfg dict, so there is no shared mutable state between
+        # _resolve_one calls, except for preresolved_models which is asyncio-safe:
+        # asyncio is cooperative and single-threaded, so dict reads/writes never
+        # interleave (a coroutine only yields at explicit await points, and dict
+        # mutation is not awaited).
         await asyncio.gather(*(_resolve_one(cfg) for cfg in agents.values()))
+
+        # Write the now-populated model lists back into session.routing so child
+        # sessions spawned from this one inherit them.  session_spawner.py already
+        # forwards session.routing from parent to child coordinator before execute()
+        # runs, so no spawner changes are needed — updating the capability here is
+        # sufficient for the lists to flow to the next generation.
+        if preresolved_models and hasattr(coordinator, "get_capability"):
+            existing_routing = coordinator.get_capability("session.routing") or {}
+            coordinator.register_capability(
+                "session.routing",
+                {**existing_routing, "preresolved_models": preresolved_models},
+            )
 
         from amplifier_core.models import HookResult
 

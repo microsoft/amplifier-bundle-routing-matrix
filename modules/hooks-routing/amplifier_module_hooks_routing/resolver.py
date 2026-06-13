@@ -92,6 +92,7 @@ async def resolve_model_role(
     roles: list[str],
     matrix: dict[str, Any],
     providers: dict[str, Any],
+    preresolved_models: dict[str, list[str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Resolve model role(s) against routing matrix.
 
@@ -99,6 +100,19 @@ async def resolve_model_role(
         roles: Prioritised list of role names to try.
         matrix: Composed matrix ``roles`` dict (from :mod:`matrix_loader`).
         providers: Installed providers dict from ``coordinator.get("providers")``.
+        preresolved_models: Optional mutable dict of ``provider_type ->
+            model_names``.  When provided, :func:`_resolve_glob` reads from it
+            to skip ``list_models()`` HTTP calls for providers whose model list
+            was already fetched (e.g. by the parent session).
+            :func:`_resolve_glob` also writes newly-fetched lists back into the
+            dict, so subsequent calls for the same provider within the same
+            session are also free.
+
+            **Asyncio safety:** the dict is shared across concurrently-running
+            ``_resolve_one`` coroutines (via ``asyncio.gather``).  Because
+            asyncio is cooperative and single-threaded, dict reads and writes
+            never interleave — a coroutine only yields at explicit ``await``
+            points, and dict mutation is a non-awaited operation.
 
     Returns:
         List of ``{provider, model, config}`` dicts representing resolved
@@ -124,7 +138,12 @@ async def resolve_model_role(
 
             # Is the model pattern a glob?
             if _is_glob(model_pattern):
-                resolved_model = await _resolve_glob(model_pattern, provider_instance)
+                resolved_model = await _resolve_glob(
+                    model_pattern,
+                    provider_instance,
+                    provider_key=provider_type,
+                    preresolved_models=preresolved_models,
+                )
                 if resolved_model is None:
                     continue
             else:
@@ -141,7 +160,12 @@ async def resolve_model_role(
     return []
 
 
-async def _resolve_glob(pattern: str, provider: Any) -> str | None:
+async def _resolve_glob(
+    pattern: str,
+    provider: Any,
+    provider_key: str = "",
+    preresolved_models: dict[str, list[str]] | None = None,
+) -> str | None:
     """Resolve a glob model pattern against a provider's model list.
 
     Uses natural-sort ordering (see :func:`_version_sort_key`) so that:
@@ -152,21 +176,32 @@ async def _resolve_glob(pattern: str, provider: Any) -> str | None:
     * Shorter aliases outrank pinned snapshots on equal primary keys
       (``gpt-5.4`` > ``gpt-5.4-2026-03-05``).
 
+    When *preresolved_models* is provided and *provider_key* is already present
+    in it, ``list_models()`` is skipped entirely — the stored list is used
+    directly.  When the list must be fetched, it is written back into
+    *preresolved_models* under *provider_key* so future calls are free.
+
     Returns the highest-ranked matching model name or ``None`` when no
     candidate matches or the provider's ``list_models()`` raises.
     """
-    try:
-        available = await provider.list_models()
-    except Exception:
-        logger.warning(
-            "Failed to list models for glob pattern '%s'", pattern, exc_info=True
-        )
-        return None
+    if preresolved_models is not None and provider_key in preresolved_models:
+        model_names = preresolved_models[provider_key]
+    else:
+        try:
+            available = await provider.list_models()
+        except Exception:
+            logger.warning(
+                "Failed to list models for glob pattern '%s'", pattern, exc_info=True
+            )
+            return None
 
-    # Normalise to list of strings
-    model_names: list[str] = [
-        m if isinstance(m, str) else getattr(m, "id", str(m)) for m in available
-    ]
+        # Normalise to list of strings
+        model_names = [
+            m if isinstance(m, str) else getattr(m, "id", str(m)) for m in available
+        ]
+
+        if preresolved_models is not None and provider_key:
+            preresolved_models[provider_key] = model_names
 
     matched = fnmatch.filter(model_names, pattern)
     if not matched:

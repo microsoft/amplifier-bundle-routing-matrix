@@ -5,7 +5,7 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -104,7 +104,9 @@ class TestMount:
 
         # Simpler approach: set up the real directory structure
         bundle_root = tmp_path / "bundle"
-        modules_dir = bundle_root / "modules" / "hooks-routing" / "amplifier_module_hooks_routing"
+        modules_dir = (
+            bundle_root / "modules" / "hooks-routing" / "amplifier_module_hooks_routing"
+        )
         modules_dir.mkdir(parents=True)
         routing_dir = bundle_root / "routing"
         routing_dir.mkdir()
@@ -431,8 +433,7 @@ class TestSessionStartParallelism:
         providers = {"provider-anthropic": mock_provider}
 
         agents = {
-            f"agent-{i:02d}": {"model_role": "general"}
-            for i in range(AGENT_COUNT)
+            f"agent-{i:02d}": {"model_role": "general"} for i in range(AGENT_COUNT)
         }
 
         coordinator = _make_coordinator(providers=providers, agents=agents)
@@ -466,3 +467,145 @@ class TestSessionStartParallelism:
                 f"Agent '{name}' missing provider_preferences after parallel resolution"
             )
             assert agent_cfg["provider_preferences"][0]["provider"] == "anthropic"
+
+
+# ---------------------------------------------------------------------------
+# preresolved_models — session.routing propagation between parent and child
+# ---------------------------------------------------------------------------
+
+
+class TestPreresolvedModelsFlow:
+    """session.routing["preresolved_models"] is read at on_session_start time
+    (not mount time) and written back afterward, so child sessions skip
+    list_models() HTTP calls for providers the parent already resolved.
+    """
+
+    def _make_routing_coordinator(
+        self,
+        *,
+        providers: dict | None = None,
+        agents: dict | None = None,
+        routing_capability: dict | None = None,
+    ) -> MagicMock:
+        """Coordinator that returns a routing capability from get_capability."""
+        coordinator = _make_coordinator(providers=providers, agents=agents)
+        coordinator.get_capability = MagicMock(return_value=routing_capability)
+        # register_capability is a no-op mock by default on MagicMock
+        return coordinator
+
+    @pytest.mark.asyncio
+    async def test_session_start_reads_preresolved_from_routing_capability(
+        self, tmp_path: Path
+    ) -> None:
+        """When session.routing carries preresolved_models, list_models() is skipped."""
+        bundle_root = tmp_path / "bundle"
+        routing_dir = bundle_root / "routing"
+        routing_dir.mkdir(parents=True)
+        content = textwrap.dedent("""\
+            name: balanced
+            description: "Test"
+            updated: "2026-01-01"
+            roles:
+              coding:
+                description: "Code"
+                candidates:
+                  - provider: anthropic
+                    model: claude-sonnet-*
+        """)
+        (routing_dir / "balanced.yaml").write_text(content)
+
+        models = ["claude-sonnet-4-20250514", "claude-haiku-3"]
+        mock_provider = MagicMock()
+        mock_provider.list_models = AsyncMock(return_value=models)
+        providers = {"provider-anthropic": mock_provider}
+
+        agents = {"coder": {"model_role": "coding"}}
+
+        # Simulate parent having already fetched models — stored in session.routing
+        routing_cap = {"preresolved_models": {"anthropic": models}}
+        coordinator = self._make_routing_coordinator(
+            providers=providers, agents=agents, routing_capability=routing_cap
+        )
+
+        await mount(
+            coordinator,
+            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
+        )
+
+        # Extract and invoke on_session_start
+        calls = coordinator.hooks.register.call_args_list
+        handler = next(
+            call.args[1] for call in calls if call.args[0] == "session:start"
+        )
+        await handler("session:start", {})
+
+        # Agent must be resolved
+        assert "provider_preferences" in agents["coder"]
+        assert agents["coder"]["provider_preferences"][0]["provider"] == "anthropic"
+        assert (
+            agents["coder"]["provider_preferences"][0]["model"]
+            == "claude-sonnet-4-20250514"
+        )
+
+        # list_models() must NOT have been called — preresolved list was used
+        mock_provider.list_models.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_session_start_writes_fetched_models_back_to_routing(
+        self, tmp_path: Path
+    ) -> None:
+        """After on_session_start fetches model lists, they are written into
+        session.routing so subsequent child spawns inherit them."""
+        bundle_root = tmp_path / "bundle"
+        routing_dir = bundle_root / "routing"
+        routing_dir.mkdir(parents=True)
+        content = textwrap.dedent("""\
+            name: balanced
+            description: "Test"
+            updated: "2026-01-01"
+            roles:
+              coding:
+                description: "Code"
+                candidates:
+                  - provider: anthropic
+                    model: claude-sonnet-*
+        """)
+        (routing_dir / "balanced.yaml").write_text(content)
+
+        models = ["claude-sonnet-4-20250514"]
+        mock_provider = MagicMock()
+        mock_provider.list_models = AsyncMock(return_value=models)
+        providers = {"provider-anthropic": mock_provider}
+
+        agents = {"coder": {"model_role": "coding"}}
+
+        # No preresolved models — coordinator starts clean
+        coordinator = self._make_routing_coordinator(
+            providers=providers, agents=agents, routing_capability=None
+        )
+
+        await mount(
+            coordinator,
+            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
+        )
+
+        # Extract and invoke on_session_start
+        calls = coordinator.hooks.register.call_args_list
+        handler = next(
+            call.args[1] for call in calls if call.args[0] == "session:start"
+        )
+        await handler("session:start", {})
+
+        # list_models() was called once (no preresolved data)
+        mock_provider.list_models.assert_called_once()
+
+        # register_capability must have been called with preresolved_models populated
+        register_calls = coordinator.register_capability.call_args_list
+        routing_updates = [c for c in register_calls if c.args[0] == "session.routing"]
+        assert len(routing_updates) == 1, (
+            "on_session_start must write preresolved_models back to session.routing"
+        )
+        written = routing_updates[0].args[1]
+        assert "preresolved_models" in written
+        assert "anthropic" in written["preresolved_models"]
+        assert written["preresolved_models"]["anthropic"] == models
