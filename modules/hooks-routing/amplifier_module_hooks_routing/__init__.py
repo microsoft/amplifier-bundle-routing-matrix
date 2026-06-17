@@ -85,6 +85,23 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             "roles": effective_matrix,
         }
 
+    # --- Register the model_role_resolver capability ---
+    # Consumers: tool-delegate, hooks-session-naming, tool-recipes, tool-skills.
+    # Duck-typed contract: async def resolve(model_role) -> list[ProviderPreference]
+    # Only register when we have a non-empty matrix to resolve against; skip when the
+    # matrix file was missing so callers get the "no resolver" warning instead of a
+    # resolver that always returns an empty list.
+    if effective_matrix and hasattr(coordinator, "register_capability"):
+        from .resolver_class import MatrixModelRoleResolver
+
+        _resolver_providers = coordinator.get("providers") or {}
+        _resolver = MatrixModelRoleResolver(
+            matrix_roles=effective_matrix,
+            providers=_resolver_providers,
+            matrix_name=base_matrix.get("name", default_matrix_name),
+        )
+        coordinator.register_capability("model_role_resolver", _resolver)
+
     # ------------------------------------------------------------------
     # Hook 1: session:start — resolve model_role for all agents
     # ------------------------------------------------------------------

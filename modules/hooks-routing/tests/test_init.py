@@ -379,6 +379,90 @@ class TestProviderRequestHook:
         assert "fast" in result.context_injection
 
 
+class TestModelRoleResolverCapability:
+    @pytest.mark.asyncio
+    async def test_mount_registers_model_role_resolver_capability(
+        self, tmp_path: Path
+    ) -> None:
+        """mount() must register 'model_role_resolver' via coordinator.register_capability.
+
+        Regression test: MatrixModelRoleResolver was shipped but never wired into
+        mount() -- coordinator.get_capability("model_role_resolver") returned None on
+        every call, producing a spurious WARNING on every delegate(..., model_role=...)
+        and silently discarding the caller's role in favour of the agent's declared role.
+        """
+        # _write_matrix() creates routing/balanced.yaml and returns the routing dir;
+        # we need the bundle root (its parent).
+        routing_dir = _write_matrix(tmp_path)
+        bundle_root = routing_dir.parent
+
+        # Coordinator with an installed openai provider so "fast" role resolves.
+        # register_capability is declared explicitly to keep assertion messages clear.
+        mock_openai = MagicMock()
+        coordinator = _make_coordinator(providers={"provider-openai": mock_openai})
+        coordinator.register_capability = MagicMock()
+
+        await mount(
+            coordinator,
+            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
+        )
+
+        # PRIMARY ASSERTION: mount() must call register_capability("model_role_resolver", ...)
+        registered_names = [
+            call.args[0] for call in coordinator.register_capability.call_args_list
+        ]
+        assert "model_role_resolver" in registered_names, (
+            "mount() never called coordinator.register_capability('model_role_resolver', ...)."
+            f" Calls seen: {registered_names!r}."
+            " Wire MatrixModelRoleResolver into mount() so tool-delegate can resolve roles."
+        )
+
+        # SECONDARY ASSERTION: the registered resolver must return ProviderPreferences for a role.
+        resolver_call = next(
+            c
+            for c in coordinator.register_capability.call_args_list
+            if c.args[0] == "model_role_resolver"
+        )
+        resolver = resolver_call.args[1]
+
+        # ProviderPreference lives in amplifier_foundation which is not guaranteed
+        # to be importable in this test environment -- inject a lightweight stand-in
+        # so we can verify resolver behaviour without a hard foundation dependency.
+        import sys
+        import types as _types
+
+        class _FakeProviderPreference:
+            def __init__(
+                self, *, provider: str, model: str, config: dict | None = None
+            ) -> None:
+                self.provider = provider
+                self.model = model
+                self.config = config or {}
+
+        fake_spawn = _types.ModuleType("amplifier_foundation.spawn_utils")
+        fake_spawn.ProviderPreference = _FakeProviderPreference  # type: ignore[attr-defined]
+        fake_foundation = _types.ModuleType("amplifier_foundation")
+
+        with patch.dict(
+            sys.modules,
+            {
+                "amplifier_foundation": fake_foundation,
+                "amplifier_foundation.spawn_utils": fake_spawn,
+            },
+        ):
+            prefs = await resolver.resolve("fast")
+
+        assert len(prefs) > 0, (
+            "Resolver returned an empty list for 'fast' role -- "
+            "verify MatrixModelRoleResolver receives effective_matrix and providers."
+        )
+        assert prefs[0].provider == "openai", (
+            f"Expected provider 'openai' for 'fast' role, got {prefs[0].provider!r}"
+        )
+        assert prefs[0].model == "gpt-4o-mini", (
+            f"Expected model 'gpt-4o-mini' for 'fast' role, got {prefs[0].model!r}"
+        )
+
 class TestSessionStartParallelism:
     @pytest.mark.asyncio
     async def test_session_start_resolves_agents_in_parallel(
