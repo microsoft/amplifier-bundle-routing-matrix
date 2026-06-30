@@ -390,7 +390,7 @@ Different providers use different naming conventions for the **same underlying m
 | Model | anthropic | openai | gemini | github-copilot |
 |-------|-----------|--------|--------|----------------|
 | Claude Sonnet 4.x | `claude-sonnet-*` (glob) | — | — | `claude-sonnet-4.6` (pin) |
-| Claude Opus 4.x | `claude-opus-*` (glob) | — | — | `claude-opus-4.6` (pin) |
+| Claude Opus 4.x | `claude-opus-*` (glob) | — | — | `claude-opus-4.8` (pin) |
 | Claude Haiku 4.x | `claude-haiku-*` (glob) | — | — | `claude-haiku-4.5` (pin) |
 | GPT base (mid-tier) | — | `gpt-[0-9].[0-9]` (glob) | — | pinned, e.g. `gpt-5.5` |
 | GPT-5.x mini | — | `gpt-?.?-mini*` (glob) | — | pinned, e.g. `gpt-5.4-mini` |
