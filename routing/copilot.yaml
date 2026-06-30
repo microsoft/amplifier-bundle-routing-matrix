@@ -11,7 +11,7 @@
 
 name: copilot
 description: "GitHub Copilot-optimized routing. Balances multiplier costs, avoids 30x trap."
-updated: "2026-04-22"
+updated: "2026-06-30"
 
 roles:
   general:
