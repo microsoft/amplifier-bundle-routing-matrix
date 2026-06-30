@@ -56,7 +56,7 @@ roles:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-4.8
         config:
           reasoning_effort: high
 
@@ -76,19 +76,19 @@ roles:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-4.8
 
   writing:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-4.8
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-4.8
 
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
@@ -110,4 +110,4 @@ roles:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-4.8
