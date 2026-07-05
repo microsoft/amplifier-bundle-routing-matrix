@@ -203,7 +203,16 @@ async def _resolve_glob(
         if preresolved_models is not None and provider_key:
             preresolved_models[provider_key] = model_names
 
-    matched = fnmatch.filter(model_names, pattern)
+    # Case-insensitive, OS-independent glob matching: lowercase both sides
+    # before comparing (raw fnmatch.filter() uses os.path.normcase, which is
+    # case-sensitive on Linux/Mac and case-insensitive on Windows -- an
+    # OS-dependent inconsistency). This matches the canonical model-glob
+    # semantics used by amplifier_foundation.spawn_utils (agent-spawn model
+    # resolution) and the unified-llm-client reference implementation, so a
+    # pattern like "Qwen3.6-*" deterministically matches "qwen3.6-35b-..."
+    # on every platform. Original casing is preserved in the returned name.
+    lowered_pattern = pattern.lower()
+    matched = [m for m in model_names if fnmatch.fnmatch(m.lower(), lowered_pattern)]
     if not matched:
         return None
 
