@@ -131,6 +131,35 @@ class TestResolveModelRole:
         assert result[0]["model"] == "claude-sonnet-4-20250514"
 
     @pytest.mark.asyncio
+    async def test_resolve_glob_pattern_case_insensitive(self) -> None:
+        """Regression test: model glob matching must be case-insensitive and
+        OS-independent. Raw fnmatch.filter() uses os.path.normcase, which is
+        case-sensitive on Linux/Mac and case-insensitive on Windows -- so a
+        real-world mixed-case model id (e.g. 'Qwen3.6-35B-A3B-UD-Q4_K_XL')
+        would silently fail to match a lowercase pattern ('qwen3.6-*') on
+        Linux/Mac while matching on Windows. Must be deterministic across
+        platforms and consistent with amplifier_foundation.spawn_utils'
+        agent-spawn model resolution semantics.
+        """
+        models = ["Qwen3.6-35B-A3B-UD-Q4_K_XL"]
+        providers = {"provider-ornith": _make_provider(models=models)}
+        roles = {
+            "general": {
+                "description": "General",
+                "candidates": [
+                    {"provider": "ornith", "model": "qwen3.6-*"},
+                ],
+            },
+        }
+
+        result = await resolve_model_role(["general"], roles, providers)
+
+        assert len(result) == 1
+        assert result[0]["model"] == "Qwen3.6-35B-A3B-UD-Q4_K_XL", (
+            f"Expected case-insensitive glob match, got: {result}"
+        )
+
+    @pytest.mark.asyncio
     async def test_resolve_no_match_returns_empty(self) -> None:
         """No roles match anything → empty list."""
         providers = {"provider-openai": _make_provider()}

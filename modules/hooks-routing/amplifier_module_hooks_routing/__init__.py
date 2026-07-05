@@ -40,15 +40,39 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
 
     routing_dir = bundle_root / "routing"
 
+    # --- Locate custom user routing dir(s) (e.g. ~/.amplifier/routing/) ---
+    # These are populated by app-cli's `amplifier routing save`/`amplifier init`
+    # (see commands/routing.py `save_custom_matrix()`), which write user-authored
+    # matrices OUTSIDE the bundle. Without this, a matrix that only exists in a
+    # user's custom dir is invisible here even though `amplifier routing list`
+    # shows it — the exact "Matrix file not found -- routing disabled" bug.
+    # Searched with priority BEFORE the bundle dir so user overrides win.
+    custom_routing_dirs = [
+        Path(d) for d in (config.get("custom_routing_dirs") or []) if d
+    ]
+
     # --- Load default matrix ---
+    # Search custom dirs first (priority), then fall back to the bundle's own
+    # routing/ dir so shipped matrices (balanced, anthropic, etc.) still work.
     default_matrix_name = config.get("default_matrix", "balanced")
-    matrix_path = routing_dir / f"{default_matrix_name}.yaml"
+    search_dirs = [*custom_routing_dirs, routing_dir]
+    matrix_path = next(
+        (
+            candidate
+            for search_dir in search_dirs
+            if (candidate := search_dir / f"{default_matrix_name}.yaml").exists()
+        ),
+        None,
+    )
 
     base_matrix: dict[str, Any] = {}
-    if matrix_path.exists():
+    if matrix_path is not None:
         base_matrix = load_matrix(matrix_path)
     else:
-        logger.warning("Matrix file not found: %s — routing disabled", matrix_path)
+        logger.warning(
+            "Matrix file not found: %s — routing disabled",
+            routing_dir / f"{default_matrix_name}.yaml",
+        )
 
     # --- Config-driven overrides (injected by CLI via _apply_hook_overrides) ---
     config_overrides: dict[str, Any] = config.get("overrides", {})

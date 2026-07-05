@@ -463,6 +463,7 @@ class TestModelRoleResolverCapability:
             f"Expected model 'gpt-4o-mini' for 'fast' role, got {prefs[0].model!r}"
         )
 
+
 class TestSessionStartParallelism:
     @pytest.mark.asyncio
     async def test_session_start_resolves_agents_in_parallel(
@@ -551,6 +552,160 @@ class TestSessionStartParallelism:
                 f"Agent '{name}' missing provider_preferences after parallel resolution"
             )
             assert agent_cfg["provider_preferences"][0]["provider"] == "anthropic"
+
+
+# ---------------------------------------------------------------------------
+# custom_routing_dirs — user matrices (e.g. written by `amplifier init` to
+# ~/.amplifier/routing/) must be resolvable at runtime, not just listable.
+# Regression coverage for: "Matrix file not found ... routing disabled" when
+# a matrix genuinely exists in the user's custom routing dir but not in the
+# bundle's own routing/ dir.
+# ---------------------------------------------------------------------------
+
+
+class TestCustomRoutingDirs:
+    @pytest.mark.asyncio
+    async def test_mount_loads_matrix_from_custom_dir_when_absent_from_bundle(
+        self, tmp_path: Path
+    ) -> None:
+        """A matrix that exists ONLY in a user custom dir (not the bundle's own
+        routing/ dir) must still load. This is the exact `amplifier init`
+        scenario: the CLI writes ~/.amplifier/routing/ornith.yaml, but there is
+        no ornith.yaml shipped in the bundle, so the runtime hook must be told
+        where the user's custom dir is (via config["custom_routing_dirs"]) or
+        it logs 'Matrix file not found -- routing disabled' despite the matrix
+        genuinely existing.
+        """
+        # Bundle root has NO ornith.yaml (mirrors the real shipped matrix set).
+        bundle_root = tmp_path / "bundle"
+        (bundle_root / "routing").mkdir(parents=True)
+
+        # Custom user dir HAS ornith.yaml (mirrors ~/.amplifier/routing/).
+        custom_dir = tmp_path / "custom-routing"
+        custom_dir.mkdir()
+        content = textwrap.dedent("""\
+            name: ornith
+            description: "Custom ornith matrix"
+            updated: "2026-01-01"
+            roles:
+              general:
+                description: "General purpose"
+                candidates:
+                  - provider: ornith
+                    model: ornith-1.0-35b
+        """)
+        (custom_dir / "ornith.yaml").write_text(content)
+
+        coordinator = _make_coordinator()
+        await mount(
+            coordinator,
+            config={
+                "default_matrix": "ornith",
+                "_bundle_root": str(bundle_root),
+                "custom_routing_dirs": [str(custom_dir)],
+            },
+        )
+
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["name"] == "ornith", (
+            "Matrix from custom_routing_dirs must load -- routing must NOT be "
+            f"disabled. Got: {stored}"
+        )
+        assert "general" in stored["roles"]
+        assert stored["roles"]["general"]["candidates"] == [
+            {"provider": "ornith", "model": "ornith-1.0-35b"},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_custom_routing_dir_takes_priority_over_bundle_dir(
+        self, tmp_path: Path
+    ) -> None:
+        """When a matrix of the same name exists in BOTH the custom dir and the
+        bundle dir, the custom (user-authored) one wins -- user overrides beat
+        shipped defaults."""
+        bundle_root = tmp_path / "bundle"
+        bundle_routing = bundle_root / "routing"
+        bundle_routing.mkdir(parents=True)
+        (bundle_routing / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Shipped default"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "General"
+                    candidates:
+                      - provider: anthropic
+                        model: claude-sonnet-4-20250514
+            """)
+        )
+
+        custom_dir = tmp_path / "custom-routing"
+        custom_dir.mkdir()
+        (custom_dir / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "User override"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "General"
+                    candidates:
+                      - provider: ornith
+                        model: ornith-1.0-35b
+            """)
+        )
+
+        coordinator = _make_coordinator()
+        await mount(
+            coordinator,
+            config={
+                "default_matrix": "balanced",
+                "_bundle_root": str(bundle_root),
+                "custom_routing_dirs": [str(custom_dir)],
+            },
+        )
+
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["roles"]["general"]["candidates"] == [
+            {"provider": "ornith", "model": "ornith-1.0-35b"},
+        ], "Custom routing dir must take priority over the bundle's own routing dir"
+
+    @pytest.mark.asyncio
+    async def test_missing_custom_routing_dir_falls_back_to_bundle(
+        self, tmp_path: Path
+    ) -> None:
+        """A nonexistent custom_routing_dirs entry must not raise -- it's simply
+        skipped and resolution falls through to the bundle dir."""
+        bundle_root = tmp_path / "bundle"
+        routing_dir = bundle_root / "routing"
+        routing_dir.mkdir(parents=True)
+        (routing_dir / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Shipped default"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "General"
+                    candidates:
+                      - provider: anthropic
+                        model: claude-sonnet-4-20250514
+            """)
+        )
+
+        coordinator = _make_coordinator()
+        await mount(
+            coordinator,
+            config={
+                "default_matrix": "balanced",
+                "_bundle_root": str(bundle_root),
+                "custom_routing_dirs": [str(tmp_path / "does-not-exist")],
+            },
+        )
+
+        stored = coordinator.session_state["routing_matrix"]
+        assert stored["name"] == "balanced"
 
 
 # ---------------------------------------------------------------------------
