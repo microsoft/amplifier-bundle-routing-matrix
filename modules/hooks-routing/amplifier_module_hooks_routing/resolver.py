@@ -53,9 +53,51 @@ def _version_sort_key(name: str) -> tuple:
     return (primary, -len(name))
 
 
+def _get_provider_specs(coordinator: Any) -> list[dict[str, Any]]:
+    """Best-effort fetch of the mount plan's provider config list.
+
+    ``coordinator.config`` is a stable, documented property of
+    ``amplifier_core``'s coordinator, used elsewhere in the ecosystem to read
+    back ``module``/``id`` metadata for mounted instances (see the sibling
+    fix in ``amplifier_foundation.spawn_utils._find_provider_instance``).
+    This helper degrades gracefully to an empty list for any coordinator-like
+    object that doesn't expose it (e.g. ``None``, bare test doubles), rather
+    than raising.
+    """
+    config = getattr(coordinator, "config", None)
+    if not isinstance(config, dict):
+        return []
+    specs = config.get("providers", [])
+    return specs if isinstance(specs, list) else []
+
+
+def _spec_for_instance(
+    provider_specs: list[dict[str, Any]], instance_id: str
+) -> dict[str, Any] | None:
+    """Find the mount plan config spec matching a runtime provider instance name."""
+    for spec in provider_specs:
+        if not isinstance(spec, dict):
+            continue
+        spec_id = spec.get("id") or spec.get("module", "")
+        if spec_id == instance_id:
+            return spec
+    return None
+
+
+def _module_type_of(spec: dict[str, Any] | None) -> str | None:
+    """Extract the bare module type (e.g. "anthropic") from a provider spec."""
+    if spec is None:
+        return None
+    module = spec.get("module", "")
+    if not module:
+        return None
+    return module.replace("provider-", "")
+
+
 def find_provider_by_type(
     providers: dict[str, Any],
     type_name: str,
+    coordinator: Any = None,
 ) -> tuple[str, Any] | None:
     """Find an installed provider by module type name or instance ID.
 
@@ -74,9 +116,27 @@ def find_provider_by_type(
         providers: Dict of mounted providers keyed by module id or instance id.
         type_name: Provider identifier from a matrix candidate's ``provider:``
             field (short type name or multi-instance id).
+        coordinator: Optional coordinator, used as a fallback source of mount
+            plan config (module/id/priority) when ``type_name`` is a bare
+            module type that doesn't match any dict key directly (see
+            fallback below).
 
     Returns:
         ``(module_id, provider_instance)`` or ``None``.
+
+    Matching strategy:
+        1. Exact key, "provider-" prefix stripped, or "provider-" prefix
+           added — covers the single-instance case and any instance
+           explicitly keyed by the bare type.
+        2. Fallback: if ``type_name`` is a bare module type (e.g.
+           "anthropic") and no provider is keyed by it directly, this
+           happens when 2+ instances of that module each have a distinct
+           explicit ``id:`` (needed for routing-matrix disambiguation) and
+           none of them is the bare type itself. Search the mount plan's
+           provider config list for every instance whose underlying module
+           type matches, and return the one configured with the highest
+           priority (lowest priority number) — mirroring the "default
+           provider" convention used elsewhere in the ecosystem.
     """
     for name, provider in providers.items():
         if type_name in (
@@ -85,7 +145,25 @@ def find_provider_by_type(
             f"provider-{type_name}",
         ):
             return (name, provider)
-    return None
+
+    provider_specs = _get_provider_specs(coordinator)
+    if not provider_specs:
+        return None
+
+    candidates: list[tuple[int, str]] = []
+    for name in providers:
+        spec = _spec_for_instance(provider_specs, name)
+        if _module_type_of(spec) == type_name:
+            assert spec is not None  # narrowed by _module_type_of returning non-None
+            priority = spec.get("config", {}).get("priority", 0)
+            candidates.append((priority, name))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda c: c[0])
+    best_name = candidates[0][1]
+    return (best_name, providers[best_name])
 
 
 async def resolve_model_role(
@@ -93,6 +171,7 @@ async def resolve_model_role(
     matrix: dict[str, Any],
     providers: dict[str, Any],
     preresolved_models: dict[str, list[str]] | None = None,
+    coordinator: Any = None,
 ) -> list[dict[str, Any]]:
     """Resolve model role(s) against routing matrix.
 
@@ -113,6 +192,12 @@ async def resolve_model_role(
             asyncio is cooperative and single-threaded, dict reads and writes
             never interleave — a coroutine only yields at explicit ``await``
             points, and dict mutation is a non-awaited operation.
+        coordinator: Optional coordinator, forwarded to
+            :func:`find_provider_by_type` as a fallback source of mount plan
+            config when a matrix candidate's ``provider:`` is a bare module
+            type (e.g. ``"anthropic"``) that isn't a key in ``providers``
+            directly — the case where 2+ named instances of that module
+            exist but none is keyed by the bare type itself.
 
     Returns:
         List of ``{provider, model, config}`` dicts representing resolved
@@ -130,7 +215,7 @@ async def resolve_model_role(
             config = candidate.get("config", {})
 
             # Is this provider installed?
-            match = find_provider_by_type(providers, provider_type)
+            match = find_provider_by_type(providers, provider_type, coordinator)
             if match is None:
                 continue
 

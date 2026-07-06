@@ -337,6 +337,160 @@ class TestMultiInstanceProviderResolution:
 
 
 # ---------------------------------------------------------------------------
+# Bare-type fallback against multi-instance providers (sibling bug to
+# amplifier-foundation #267: `_find_provider_instance()` had the identical
+# gap). Reproduces the exact production scenario: 3 named Anthropic
+# instances (anthropic-sonnet priority 1/default, anthropic-opus priority 2,
+# anthropic-haiku priority 9), none keyed bare "anthropic". A matrix
+# candidate naming the bare type "anthropic" must still resolve -- to the
+# highest-priority (lowest priority number) instance -- via a coordinator
+# config fallback, mirroring the "default provider" convention.
+# ---------------------------------------------------------------------------
+
+
+def _make_coordinator_with_provider_specs(specs: list[dict]) -> MagicMock:
+    """Build a minimal coordinator-like stub exposing `.config["providers"]`."""
+    coordinator = MagicMock()
+    coordinator.config = {"providers": specs}
+    return coordinator
+
+
+_ANTHROPIC_MULTI_INSTANCE_SPECS = [
+    {
+        "module": "provider-anthropic",
+        "id": "anthropic-sonnet",
+        "config": {"priority": 1},
+    },
+    {
+        "module": "provider-anthropic",
+        "id": "anthropic-opus",
+        "config": {"priority": 2},
+    },
+    {
+        "module": "provider-anthropic",
+        "id": "anthropic-haiku",
+        "config": {"priority": 9},
+    },
+]
+
+
+class TestBareTypeFallbackAgainstMultiInstanceProviders:
+    def test_find_provider_by_type_falls_back_to_default_instance(self) -> None:
+        """No key is bare 'anthropic'; today this returns None. With the
+        coordinator fallback it must return the priority-1/default instance.
+        """
+        sonnet = MagicMock()
+        opus = MagicMock()
+        haiku = MagicMock()
+        providers = {
+            "anthropic-sonnet": sonnet,
+            "anthropic-opus": opus,
+            "anthropic-haiku": haiku,
+        }
+        coordinator = _make_coordinator_with_provider_specs(
+            _ANTHROPIC_MULTI_INSTANCE_SPECS
+        )
+
+        result = find_provider_by_type(providers, "anthropic", coordinator)
+
+        assert result == ("anthropic-sonnet", sonnet), (
+            "Bare type 'anthropic' must resolve to the lowest-priority-number "
+            "(default) instance via the coordinator config fallback"
+        )
+
+    def test_find_provider_by_type_without_coordinator_still_returns_none(
+        self,
+    ) -> None:
+        """Backward compatibility: omitting coordinator preserves old behaviour."""
+        providers = {
+            "anthropic-sonnet": MagicMock(),
+            "anthropic-opus": MagicMock(),
+        }
+        result = find_provider_by_type(providers, "anthropic")
+        assert result is None
+
+    def test_find_provider_by_type_no_matching_specs_returns_none(self) -> None:
+        """Coordinator present but no spec matches the requested type."""
+        providers = {"anthropic-sonnet": MagicMock()}
+        coordinator = _make_coordinator_with_provider_specs(
+            [{"module": "provider-openai", "id": "openai-main", "config": {}}]
+        )
+        result = find_provider_by_type(providers, "anthropic", coordinator)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_resolve_model_role_fast_role_resolves_via_fallback(self) -> None:
+        """End-to-end: 'fast' role -> provider: anthropic, model: claude-haiku-*
+        must resolve against the multi-instance setup, exactly reproducing the
+        production scenario (previously returned []).
+
+        All three instances share one Anthropic account, so ``list_models()``
+        returns the same full catalog regardless of which instance answers --
+        matching the real, directly-verified API response (9 models,
+        including multiple haiku/opus variants) rather than an artificially
+        restricted per-instance list.
+        """
+        full_catalog = [
+            "claude-opus-4-8",
+            "claude-opus-4-7",
+            "claude-sonnet-5",
+            "claude-haiku-4-5-20251001",
+            "claude-haiku-3-20240307",
+        ]
+        providers = {
+            "anthropic-sonnet": _make_provider(models=full_catalog),
+            "anthropic-opus": _make_provider(models=full_catalog),
+            "anthropic-haiku": _make_provider(models=full_catalog),
+        }
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        coordinator = _make_coordinator_with_provider_specs(
+            _ANTHROPIC_MULTI_INSTANCE_SPECS
+        )
+
+        result = await resolve_model_role(
+            ["fast"], roles, providers, coordinator=coordinator
+        )
+
+        assert len(result) == 1, (
+            "Expected 'fast' role to resolve to one candidate via the "
+            "bare-type coordinator fallback, got: %r" % (result,)
+        )
+        assert result[0]["provider"] == "anthropic"
+        assert result[0]["model"] == "claude-haiku-4-5-20251001"
+
+    @pytest.mark.asyncio
+    async def test_resolve_model_role_without_coordinator_still_fails(self) -> None:
+        """Without a coordinator, resolve_model_role preserves the old (buggy)
+        behaviour of returning [] -- proving the coordinator param is what
+        fixes it, not some other change.
+        """
+        full_catalog = ["claude-sonnet-5", "claude-haiku-4-5-20251001"]
+        providers = {
+            "anthropic-sonnet": _make_provider(models=full_catalog),
+            "anthropic-haiku": _make_provider(models=full_catalog),
+        }
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+
+        result = await resolve_model_role(["fast"], roles, providers)
+
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
 # Version-aware sort for glob resolution
 # ---------------------------------------------------------------------------
 
