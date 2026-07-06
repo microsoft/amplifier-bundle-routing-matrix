@@ -40,6 +40,12 @@ class MatrixModelRoleResolver:
         providers: Installed providers dict from ``coordinator.get("providers")``.
         matrix_name: Human-readable matrix name, exposed via ``self.name`` for
             diagnostics (``logger.debug("resolver=%s", resolver.name)``).
+        coordinator: Optional coordinator, forwarded to
+            :func:`amplifier_module_hooks_routing.resolver.resolve_model_role`
+            as a fallback source of mount plan config (module/id/priority).
+            Needed to resolve a matrix candidate's bare ``provider:`` type
+            (e.g. ``"anthropic"``) when 2+ named instances of that module
+            exist but none is keyed by the bare type itself.
     """
 
     def __init__(
@@ -47,10 +53,12 @@ class MatrixModelRoleResolver:
         matrix_roles: dict[str, Any],
         providers: dict[str, Any],
         matrix_name: str,
+        coordinator: Any = None,
     ) -> None:
         self._matrix_roles = matrix_roles
         self._providers = providers
         self.name = matrix_name
+        self._coordinator = coordinator
 
     async def resolve(self, model_role: str | list[str]) -> list[ProviderPreference]:
         """Resolve a model role (or ordered fallback list) to provider preferences.

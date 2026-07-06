@@ -123,6 +123,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             matrix_roles=effective_matrix,
             providers=_resolver_providers,
             matrix_name=base_matrix.get("name", default_matrix_name),
+            coordinator=coordinator,
         )
         coordinator.register_capability("model_role_resolver", _resolver)
 
