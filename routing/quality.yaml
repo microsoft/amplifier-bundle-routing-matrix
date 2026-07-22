@@ -23,7 +23,7 @@
 
 name: quality
 description: "Best available models. Prioritizes capability over cost."
-updated: "2026-05-12"
+updated: "2026-07-22"
 
 roles:
   general:
@@ -31,6 +31,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: low
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
@@ -46,6 +50,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-?.?-terra*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-flash-preview
@@ -57,6 +63,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
@@ -71,6 +81,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
@@ -88,6 +102,10 @@ roles:
         model: claude-sonnet-*
         config:
           reasoning_effort: high
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: xhigh
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
@@ -113,6 +131,10 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: xhigh
@@ -127,6 +149,10 @@ roles:
       # Anthropic promoted above OpenAI per ordering rule (2026-04-22).
       - provider: anthropic
         model: claude-sonnet-*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
+        model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
       - provider: openai
@@ -148,6 +174,10 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: low
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: low
@@ -162,6 +192,10 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: low
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: low
@@ -175,6 +209,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-opus-*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: gpt-?.?-sol*
         config:
           reasoning_effort: high
       - provider: openai
@@ -196,6 +234,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-?.?-terra*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: github-copilot
         model: claude-sonnet-4.6
@@ -211,6 +251,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-opus-*
+      - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: medium
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:

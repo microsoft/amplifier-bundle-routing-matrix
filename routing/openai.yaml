@@ -3,21 +3,34 @@
 # OpenAI-only routing. All roles use OpenAI models exclusively.
 # Use when you want to run entirely on your OpenAI API account.
 #
-# Glob strategy: tier suffixes (`gpt-?.?-mini*`, `gpt-?.?-nano*`) auto-track
-# minor version bumps without matching the wrong tier. The base mid-tier uses
-# `gpt-[0-9].[0-9]` which matches any single-digit major.minor base model
-# (e.g. gpt-5.5, gpt-6.0) without matching suffix variants (-mini, -pro, -nano)
-# or dated snapshots. The resolver's version-aware sort picks the highest
-# available version automatically.
+# Glob strategy: tier suffixes (`gpt-?.?-sol*` flagship, `gpt-?.?-terra*` mid,
+# `gpt-?.?-luna*` cheap, `gpt-?.?-mini*`, `gpt-?.?-nano*`) auto-track minor
+# version bumps without matching the wrong tier. The mid tier uses
+# `gpt-?.?-terra*`, falling back to the base glob `gpt-[0-9].[0-9]` which matches
+# any single-digit major.minor base model (e.g. gpt-5.5) without matching suffix
+# variants (-sol, -terra, -luna, -mini, -pro, -nano) or dated snapshots.
+# IMPORTANT: since the 5.6 rename, the bare `gpt-5.6` alias points at the
+# flagship (sol) tier, so the base glob is a migration fallback for pre-5.6
+# accounts (where the un-suffixed model WAS the mid tier) -- not the primary
+# mid-tier candidate. Mid-tier roles (general, coding, ui-coding,
+# security-audit, critique, vision) try `gpt-?.?-terra*` first, then the base
+# glob. Flagship roles (reasoning, creative, writing, research, critical-ops)
+# try `gpt-?.?-sol*` first, then fall back to the base glob; the cheap `fast`
+# role tries `gpt-?.?-luna*` then `gpt-?.?-mini*`. The resolver's version-aware
+# sort picks the highest available version automatically; an unmatched glob
+# falls through to the next candidate, so accounts mid-migration degrade
+# gracefully.
 
 name: openai
 description: "OpenAI-only routing. All roles use OpenAI models exclusively."
-updated: "2026-05-12"
+updated: "2026-07-22"
 
 roles:
   general:
     description: "Versatile catch-all, no specialization needed"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
       - provider: openai
         model: "gpt-[0-9].[0-9]"
 
@@ -25,11 +38,15 @@ roles:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: openai
+        model: gpt-?.?-luna*
+      - provider: openai
         model: gpt-?.?-mini*
 
   coding:
     description: "Code generation, implementation, debugging"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
       - provider: openai
         model: "gpt-[0-9].[0-9]"
 
@@ -37,11 +54,17 @@ roles:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: openai
+        model: gpt-?.?-terra*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: xhigh
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
@@ -51,6 +74,10 @@ roles:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: xhigh
@@ -58,6 +85,10 @@ roles:
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: xhigh
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
@@ -67,17 +98,25 @@ roles:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
       - provider: openai
+        model: gpt-?.?-sol*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
 
   writing:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: openai
+        model: gpt-?.?-sol*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
+      - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: high
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
@@ -86,6 +125,8 @@ roles:
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
       - provider: openai
         model: "gpt-[0-9].[0-9]"
 
@@ -96,11 +137,17 @@ roles:
     description: "Image generation (limited — gpt-image not available via chat API)"
     candidates:
       - provider: openai
+        model: gpt-?.?-sol*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
+      - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: high
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:

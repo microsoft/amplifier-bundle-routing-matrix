@@ -24,7 +24,7 @@
 
 name: balanced
 description: "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team."
-updated: "2026-05-12"
+updated: "2026-07-22"
 
 roles:
   # ---------------------------------------------------------------------------
@@ -36,6 +36,8 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+      - provider: openai
+        model: gpt-?.?-terra*
       - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
@@ -52,6 +54,8 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-haiku-*
+      - provider: openai
+        model: gpt-?.?-luna*
       - provider: openai
         model: gpt-?.?-mini*
       - provider: gemini
@@ -73,6 +77,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-?.?-terra*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
@@ -88,6 +94,8 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+      - provider: openai
+        model: gpt-?.?-terra*
       - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
@@ -105,6 +113,10 @@ roles:
         model: claude-sonnet-*
         config:
           reasoning_effort: high
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: xhigh
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
@@ -130,6 +142,10 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: xhigh
@@ -153,6 +169,10 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: xhigh
@@ -171,6 +191,8 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
+        model: gpt-?.?-sol*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
@@ -183,6 +205,8 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
+        model: gpt-?.?-sol*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
@@ -194,6 +218,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-opus-*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: gpt-?.?-sol*
         config:
           reasoning_effort: high
       - provider: openai
@@ -223,6 +251,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-?.?-terra*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: github-copilot
         model: gpt-5.5
@@ -246,6 +276,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-opus-*
+      - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: high
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:

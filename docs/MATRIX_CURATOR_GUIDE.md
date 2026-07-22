@@ -278,18 +278,18 @@ The routing system defines 13 roles organized into 5 categories. For full descri
 | # | Role | Category | Model Tier | Reasoning | Description |
 |---|------|----------|------------|-----------|-------------|
 | 1 | `general` | Foundation | Mid (Sonnet, GPT base) | default | Versatile catch-all, no specialization needed |
-| 2 | `fast` | Foundation | Cheap (Haiku, gpt-5-mini) | default | Quick utility tasks — parsing, classification, file ops |
+| 2 | `fast` | Foundation | Cheap (Haiku, GPT luna) | default | Quick utility tasks — parsing, classification, file ops |
 | 3 | `coding` | Coding | Mid, code-specialized | default | Code generation, implementation, debugging |
 | 4 | `ui-coding` | Coding | Mid, code-specialized | default | Frontend/UI code — components, layouts, styling |
 | 5 | `security-audit` | Coding | Mid, code-specialized | xhigh | Vulnerability assessment, attack surface analysis |
-| 6 | `reasoning` | Cognitive | Heavy (Opus, GPT base) | xhigh | Deep architectural reasoning, system design |
+| 6 | `reasoning` | Cognitive | Heavy (Opus, GPT sol) | xhigh | Deep architectural reasoning, system design |
 | 7 | `critique` | Cognitive | Mid | extra-high | Analytical evaluation — finding flaws in existing work |
-| 8 | `creative` | Cognitive | Heavy (Opus, GPT base) | default | Design direction, aesthetic judgment |
-| 9 | `writing` | Cognitive | Heavy (Opus, GPT base) | default | Long-form content — docs, marketing, case studies |
-| 10 | `research` | Cognitive | Heavy (Opus, GPT base) | high | Deep investigation, information synthesis |
+| 8 | `creative` | Cognitive | Heavy (Opus, GPT sol) | default | Design direction, aesthetic judgment |
+| 9 | `writing` | Cognitive | Heavy (Opus, GPT sol) | default | Long-form content — docs, marketing, case studies |
+| 10 | `research` | Cognitive | Heavy (Opus, GPT sol) | high | Deep investigation, information synthesis |
 | 11 | `vision` | Capability | Mid, multimodal | default | Understanding visual input — screenshots, diagrams |
 | 12 | `image-gen` | Capability | Specialized | default | Image generation, visual mockup creation |
-| 13 | `critical-ops` | Operational | Heavy (Opus, GPT base) | high | High-reliability operational tasks — infrastructure, orchestration |
+| 13 | `critical-ops` | Operational | Heavy (Opus, GPT sol) | high | High-reliability operational tasks — infrastructure, orchestration |
 
 ---
 
@@ -361,9 +361,12 @@ Avoid them outside of `model: "*"` for user-managed providers like Ollama.
 | `gemini-*-pro-preview` | Pro-tier previews, any generation | Flash, Flash-Lite, Image, `*-customtools` |
 | `gemini-*-flash-preview` | Flash-tier previews | Flash-Lite, Image, TTS |
 | `gemini-*-flash-lite-preview` | Flash-Lite-tier previews | Flash, TTS |
-| `gpt-[0-9].[0-9]` | any single-digit major.minor base (e.g. `gpt-5.5`, `gpt-6.0`) | all suffix variants (-mini, -pro, -nano), dated snapshots |
-| `gpt-?.?-mini*` | any dotted-version mini (e.g. `gpt-5.4-mini`) | base, pro, nano, `gpt-5-mini` (no dot) |
-| `gpt-?.?-nano*` | any dotted-version nano | base, mini, pro |
+| `gpt-[0-9].[0-9]` | any single-digit major.minor base (e.g. `gpt-5.5`, `gpt-6.0`) | all suffix variants (-sol, -terra, -luna, -mini, -pro, -nano), dated snapshots |
+| `gpt-?.?-sol*` | any dotted-version sol / flagship tier (e.g. `gpt-5.6-sol`) | base, terra, mini, nano, luna, pro |
+| `gpt-?.?-terra*` | any dotted-version terra / mid tier (e.g. `gpt-5.6-terra`) | base, sol, mini, nano, luna, pro |
+| `gpt-?.?-luna*` | any dotted-version luna / cheap-fast tier (e.g. `gpt-5.6-luna`) | base, terra, mini, nano, sol, pro |
+| `gpt-?.?-mini*` | any dotted-version mini (e.g. `gpt-5.4-mini`) | base, pro, nano, sol, luna, `gpt-5-mini` (no dot) |
+| `gpt-?.?-nano*` | any dotted-version nano | base, mini, pro, sol, luna |
 
 **Pinned names** remain appropriate when:
 
@@ -392,7 +395,10 @@ Different providers use different naming conventions for the **same underlying m
 | Claude Sonnet 4.x | `claude-sonnet-*` (glob) | — | — | `claude-sonnet-4.6` (pin) |
 | Claude Opus 4.x | `claude-opus-*` (glob) | — | — | `claude-opus-4.8` (pin) |
 | Claude Haiku 4.x | `claude-haiku-*` (glob) | — | — | `claude-haiku-4.5` (pin) |
-| GPT base (mid-tier) | — | `gpt-[0-9].[0-9]` (glob) | — | pinned, e.g. `gpt-5.5` |
+| GPT mid-tier (terra) | — | `gpt-?.?-terra*` (glob) | — | pinned, e.g. `gpt-5.6-terra` |
+| GPT base / pre-5.6 migration fallback | — | `gpt-[0-9].[0-9]` (glob) | — | pinned, e.g. `gpt-5.5` |
+| GPT flagship (sol) | — | `gpt-?.?-sol*` (glob) | — | pinned, e.g. `gpt-5.6-sol` |
+| GPT cheap-fast (luna) | — | `gpt-?.?-luna*` (glob) | — | pinned, e.g. `gpt-5.6-luna` |
 | GPT-5.x mini | — | `gpt-?.?-mini*` (glob) | — | pinned, e.g. `gpt-5.4-mini` |
 | Gemini Pro | — | — | `gemini-*-pro-preview` (glob) | — |
 | Gemini Flash | — | — | `gemini-*-flash-preview` (glob) | — |

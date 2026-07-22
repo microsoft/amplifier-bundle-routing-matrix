@@ -4,9 +4,10 @@
 # The routing hook tries candidates top-to-bottom, using the first
 # that matches an installed provider.
 #
-# Philosophy: budget-first. Prefer cheap tier (Haiku, *-mini, Flash, Flash-Lite)
-# for utility roles. Reserve mid-tier (Sonnet, gpt-[0-9].[0-9]) for quality-sensitive
-# roles like security-audit, critique, creative, writing, research.
+# Philosophy: budget-first. Prefer cheap tier (Haiku, *-luna, *-mini, Flash, Flash-Lite)
+# for utility roles. Reserve mid-tier (Sonnet, gpt-?.?-terra*, with the base glob
+# gpt-[0-9].[0-9] as a pre-5.6 migration fallback) for quality-sensitive roles
+# like security-audit, critique, creative, writing, research.
 #
 # Schema:
 #   provider: Module mount name (e.g., "anthropic", "gemini", "github-copilot")
@@ -22,7 +23,7 @@
 
 name: economy
 description: "Cost-optimized routing. Prefers free tiers and budget models."
-updated: "2026-05-12"
+updated: "2026-07-22"
 
 roles:
   general:
@@ -30,6 +31,8 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-haiku-*
+      - provider: openai
+        model: gpt-?.?-luna*
       - provider: openai
         model: gpt-?.?-mini*
       - provider: gemini
@@ -49,6 +52,8 @@ roles:
       - provider: openai
         model: gpt-?.?-nano*
       - provider: openai
+        model: gpt-?.?-luna*
+      - provider: openai
         model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-lite-preview
@@ -67,6 +72,8 @@ roles:
       - provider: anthropic
         model: claude-haiku-*
       - provider: openai
+        model: gpt-?.?-luna*
+      - provider: openai
         model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-preview
@@ -81,6 +88,8 @@ roles:
       - provider: anthropic
         model: claude-haiku-*
       - provider: openai
+        model: gpt-?.?-luna*
+      - provider: openai
         model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-preview
@@ -92,6 +101,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: gpt-?.?-terra*
         config:
           reasoning_effort: high
       - provider: openai
@@ -113,6 +126,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-?.?-terra*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
@@ -127,6 +142,10 @@ roles:
       # Anthropic promoted above OpenAI per ordering rule (2026-04-22).
       - provider: anthropic
         model: claude-sonnet-*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
+        model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
       - provider: openai
@@ -148,6 +167,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-?.?-terra*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
@@ -160,6 +181,8 @@ roles:
       - provider: anthropic
         model: claude-sonnet-*
       - provider: openai
+        model: gpt-?.?-terra*
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
         model: gemini-*-pro-preview
@@ -171,6 +194,8 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+      - provider: openai
+        model: gpt-?.?-terra*
       - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
@@ -189,6 +214,8 @@ roles:
       - provider: anthropic
         model: claude-haiku-*
       - provider: openai
+        model: gpt-?.?-luna*
+      - provider: openai
         model: gpt-?.?-mini*
 
   image-gen:
@@ -202,6 +229,8 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+      - provider: openai
+        model: gpt-?.?-terra*
       - provider: openai
         model: "gpt-[0-9].[0-9]"
       - provider: gemini
