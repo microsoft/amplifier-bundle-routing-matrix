@@ -51,7 +51,7 @@ These two roles are required in every matrix and serve as universal fallbacks.
 
 #### `fast`
 - **Description:** Quick utility tasks — parsing, classification, file ops, bulk work
-- **Model tier:** Cheap (Haiku, gpt-5-mini, Gemini Flash)
+- **Model tier:** Cheap (Haiku, GPT luna, Gemini Flash)
 - **When to use:** Well-defined, low-ambiguity, high-volume, or latency-sensitive tasks — file operations, git commands, notification triage, data extraction
 - **When NOT to use:** If the agent needs judgment calls, synthesis, or quality prose
 - **Example agents:** file-ops, git-ops, shell-exec, health-checker, triage-manager

@@ -4,7 +4,7 @@
 # The routing hook tries candidates top-to-bottom, using the first
 # that matches an installed provider.
 #
-# Philosophy: budget-first. Prefer cheap tier (Haiku, *-mini, Flash, Flash-Lite)
+# Philosophy: budget-first. Prefer cheap tier (Haiku, *-luna, *-mini, Flash, Flash-Lite)
 # for utility roles. Reserve mid-tier (Sonnet, gpt-[0-9].[0-9]) for quality-sensitive
 # roles like security-audit, critique, creative, writing, research.
 #
@@ -22,7 +22,7 @@
 
 name: economy
 description: "Cost-optimized routing. Prefers free tiers and budget models."
-updated: "2026-05-12"
+updated: "2026-07-22"
 
 roles:
   general:
@@ -30,6 +30,8 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-haiku-*
+      - provider: openai
+        model: gpt-?.?-luna*
       - provider: openai
         model: gpt-?.?-mini*
       - provider: gemini
@@ -49,6 +51,8 @@ roles:
       - provider: openai
         model: gpt-?.?-nano*
       - provider: openai
+        model: gpt-?.?-luna*
+      - provider: openai
         model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-lite-preview
@@ -67,6 +71,8 @@ roles:
       - provider: anthropic
         model: claude-haiku-*
       - provider: openai
+        model: gpt-?.?-luna*
+      - provider: openai
         model: gpt-?.?-mini*
       - provider: gemini
         model: gemini-*-flash-preview
@@ -80,6 +86,8 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-haiku-*
+      - provider: openai
+        model: gpt-?.?-luna*
       - provider: openai
         model: gpt-?.?-mini*
       - provider: gemini
@@ -188,6 +196,8 @@ roles:
         model: claude-haiku-4.5
       - provider: anthropic
         model: claude-haiku-*
+      - provider: openai
+        model: gpt-?.?-luna*
       - provider: openai
         model: gpt-?.?-mini*
 

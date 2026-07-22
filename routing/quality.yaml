@@ -23,7 +23,7 @@
 
 name: quality
 description: "Best available models. Prioritizes capability over cost."
-updated: "2026-05-12"
+updated: "2026-07-22"
 
 roles:
   general:
@@ -113,6 +113,10 @@ roles:
         config:
           reasoning_effort: high
       - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: xhigh
@@ -148,6 +152,10 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: low
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: low
@@ -162,6 +170,10 @@ roles:
       - provider: anthropic
         model: claude-opus-*
       - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: low
+      - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: low
@@ -175,6 +187,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-opus-*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: gpt-?.?-sol*
         config:
           reasoning_effort: high
       - provider: openai
@@ -211,6 +227,10 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-opus-*
+      - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: medium
       - provider: openai
         model: "gpt-[0-9].[0-9]"
         config:
