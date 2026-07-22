@@ -361,9 +361,10 @@ Avoid them outside of `model: "*"` for user-managed providers like Ollama.
 | `gemini-*-pro-preview` | Pro-tier previews, any generation | Flash, Flash-Lite, Image, `*-customtools` |
 | `gemini-*-flash-preview` | Flash-tier previews | Flash-Lite, Image, TTS |
 | `gemini-*-flash-lite-preview` | Flash-Lite-tier previews | Flash, TTS |
-| `gpt-[0-9].[0-9]` | any single-digit major.minor base (e.g. `gpt-5.5`, `gpt-6.0`) | all suffix variants (-sol, -luna, -mini, -pro, -nano), dated snapshots |
-| `gpt-?.?-sol*` | any dotted-version sol / flagship tier (e.g. `gpt-5.6-sol`) | base, mini, nano, luna, pro |
-| `gpt-?.?-luna*` | any dotted-version luna / cheap-fast tier (e.g. `gpt-5.6-luna`) | base, mini, nano, sol, pro |
+| `gpt-[0-9].[0-9]` | any single-digit major.minor base (e.g. `gpt-5.5`, `gpt-6.0`) | all suffix variants (-sol, -terra, -luna, -mini, -pro, -nano), dated snapshots |
+| `gpt-?.?-sol*` | any dotted-version sol / flagship tier (e.g. `gpt-5.6-sol`) | base, terra, mini, nano, luna, pro |
+| `gpt-?.?-terra*` | any dotted-version terra / mid tier (e.g. `gpt-5.6-terra`) | base, sol, mini, nano, luna, pro |
+| `gpt-?.?-luna*` | any dotted-version luna / cheap-fast tier (e.g. `gpt-5.6-luna`) | base, terra, mini, nano, sol, pro |
 | `gpt-?.?-mini*` | any dotted-version mini (e.g. `gpt-5.4-mini`) | base, pro, nano, sol, luna, `gpt-5-mini` (no dot) |
 | `gpt-?.?-nano*` | any dotted-version nano | base, mini, pro, sol, luna |
 
@@ -394,7 +395,8 @@ Different providers use different naming conventions for the **same underlying m
 | Claude Sonnet 4.x | `claude-sonnet-*` (glob) | — | — | `claude-sonnet-4.6` (pin) |
 | Claude Opus 4.x | `claude-opus-*` (glob) | — | — | `claude-opus-4.8` (pin) |
 | Claude Haiku 4.x | `claude-haiku-*` (glob) | — | — | `claude-haiku-4.5` (pin) |
-| GPT base (mid-tier) | — | `gpt-[0-9].[0-9]` (glob) | — | pinned, e.g. `gpt-5.5` |
+| GPT mid-tier (terra) | — | `gpt-?.?-terra*` (glob) | — | pinned, e.g. `gpt-5.6-terra` |
+| GPT base / pre-5.6 migration fallback | — | `gpt-[0-9].[0-9]` (glob) | — | pinned, e.g. `gpt-5.5` |
 | GPT flagship (sol) | — | `gpt-?.?-sol*` (glob) | — | pinned, e.g. `gpt-5.6-sol` |
 | GPT cheap-fast (luna) | — | `gpt-?.?-luna*` (glob) | — | pinned, e.g. `gpt-5.6-luna` |
 | GPT-5.x mini | — | `gpt-?.?-mini*` (glob) | — | pinned, e.g. `gpt-5.4-mini` |
