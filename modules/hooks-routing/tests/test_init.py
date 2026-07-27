@@ -327,6 +327,76 @@ class TestSessionStartHook:
         # plain should not have provider_preferences
         assert "provider_preferences" not in agents["plain"]
 
+    @pytest.mark.asyncio
+    async def test_session_start_preserves_candidate_config(
+        self, tmp_path: Path
+    ) -> None:
+        """Matrix `config:` blocks must survive into provider_preferences.
+
+        resolve_model_role() returns {"provider", "model", "config"} per
+        candidate, and ProviderPreference.from_dict() reads the "config" key to
+        merge routing params (e.g. reasoning_effort) into the child provider's
+        mount config. _resolve_one() previously rebuilt each preference from
+        only "provider" and "model", silently discarding every `config:` block
+        in the shipped matrices.
+        """
+        bundle_root = tmp_path / "bundle"
+        routing_dir = bundle_root / "routing"
+        routing_dir.mkdir(parents=True)
+        content = textwrap.dedent("""\
+            name: balanced
+            description: "Test"
+            updated: "2026-01-01"
+            roles:
+              reasoning:
+                description: "Reasoning"
+                candidates:
+                  - provider: anthropic
+                    model: claude-sonnet-4-20250514
+                    config:
+                      reasoning_effort: high
+              fast:
+                description: "Fast"
+                candidates:
+                  - provider: openai
+                    model: gpt-4o-mini
+        """)
+        (routing_dir / "balanced.yaml").write_text(content)
+
+        agents = {
+            "thinker": {"model_role": "reasoning"},
+            "quick": {"model_role": "fast"},
+        }
+        providers = {"provider-anthropic": MagicMock(), "provider-openai": MagicMock()}
+        coordinator = _make_coordinator(providers=providers, agents=agents)
+
+        await mount(
+            coordinator,
+            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
+        )
+
+        session_start_handler = None
+        for call in coordinator.hooks.register.call_args_list:
+            if call.args[0] == "session:start":
+                session_start_handler = call.args[1]
+                break
+        assert session_start_handler is not None
+
+        await session_start_handler("session:start", {})
+
+        # Candidate that declares config: the block is carried through verbatim.
+        thinker_pref = agents["thinker"]["provider_preferences"][0]
+        assert thinker_pref["config"] == {"reasoning_effort": "high"}, (
+            "matrix `config:` block was dropped from provider_preferences -- "
+            "reasoning_effort never reaches the child provider"
+        )
+
+        # Candidate with no config: key omitted, matching ProviderPreference.to_dict().
+        quick_pref = agents["quick"]["provider_preferences"][0]
+        assert "config" not in quick_pref, (
+            "candidates without a `config:` block must not gain an empty config key"
+        )
+
 
 class TestProviderRequestHook:
     @pytest.mark.asyncio
