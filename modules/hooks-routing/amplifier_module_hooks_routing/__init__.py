@@ -175,9 +175,23 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                 preresolved_models=preresolved_models,
             )
             if resolved:
-                agent_cfg["provider_preferences"] = [
-                    {"provider": r["provider"], "model": r["model"]} for r in resolved
-                ]
+                # Preserve the per-candidate `config` block (e.g. reasoning_effort)
+                # declared in the matrix. ProviderPreference.from_dict() reads this
+                # key and merges it into the child provider's mount config, so
+                # dropping it here made every `config:` block in the shipped
+                # matrices dead data.
+                prefs: list[dict[str, Any]] = []
+                for r in resolved:
+                    pref: dict[str, Any] = {
+                        "provider": r["provider"],
+                        "model": r["model"],
+                    }
+                    # Omitted when empty, matching ProviderPreference.to_dict(), so
+                    # candidates with no config stay byte-identical to before.
+                    if r.get("config"):
+                        pref["config"] = r["config"]
+                    prefs.append(pref)
+                agent_cfg["provider_preferences"] = prefs
 
         # Resolve all agents concurrently — wall-time becomes single longest
         # latency rather than sum of all latencies.  Each coroutine writes only
