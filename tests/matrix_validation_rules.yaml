@@ -1,0 +1,47 @@
+# Validation rules for routing/*.yaml candidate `config:` maps.
+#
+# This file is DATA, not code — maintainers extend it here without touching
+# test logic (tests/test_matrix_config_validation.py reads it).
+#
+# HOW TO EXTEND:
+#   - New config key supported by providers?  Add it to `allowed_config_keys`.
+#   - New provider appears in a matrix with `reasoning_effort`?  Add an entry
+#     under `reasoning_effort_values` with that provider's documented set.
+#     The test FAILS on providers missing from this map — that failure is the
+#     prompt to look up the provider's valid set and record it here.
+#   - Provider gains/loses effort levels?  Edit its list below.
+#
+# NOTE: this file must live OUTSIDE routing/ — any *.yaml in routing/ is
+# loaded as a matrix by the routing hook.
+
+# The single canonical spelling for the effort knob. Legacy spellings
+# (`effort`, `thinking_effort`, `reasoning-effort`, ...) must never appear in
+# shipped matrices — providers accept them only as deprecated aliases.
+canonical_effort_key: reasoning_effort
+
+# Every key permitted in a candidate's `config:` map. Anything else is
+# treated as a typo (this is what catches the `extra_high`-style sibling
+# bugs: unknown keys silently pass through and become inert).
+allowed_config_keys:
+  - reasoning_effort
+
+# Per-provider valid values for `reasoning_effort`.
+# Keys are the matrix `provider:` field (module type name or instance id).
+#
+# Sources:
+#   anthropic:      provider-anthropic documented set (warns+ignores others)
+#   openai:         provider-openai `_KNOWN_REASONING_EFFORTS` (the source of
+#                   truth; "minimal..xhigh per OpenAI docs; max added by
+#                   gpt-5.6"). Per-MODEL restrictions (e.g. gpt-5.5-pro
+#                   accepts only medium/high/xhigh) are enforced
+#                   provider-side at mount, not here — this list is the
+#                   provider-wide superset.
+#   gemini:         reflects currently-shipped usage; verify against
+#                   provider-gemini docs before extending
+#   github-copilot: reflects currently-shipped usage; verify against
+#                   provider-github-copilot docs before extending
+reasoning_effort_values:
+  anthropic: [low, medium, high, xhigh, max]
+  openai: [none, minimal, low, medium, high, xhigh, max]
+  gemini: [low, medium, high, xhigh]
+  github-copilot: [low, medium, high, xhigh]

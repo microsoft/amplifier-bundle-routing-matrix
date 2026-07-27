@@ -194,6 +194,14 @@ Common values:
 
 Only include `config` when a candidate genuinely needs different parameters from the provider default. Most candidates don't need it.
 
+> **Key spelling and valid values are enforced by tests.** `reasoning_effort`
+> is the single canonical spelling — legacy spellings like `effort` are inert
+> on some providers and must not appear in matrix files. Valid values differ
+> per provider (e.g., openai accepts only `low`/`medium`/`high`; anthropic
+> also accepts `xhigh`/`max`). The authoritative allow-lists live in
+> [`tests/matrix_validation_rules.yaml`](../tests/matrix_validation_rules.yaml)
+> — extend them there when providers add keys or values.
+
 ---
 
 ## Adding a New Role
