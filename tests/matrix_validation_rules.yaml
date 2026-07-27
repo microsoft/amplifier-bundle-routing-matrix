@@ -36,12 +36,10 @@ allowed_config_keys:
 #                   accepts only medium/high/xhigh) are enforced
 #                   provider-side at mount, not here — this list is the
 #                   provider-wide superset.
-#   gemini:         provider-gemini maps reasoning_effort -> thinking_budget.
-#                   NOTE: it currently reads the value only from the
-#                   per-request field, not from mount config, so the matrix
-#                   `config:` entries below are inert at runtime until the
-#                   provider adds config-path support. `xhigh` is likewise
-#                   unmapped provider-side today (falls through to default).
+#   gemini:         no provider-side constant exists to cite; this list is the
+#                   set already in use across the shipped matrices. Re-derive
+#                   it from provider-gemini if that provider grows an explicit
+#                   effort vocabulary.
 #   github-copilot: provider-github-copilot `REASONING_EFFORT_LEVELS`
 #                   (request_adapter.py) — the provider-wide superset, also
 #                   surfaced to operators as the ConfigField choice list.
