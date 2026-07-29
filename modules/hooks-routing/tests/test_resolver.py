@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from amplifier_module_hooks_routing.resolver_class import MatrixModelRoleResolver
 from amplifier_module_hooks_routing.resolver import (
     _resolve_glob,
     find_provider_by_type,
@@ -765,3 +766,65 @@ class TestPreresolvedModels:
 
         assert result[0]["model"] == "claude-sonnet-4-20250514"
         provider.list_models.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# MatrixModelRoleResolver.known_roles -- optional part of the
+# model_role_resolver contract. Consumers (tool-delegate) turn this into a
+# JSON-Schema enum, so order and immutability are load-bearing.
+# ---------------------------------------------------------------------------
+
+
+class TestKnownRoles:
+    @staticmethod
+    def _make(roles: dict) -> "MatrixModelRoleResolver":
+        return MatrixModelRoleResolver(
+            matrix_roles=roles,
+            providers={},
+            matrix_name="balanced",
+        )
+
+    def test_exposes_matrix_role_names(self) -> None:
+        resolver = self._make(
+            {
+                "general": {"candidates": []},
+                "fast": {"candidates": []},
+                "coding": {"candidates": []},
+            }
+        )
+        assert set(resolver.known_roles) == {"general", "fast", "coding"}
+
+    def test_preserves_declaration_order_not_sorted(self) -> None:
+        """Matrix order is curated and is what hooks-routing injects into
+        session context. Alphabetising here would desync the two surfaces."""
+        resolver = self._make(
+            {
+                "general": {"candidates": []},
+                "fast": {"candidates": []},
+                "coding": {"candidates": []},
+                "ui-coding": {"candidates": []},
+            }
+        )
+        assert resolver.known_roles == ("general", "fast", "coding", "ui-coding")
+        assert resolver.known_roles != tuple(sorted(resolver.known_roles))
+
+    def test_reflects_composed_matrix_including_overrides(self) -> None:
+        """mount() passes the *effective* matrix (base + config overrides), so a
+        role added by an override must appear in known_roles."""
+        resolver = self._make(
+            {
+                "general": {"candidates": []},
+                "house-special": {"candidates": []},
+            }
+        )
+        assert "house-special" in resolver.known_roles
+
+    def test_is_a_tuple_snapshot_not_a_live_view(self) -> None:
+        roles = {"general": {"candidates": []}}
+        resolver = self._make(roles)
+        roles["injected-later"] = {"candidates": []}
+        assert isinstance(resolver.known_roles, tuple)
+        assert resolver.known_roles == ("general",)
+
+    def test_empty_matrix_yields_empty_tuple(self) -> None:
+        assert self._make({}).known_roles == ()

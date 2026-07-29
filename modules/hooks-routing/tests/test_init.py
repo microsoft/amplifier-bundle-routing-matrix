@@ -45,6 +45,18 @@ def _make_coordinator(
     return coordinator
 
 
+def _resolver_from(coordinator: MagicMock) -> Any:
+    """Return the model_role_resolver mount() registered, or None.
+
+    The composed matrix is no longer mirrored into session_state -- the
+    registered resolver is the only surface. Tests read it from here.
+    """
+    for call in coordinator.register_capability.call_args_list:
+        if call.args and call.args[0] == "model_role_resolver":
+            return call.args[1]
+    return None
+
+
 def _write_matrix(tmp_path: Path, name: str = "balanced") -> Path:
     """Write a minimal matrix YAML and return the routing dir."""
     routing_dir = tmp_path / "routing"
@@ -212,18 +224,22 @@ class TestMount:
         )
 
         # The effective matrix should have the override applied to "fast"
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["roles"]["fast"]["candidates"] == [
+        stored = _resolver_from(coordinator)._matrix_roles
+        assert stored["fast"]["candidates"] == [
             {"provider": "anthropic", "model": "claude-haiku-3"},
         ]
         # "general" should remain unchanged from the base matrix
-        assert stored["roles"]["general"]["candidates"] == [
+        assert stored["general"]["candidates"] == [
             {"provider": "anthropic", "model": "claude-sonnet-4-20250514"},
         ]
 
     @pytest.mark.asyncio
-    async def test_mount_stores_session_state(self, tmp_path: Path) -> None:
-        """Mount stores routing matrix info in session_state."""
+    async def test_mount_exposes_matrix_via_resolver(self, tmp_path: Path) -> None:
+        """Mount exposes the composed matrix via the registered resolver.
+
+        The matrix is NOT mirrored into session_state -- that write was deleted
+        as vestigial. The model_role_resolver capability is the only surface.
+        """
         bundle_root = tmp_path / "bundle"
         routing_dir = bundle_root / "routing"
         routing_dir.mkdir(parents=True)
@@ -251,9 +267,12 @@ class TestMount:
             config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
         )
 
-        assert "routing_matrix" in coordinator.session_state
-        assert coordinator.session_state["routing_matrix"]["name"] == "balanced"
-        assert "general" in coordinator.session_state["routing_matrix"]["roles"]
+        resolver = _resolver_from(coordinator)
+        assert resolver is not None, "mount() must register model_role_resolver"
+        assert resolver.name == "balanced"
+        assert "general" in resolver._matrix_roles
+        # And the composed matrix must NOT be mirrored into session_state.
+        assert "routing_matrix" not in coordinator.session_state
 
 
 # ---------------------------------------------------------------------------
@@ -676,13 +695,13 @@ class TestCustomRoutingDirs:
             },
         )
 
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["name"] == "ornith", (
+        resolver = _resolver_from(coordinator)
+        assert resolver is not None and resolver.name == "ornith", (
             "Matrix from custom_routing_dirs must load -- routing must NOT be "
-            f"disabled. Got: {stored}"
+            f"disabled. Got: {resolver}"
         )
-        assert "general" in stored["roles"]
-        assert stored["roles"]["general"]["candidates"] == [
+        assert "general" in resolver._matrix_roles
+        assert resolver._matrix_roles["general"]["candidates"] == [
             {"provider": "ornith", "model": "ornith-1.0-35b"},
         ]
 
@@ -736,8 +755,7 @@ class TestCustomRoutingDirs:
             },
         )
 
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["roles"]["general"]["candidates"] == [
+        assert _resolver_from(coordinator)._matrix_roles["general"]["candidates"] == [
             {"provider": "ornith", "model": "ornith-1.0-35b"},
         ], "Custom routing dir must take priority over the bundle's own routing dir"
 
@@ -774,8 +792,7 @@ class TestCustomRoutingDirs:
             },
         )
 
-        stored = coordinator.session_state["routing_matrix"]
-        assert stored["name"] == "balanced"
+        assert _resolver_from(coordinator).name == "balanced"
 
 
 # ---------------------------------------------------------------------------
