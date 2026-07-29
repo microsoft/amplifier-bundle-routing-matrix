@@ -11,13 +11,28 @@ implementation under the same capability name; only one is active per session.
 Contract (duck-typed, no Protocol class by design):
 
     class _Resolver:
+        # Required.
         async def resolve(self, model_role: str | list[str]) -> list[ProviderPreference]:
             ...
+
+        # Optional. Role names this strategy recognises, in the order it wants
+        # them presented. Omit when the strategy cannot enumerate its roles.
+        known_roles: tuple[str, ...]
 
 Returning an empty list means "role known but no installed provider matches";
 returning a list with one or more ``ProviderPreference`` is the success path.
 The resolver honours fallback order encoded by the active strategy (matrix
 candidate order, cost ranking, etc.).
+
+``known_roles`` is advisory metadata, not a resolution guarantee: a role may be
+listed and still resolve to ``[]`` when no installed provider serves it. That is
+why it is named "known" rather than "available". Consumers use it to constrain
+their own surfaces -- tool-delegate turns it into a JSON-Schema ``enum`` on its
+``model_role`` parameter so models cannot invent role names. It is *optional*,
+so every consumer MUST degrade gracefully when a resolver does not expose it:
+absent means "cannot enumerate", which is NOT the same as "no resolver
+registered" and must not be treated as such. Consumers should also type-guard
+the value (sequence of ``str``) rather than trusting it blindly.
 """
 
 from __future__ import annotations
@@ -59,6 +74,11 @@ class MatrixModelRoleResolver:
         self._providers = providers
         self.name = matrix_name
         self._coordinator = coordinator
+        # Optional part of the model_role_resolver contract. Snapshot in matrix
+        # declaration order -- the same order hooks-routing injects into session
+        # context -- so consumers that surface these to a model agree with it.
+        # Not sorted: the matrix order is curated (general, fast, coding, ...).
+        self.known_roles: tuple[str, ...] = tuple(matrix_roles)
 
     async def resolve(self, model_role: str | list[str]) -> list[ProviderPreference]:
         """Resolve a model role (or ordered fallback list) to provider preferences.

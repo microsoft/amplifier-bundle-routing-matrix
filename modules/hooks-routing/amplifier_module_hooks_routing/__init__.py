@@ -102,13 +102,6 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         if capability_overrides:
             effective_matrix = compose_matrix(effective_matrix, capability_overrides)
 
-    # --- Store in session state (modes pattern) ---
-    if hasattr(coordinator, "session_state"):
-        coordinator.session_state["routing_matrix"] = {
-            "name": base_matrix.get("name", default_matrix_name),
-            "roles": effective_matrix,
-        }
-
     # --- Register the model_role_resolver capability ---
     # Consumers: tool-delegate, hooks-session-naming, tool-recipes, tool-skills.
     # Duck-typed contract: async def resolve(model_role) -> list[ProviderPreference]
