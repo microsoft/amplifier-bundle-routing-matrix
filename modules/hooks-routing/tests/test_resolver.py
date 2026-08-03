@@ -492,6 +492,89 @@ class TestBareTypeFallbackAgainstMultiInstanceProviders:
 
 
 # ---------------------------------------------------------------------------
+# MatrixModelRoleResolver.resolve() must forward its own coordinator to
+# resolve_model_role(). The constructor accepts and stores `coordinator`
+# (see resolver_class.py's ``self._coordinator = coordinator``), but the
+# resolve() method previously never passed it on to resolve_model_role(),
+# leaving the bare-type-vs-multi-instance fallback (see
+# TestBareTypeFallbackAgainstMultiInstanceProviders above) permanently dead
+# for the *only* call path every real consumer (tool-delegate,
+# hooks-session-naming, tool-recipes, tool-skills) actually uses. This is a
+# regression test for that gap, not for find_provider_by_type/
+# resolve_model_role themselves (already covered above).
+# ---------------------------------------------------------------------------
+
+
+class TestMatrixModelRoleResolverForwardsCoordinator:
+    @pytest.mark.asyncio
+    async def test_resolve_forwards_coordinator_for_bare_type_fallback(self) -> None:
+        """A single anthropic instance mounted with an explicit `id:` (e.g. a
+        user's settings.yaml sets `id: anthropic-opus`) is keyed
+        'anthropic-opus' in coordinator.providers, not the bare module type
+        'anthropic' a matrix candidate names. Resolution must still succeed
+        via the coordinator config fallback -- but only if resolve() actually
+        forwards the coordinator it was constructed with.
+        """
+        anthropic_opus = _make_provider(
+            models=["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"]
+        )
+        providers = {"anthropic-opus": anthropic_opus}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        coordinator = _make_coordinator_with_provider_specs(
+            [{"module": "provider-anthropic", "id": "anthropic-opus", "config": {}}]
+        )
+
+        resolver = MatrixModelRoleResolver(
+            matrix_roles=roles,
+            providers=providers,
+            matrix_name="anthropic",
+            coordinator=coordinator,
+        )
+
+        result = await resolver.resolve("fast")
+
+        assert len(result) == 1, (
+            "resolver.resolve('fast') must resolve via the coordinator "
+            "fallback exactly like resolve_model_role(coordinator=...) does "
+            "directly -- got: %r. If this is empty, resolve() is not "
+            "forwarding self._coordinator to resolve_model_role()." % (result,)
+        )
+        assert result[0].provider == "anthropic"
+        assert result[0].model == "claude-haiku-4-5"
+
+    @pytest.mark.asyncio
+    async def test_resolve_without_coordinator_still_returns_empty(self) -> None:
+        """Backward compatibility: a resolver built without a coordinator
+        (e.g. in a test double) must still return [] rather than raising,
+        for a bare-type candidate with no exact provider key match."""
+        providers = {"anthropic-opus": _make_provider(models=["claude-haiku-4-5"])}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        resolver = MatrixModelRoleResolver(
+            matrix_roles=roles,
+            providers=providers,
+            matrix_name="anthropic",
+        )
+
+        result = await resolver.resolve("fast")
+
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
 # Version-aware sort for glob resolution
 # ---------------------------------------------------------------------------
 
