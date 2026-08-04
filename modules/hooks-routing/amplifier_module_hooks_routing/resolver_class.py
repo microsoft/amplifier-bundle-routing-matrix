@@ -106,7 +106,9 @@ class MatrixModelRoleResolver:
         from .resolver import resolve_model_role
 
         roles = [model_role] if isinstance(model_role, str) else list(model_role)
-        resolved = await resolve_model_role(roles, self._matrix_roles, self._providers)
+        resolved = await resolve_model_role(
+            roles, self._matrix_roles, self._providers, coordinator=self._coordinator
+        )
         return [
             ProviderPreference(
                 provider=r["provider"],

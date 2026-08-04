@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-from amplifier_module_hooks_routing.resolver_class import MatrixModelRoleResolver
 from amplifier_module_hooks_routing.resolver import (
     _resolve_glob,
     find_provider_by_type,
     resolve_model_role,
 )
-
+from amplifier_module_hooks_routing.resolver_class import MatrixModelRoleResolver
 
 # ---------------------------------------------------------------------------
 # Helper to build mock providers dict
@@ -69,13 +68,19 @@ class TestFindProviderByType:
 class TestResolveModelRole:
     @pytest.mark.asyncio
     async def test_resolve_single_role_matches(self, sample_roles: dict) -> None:
-        """Role in matrix, provider installed, returns match."""
+        """Role in matrix, provider installed, returns match.
+
+        ``result[0]["provider"]`` is the *matched mount key* (here
+        "provider-anthropic", the actual providers-dict key), not the bare
+        "anthropic" written in the matrix candidate -- see resolve_model_role's
+        docstring on why the matched key must be returned.
+        """
         providers = {"provider-anthropic": _make_provider()}
 
         result = await resolve_model_role(["general"], sample_roles, providers)
 
         assert len(result) == 1
-        assert result[0]["provider"] == "anthropic"
+        assert result[0]["provider"] == "provider-anthropic"
         assert result[0]["model"] == "claude-sonnet-4-20250514"
 
     @pytest.mark.asyncio
@@ -88,7 +93,7 @@ class TestResolveModelRole:
         )
 
         assert len(result) == 1
-        assert result[0]["provider"] == "openai"
+        assert result[0]["provider"] == "provider-openai"
         assert result[0]["model"] == "gpt-4o-mini"
 
     @pytest.mark.asyncio
@@ -103,7 +108,7 @@ class TestResolveModelRole:
         result = await resolve_model_role(["coding"], sample_roles, providers)
 
         assert len(result) == 1
-        assert result[0]["provider"] == "openai"
+        assert result[0]["provider"] == "provider-openai"
         assert result[0]["model"] == "gpt-4o"
 
     @pytest.mark.asyncio
@@ -127,7 +132,7 @@ class TestResolveModelRole:
         result = await resolve_model_role(["coding"], roles, providers)
 
         assert len(result) == 1
-        assert result[0]["provider"] == "anthropic"
+        assert result[0]["provider"] == "provider-anthropic"
         # Sorted descending, sonnet-4 > sonnet-3.5
         assert result[0]["model"] == "claude-sonnet-4-20250514"
 
@@ -201,7 +206,14 @@ class TestResolveModelRole:
 
     @pytest.mark.asyncio
     async def test_resolve_provider_type_flexible_matching(self) -> None:
-        """'anthropic' matches 'provider-anthropic' key."""
+        """'anthropic' matches 'provider-anthropic' key.
+
+        The *matching* is flexible (bare "anthropic" finds the
+        "provider-anthropic" key); the *returned* provider identifier is the
+        matched key itself, not the bare candidate string -- downstream
+        consumers re-match against the same providers dict / mount plan and
+        need the exact key that was actually found.
+        """
         providers = {"provider-anthropic": _make_provider()}
         roles = {
             "general": {
@@ -215,7 +227,7 @@ class TestResolveModelRole:
         result = await resolve_model_role(["general"], roles, providers)
 
         assert len(result) == 1
-        assert result[0]["provider"] == "anthropic"
+        assert result[0]["provider"] == "provider-anthropic"
 
     @pytest.mark.asyncio
     async def test_resolve_list_models_failure_skips(self) -> None:
@@ -237,7 +249,7 @@ class TestResolveModelRole:
         result = await resolve_model_role(["coding"], roles, providers)
 
         assert len(result) == 1
-        assert result[0]["provider"] == "openai"
+        assert result[0]["provider"] == "provider-openai"
         assert result[0]["model"] == "gpt-4o"
 
     @pytest.mark.asyncio
@@ -260,7 +272,7 @@ class TestResolveModelRole:
         result = await resolve_model_role(["coding"], roles, providers)
 
         assert len(result) == 1
-        assert result[0]["provider"] == "openai"
+        assert result[0]["provider"] == "provider-openai"
 
 
 # ---------------------------------------------------------------------------
@@ -463,7 +475,12 @@ class TestBareTypeFallbackAgainstMultiInstanceProviders:
             "Expected 'fast' role to resolve to one candidate via the "
             "bare-type coordinator fallback, got: %r" % (result,)
         )
-        assert result[0]["provider"] == "anthropic"
+        # The returned "provider" is the matched mount key -- the priority-1
+        # (default) instance the fallback selected -- not the matrix's bare
+        # "anthropic" string. Downstream consumers (loop-streaming,
+        # hooks-session-naming) re-match this exact key against the same
+        # providers dict; a bare type here would never match "anthropic-sonnet".
+        assert result[0]["provider"] == "anthropic-sonnet"
         assert result[0]["model"] == "claude-haiku-4-5-20251001"
 
     @pytest.mark.asyncio
@@ -487,6 +504,225 @@ class TestBareTypeFallbackAgainstMultiInstanceProviders:
         }
 
         result = await resolve_model_role(["fast"], roles, providers)
+
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# MatrixModelRoleResolver.resolve() must forward its own coordinator to
+# resolve_model_role(). The constructor accepts and stores `coordinator`
+# (see resolver_class.py's ``self._coordinator = coordinator``), but the
+# resolve() method previously never passed it on to resolve_model_role(),
+# leaving the bare-type-vs-multi-instance fallback (see
+# TestBareTypeFallbackAgainstMultiInstanceProviders above) permanently dead
+# for the *only* call path every real consumer (tool-delegate,
+# hooks-session-naming, tool-recipes, tool-skills) actually uses. This is a
+# regression test for that gap, not for find_provider_by_type/
+# resolve_model_role themselves (already covered above).
+# ---------------------------------------------------------------------------
+
+
+class TestMatrixModelRoleResolverForwardsCoordinator:
+    @pytest.mark.asyncio
+    async def test_resolve_forwards_coordinator_for_bare_type_fallback(self) -> None:
+        """A single anthropic instance mounted with an explicit `id:` (e.g. a
+        user's settings.yaml sets `id: anthropic-opus`) is keyed
+        'anthropic-opus' in coordinator.providers, not the bare module type
+        'anthropic' a matrix candidate names. Resolution must still succeed
+        via the coordinator config fallback -- but only if resolve() actually
+        forwards the coordinator it was constructed with.
+        """
+        anthropic_opus = _make_provider(
+            models=["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"]
+        )
+        providers = {"anthropic-opus": anthropic_opus}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        coordinator = _make_coordinator_with_provider_specs(
+            [{"module": "provider-anthropic", "id": "anthropic-opus", "config": {}}]
+        )
+
+        resolver = MatrixModelRoleResolver(
+            matrix_roles=roles,
+            providers=providers,
+            matrix_name="anthropic",
+            coordinator=coordinator,
+        )
+
+        result = await resolver.resolve("fast")
+
+        assert len(result) == 1, (
+            "resolver.resolve('fast') must resolve via the coordinator "
+            "fallback exactly like resolve_model_role(coordinator=...) does "
+            "directly -- got: %r. If this is empty, resolve() is not "
+            "forwarding self._coordinator to resolve_model_role()." % (result,)
+        )
+        # This is the crux of the still-unfixed downstream defect: the
+        # returned provider must be "anthropic-opus" (the actual mounted
+        # key), not the bare "anthropic" matrix type -- otherwise every
+        # consumer's own exact/prefix-based provider lookup (loop-streaming,
+        # hooks-session-naming) can never re-match it.
+        assert result[0].provider == "anthropic-opus"
+        assert result[0].model == "claude-haiku-4-5"
+
+    @pytest.mark.asyncio
+    async def test_resolve_without_coordinator_still_returns_empty(self) -> None:
+        """Backward compatibility: a resolver built without a coordinator
+        (e.g. in a test double) must still return [] rather than raising,
+        for a bare-type candidate with no exact provider key match."""
+        providers = {"anthropic-opus": _make_provider(models=["claude-haiku-4-5"])}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        resolver = MatrixModelRoleResolver(
+            matrix_roles=roles,
+            providers=providers,
+            matrix_name="anthropic",
+        )
+
+        result = await resolver.resolve("fast")
+
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# End-to-end regression: the resolved "provider" identifier must be usable
+# by a real consumer's own match loop, not just non-empty. Extends the
+# TestBareTypeFallbackAgainstMultiInstanceProviders / ForwardsCoordinator
+# coverage above (which only asserted resolution *succeeded*) with the
+# actual downstream re-match every consumer performs -- reproducing
+# amplifier-module-loop-streaming's _via_role_resolver() match loop
+# verbatim (see repro_routing_defect.py Section D for the full harness).
+# ---------------------------------------------------------------------------
+
+
+def _consumer_match(pref_provider: str, providers: dict) -> tuple[str, Any] | None:
+    """Verbatim consumer-side match loop.
+
+    Copied from amplifier-module-loop-streaming's
+    ``StreamingOrchestrator._resolve_goal_model._via_role_resolver()``
+    (``amplifier_module_loop_streaming/__init__.py`` ~line 1500). Every
+    ``ProviderPreference.provider`` this resolver produces must survive this
+    exact re-match against the same ``providers`` dict it was resolved
+    against, or the resolution is a phantom success: it reports a candidate
+    but no consumer can ever act on it.
+    """
+    for name, provider in providers.items():
+        if pref_provider in (
+            name,
+            name.replace("provider-", ""),
+            f"provider-{pref_provider}",
+        ):
+            return (name, provider)
+    return None
+
+
+class TestResolvedProviderIsConsumerMatchable:
+    """Regression coverage for the gap 903305d alone did not close: a
+    resolved candidate whose "provider" a real consumer can't re-match is
+    indistinguishable, from the caller's side, from no resolution at all.
+    """
+
+    @pytest.mark.asyncio
+    async def test_id_bearing_single_instance_resolves_and_is_matchable(
+        self,
+    ) -> None:
+        """Production scenario: one Anthropic instance, `id: anthropic-opus`
+        in settings.yaml, keyed 'anthropic-opus' in coordinator.providers.
+        Must both resolve AND be re-matchable by a downstream consumer.
+        """
+        anthropic_opus = _make_provider(
+            models=["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"]
+        )
+        providers = {"anthropic-opus": anthropic_opus}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        coordinator = _make_coordinator_with_provider_specs(
+            [{"module": "provider-anthropic", "id": "anthropic-opus", "config": {}}]
+        )
+
+        result = await resolve_model_role(
+            ["fast"], roles, providers, coordinator=coordinator
+        )
+
+        assert len(result) == 1
+        match = _consumer_match(result[0]["provider"], providers)
+        assert match is not None, (
+            f"Resolved provider {result[0]['provider']!r} could not be "
+            f"re-matched by the consumer's own lookup against "
+            f"providers={providers!r} -- this is the exact production "
+            "defect (resolution succeeds, but no consumer can act on it)."
+        )
+        assert match == ("anthropic-opus", anthropic_opus)
+
+    @pytest.mark.asyncio
+    async def test_single_instance_no_id_unchanged(self) -> None:
+        """No `id:` set -- single instance keyed by its own module type
+        (the pre-existing, non-multi-instance case). Must resolve exactly
+        as before this fix: matched name equals the bare type because
+        that *is* the mount key, so the returned provider is unchanged
+        and trivially matchable.
+        """
+        providers = {"anthropic": _make_provider(models=["claude-haiku-4-5"])}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+
+        # No coordinator needed: first loop of find_provider_by_type finds
+        # the exact key directly, bypassing the coordinator-spec fallback
+        # entirely -- confirms this path is untouched by the fix.
+        result = await resolve_model_role(["fast"], roles, providers)
+
+        assert len(result) == 1
+        assert result[0]["provider"] == "anthropic"
+        match = _consumer_match(result[0]["provider"], providers)
+        assert match is not None
+        assert match[0] == "anthropic"
+
+    @pytest.mark.asyncio
+    async def test_genuinely_absent_provider_still_returns_empty(self) -> None:
+        """No installed provider serves the role at all (not an id-mismatch
+        case -- the provider module itself isn't mounted). Must stay a loud,
+        honest [] rather than fabricating a match.
+        """
+        providers = {"provider-openai": _make_provider()}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        coordinator = _make_coordinator_with_provider_specs(
+            [{"module": "provider-openai", "id": "openai-main", "config": {}}]
+        )
+
+        result = await resolve_model_role(
+            ["fast"], roles, providers, coordinator=coordinator
+        )
 
         assert result == []
 
@@ -777,7 +1013,7 @@ class TestPreresolvedModels:
 
 class TestKnownRoles:
     @staticmethod
-    def _make(roles: dict) -> "MatrixModelRoleResolver":
+    def _make(roles: dict) -> MatrixModelRoleResolver:
         return MatrixModelRoleResolver(
             matrix_roles=roles,
             providers={},

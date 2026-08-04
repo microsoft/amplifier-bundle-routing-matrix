@@ -202,6 +202,28 @@ async def resolve_model_role(
     Returns:
         List of ``{provider, model, config}`` dicts representing resolved
         preferences.  Empty if no role resolves.
+
+        The ``"provider"`` value is the *actual mounted key* that
+        :func:`find_provider_by_type` matched in ``providers`` -- NOT
+        necessarily the bare ``provider:`` string written in the matrix
+        candidate. For the common case (a candidate's bare type is itself
+        a key in ``providers``, or differs from one only by the
+        "provider-" prefix) these are the same string, so this is a no-op.
+        They diverge only when resolution went through the coordinator
+        fallback (an instance mounted under an explicit ``id:`` that
+        doesn't match the bare type via any of the three simple string
+        forms, e.g. matrix says ``provider: anthropic`` but the only
+        installed instance is mounted as ``anthropic-opus``). In that
+        case, returning the bare type here would hand every downstream
+        consumer (loop-streaming's goal-model resolution, hooks-session-
+        naming) a string that can never re-match ``anthropic-opus`` via
+        their own exact/prefix-based lookups -- reproducing the exact
+        "resolved to provider 'anthropic', which is not mounted/installed"
+        defect this fixes. Returning the matched key means every consumer
+        that re-resolves this string against the same ``providers`` dict
+        (or, for tool-delegate's mount-plan path,
+        ``amplifier_foundation.spawn_utils._build_provider_lookup()``,
+        which already indexes by ``id:``) finds an exact hit.
     """
     for role in roles:
         role_data = matrix.get(role)
@@ -219,7 +241,7 @@ async def resolve_model_role(
             if match is None:
                 continue
 
-            _module_id, provider_instance = match
+            matched_name, provider_instance = match
 
             # Is the model pattern a glob?
             if _is_glob(model_pattern):
@@ -236,7 +258,10 @@ async def resolve_model_role(
 
             return [
                 {
-                    "provider": provider_type,
+                    # The mounted key find_provider_by_type() actually
+                    # matched -- see the docstring above for why this must
+                    # not be provider_type (the matrix's bare type string).
+                    "provider": matched_name,
                     "model": resolved_model,
                     "config": config,
                 }

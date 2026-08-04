@@ -335,13 +335,21 @@ class TestSessionStartHook:
         # Invoke the handler
         await session_start_handler("session:start", {})
 
-        # coder should have provider_preferences set
+        # coder should have provider_preferences set. The provider value is
+        # the matched providers-dict key ("provider-anthropic"), not the
+        # matrix's bare "anthropic" -- see resolve_model_role's docstring.
         assert "provider_preferences" in agents["coder"]
-        assert agents["coder"]["provider_preferences"][0]["provider"] == "anthropic"
+        assert (
+            agents["coder"]["provider_preferences"][0]["provider"]
+            == "provider-anthropic"
+        )
 
         # helper should resolve fast → openai
         assert "provider_preferences" in agents["helper"]
-        assert agents["helper"]["provider_preferences"][0]["provider"] == "openai"
+        assert (
+            agents["helper"]["provider_preferences"][0]["provider"]
+            == "provider-openai"
+        )
 
         # plain should not have provider_preferences
         assert "provider_preferences" not in agents["plain"]
@@ -545,8 +553,9 @@ class TestModelRoleResolverCapability:
             "Resolver returned an empty list for 'fast' role -- "
             "verify MatrixModelRoleResolver receives effective_matrix and providers."
         )
-        assert prefs[0].provider == "openai", (
-            f"Expected provider 'openai' for 'fast' role, got {prefs[0].provider!r}"
+        assert prefs[0].provider == "provider-openai", (
+            "Expected the matched providers-dict key 'provider-openai' for "
+            f"'fast' role, got {prefs[0].provider!r}"
         )
         assert prefs[0].model == "gpt-4o-mini", (
             f"Expected model 'gpt-4o-mini' for 'fast' role, got {prefs[0].model!r}"
@@ -640,7 +649,10 @@ class TestSessionStartParallelism:
             assert "provider_preferences" in agent_cfg, (
                 f"Agent '{name}' missing provider_preferences after parallel resolution"
             )
-            assert agent_cfg["provider_preferences"][0]["provider"] == "anthropic"
+            assert (
+                agent_cfg["provider_preferences"][0]["provider"]
+                == "provider-anthropic"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -867,7 +879,10 @@ class TestPreresolvedModelsFlow:
 
         # Agent must be resolved
         assert "provider_preferences" in agents["coder"]
-        assert agents["coder"]["provider_preferences"][0]["provider"] == "anthropic"
+        assert (
+            agents["coder"]["provider_preferences"][0]["provider"]
+            == "provider-anthropic"
+        )
         assert (
             agents["coder"]["provider_preferences"][0]["model"]
             == "claude-sonnet-4-20250514"
