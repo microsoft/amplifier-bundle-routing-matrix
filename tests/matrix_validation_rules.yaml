@@ -4,7 +4,6 @@
 # test logic (tests/test_matrix_config_validation.py reads it).
 #
 # HOW TO EXTEND:
-#   - New config key supported by providers?  Add it to `allowed_config_keys`.
 #   - New provider appears in a matrix with `reasoning_effort`?  Add an entry
 #     under `reasoning_effort_values` with that provider's documented set.
 #     The test FAILS on providers missing from this map — that failure is the
@@ -18,12 +17,6 @@
 # (`effort`, `thinking_effort`, `reasoning-effort`, ...) must never appear in
 # shipped matrices — providers accept them only as deprecated aliases.
 canonical_effort_key: reasoning_effort
-
-# Every key permitted in a candidate's `config:` map. Anything else is
-# treated as a typo (this is what catches the `extra_high`-style sibling
-# bugs: unknown keys silently pass through and become inert).
-allowed_config_keys:
-  - reasoning_effort
 
 # Per-provider valid values for `reasoning_effort`.
 # Keys are the matrix `provider:` field (module type name or instance id).

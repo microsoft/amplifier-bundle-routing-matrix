@@ -21,7 +21,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     """
     config = config or {}
 
-    from .matrix_loader import compose_matrix, load_matrix
+    from .matrix_loader import compose_matrix, load_matrix, validate_matrix_config
 
     # --- Locate the routing directory ---
     # Accept an explicit override for testing; otherwise use __file__ traversal
@@ -101,6 +101,25 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         )
         if capability_overrides:
             effective_matrix = compose_matrix(effective_matrix, capability_overrides)
+
+    # --- Validate composed matrix config values ---
+    # Catches provider-declared `choice` fields (e.g. reasoning_effort) set to
+    # invalid values that the provider would otherwise silently warn about and
+    # ignore, leaving the setting inert (the historical `extra_high` bug).
+    if effective_matrix:
+        _validation_providers = coordinator.get("providers") or {}
+        config_errors = validate_matrix_config(
+            {"roles": effective_matrix}, _validation_providers, coordinator
+        )
+        if config_errors:
+            logger.warning("[ROUTING] Invalid config in matrix %s:", matrix_path)
+            for err in config_errors:
+                logger.warning("[ROUTING]   %s", err)
+            logger.warning(
+                "[ROUTING]   These settings are IGNORED by the provider. "
+                "Fix with: amplifier routing edit %s",
+                default_matrix_name,
+            )
 
     # --- Register the model_role_resolver capability ---
     # Consumers: tool-delegate, hooks-session-naming, tool-recipes, tool-skills.
