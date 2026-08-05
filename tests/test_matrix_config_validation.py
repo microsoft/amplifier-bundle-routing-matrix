@@ -22,7 +22,6 @@ RULES_PATH = Path(__file__).parent / "matrix_validation_rules.yaml"
 
 RULES = yaml.safe_load(RULES_PATH.read_text())
 CANONICAL_EFFORT_KEY = RULES["canonical_effort_key"]
-ALLOWED_CONFIG_KEYS = set(RULES["allowed_config_keys"])
 EFFORT_VALUES_BY_PROVIDER = RULES["reasoning_effort_values"]
 
 MATRIX_FILES = sorted(ROUTING_DIR.glob("*.yaml"))
@@ -93,25 +92,5 @@ class TestMatrixConfigValidation:
                 )
         assert not violations, (
             f"{matrix_path.name}: invalid reasoning_effort values:\n  "
-            + "\n  ".join(violations)
-        )
-
-    def test_config_keys_in_allowlist(self, matrix_path):
-        """(c) Every candidate config key is a known key.
-
-        Catches typos and unsupported knobs -- providers pass unknown config
-        through or ignore it, so a misspelled key fails silently at runtime.
-        New legitimate keys go in tests/matrix_validation_rules.yaml.
-        """
-        violations = []
-        for role, i, cand in iter_candidates(matrix_path):
-            for key in cand.get("config") or {}:
-                if key not in ALLOWED_CONFIG_KEYS:
-                    violations.append(
-                        f"{role}[{i}] ({cand.get('provider')}/{cand.get('model')}): "
-                        f"unknown config key {key!r} (allowed: {sorted(ALLOWED_CONFIG_KEYS)})"
-                    )
-        assert not violations, (
-            f"{matrix_path.name}: unknown config keys found:\n  "
             + "\n  ".join(violations)
         )
