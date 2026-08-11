@@ -1005,6 +1005,146 @@ class TestPreresolvedModels:
 
 
 # ---------------------------------------------------------------------------
+# MatrixModelRoleResolver session-lifetime cache -- resolve() must reuse a
+# single instance-level preresolved_models dict across calls so a resolver
+# constructed once per session (see __init__.py's
+# ``coordinator.register_capability("model_role_resolver", _resolver)``) does
+# not re-fetch a provider's model list on every resolve() call. Regression
+# coverage for the gap where resolve() called resolve_model_role() without
+# ever passing preresolved_models, defeating the caching mechanism that
+# already existed in resolve_model_role/_resolve_glob (see
+# TestPreresolvedModels above, which covers that lower layer directly).
+# ---------------------------------------------------------------------------
+
+
+class TestMatrixModelRoleResolverCachesModelLists:
+    @pytest.mark.asyncio
+    async def test_second_resolve_reuses_cached_model_list(self) -> None:
+        """Two consecutive resolve() calls for the same glob-based role must
+        only hit list_models() once -- the load-bearing proof for this fix."""
+        provider = _make_provider(
+            models=["claude-haiku-4-5-20251001", "claude-haiku-3"]
+        )
+        providers = {"anthropic": provider}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        resolver = MatrixModelRoleResolver(
+            matrix_roles=roles, providers=providers, matrix_name="anthropic"
+        )
+
+        first = await resolver.resolve("fast")
+        second = await resolver.resolve("fast")
+
+        assert first[0].model == "claude-haiku-4-5-20251001"
+        assert second[0].model == "claude-haiku-4-5-20251001"
+        assert provider.list_models.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_cached_list_survives_a_later_transient_failure(self) -> None:
+        """Once a provider's model list has been fetched and cached, a
+        subsequent list_models() failure must NOT demote the caller -- the
+        cached list is used and the correct model still resolves. This is the
+        actual defect: before this fix, resolve() never populated a durable
+        cache, so every call re-hit list_models(), and a transient failure on
+        any call silently returned no candidates (caller falls back to a
+        different model)."""
+        provider = _make_provider(
+            models=["claude-haiku-4-5-20251001", "claude-haiku-3"]
+        )
+        providers = {"anthropic": provider}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        resolver = MatrixModelRoleResolver(
+            matrix_roles=roles, providers=providers, matrix_name="anthropic"
+        )
+
+        first = await resolver.resolve("fast")
+        assert first[0].model == "claude-haiku-4-5-20251001"
+
+        # Simulate a transient network failure on any further list_models() call.
+        provider.list_models.side_effect = RuntimeError("boom")
+
+        second = await resolver.resolve("fast")
+
+        assert len(second) == 1, (
+            "second resolve() must still return the cached candidate rather "
+            "than silently falling back to no candidates"
+        )
+        assert second[0].model == "claude-haiku-4-5-20251001"
+
+    @pytest.mark.asyncio
+    async def test_single_resolve_on_fresh_instance_still_resolves(self) -> None:
+        """Regression guard: the empty-cache path (a single resolve() call)
+        is unchanged -- it still fetches and resolves correctly."""
+        provider = _make_provider(models=["claude-haiku-4-5-20251001"])
+        providers = {"anthropic": provider}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+        }
+        resolver = MatrixModelRoleResolver(
+            matrix_roles=roles, providers=providers, matrix_name="anthropic"
+        )
+
+        result = await resolver.resolve("fast")
+
+        assert result[0].model == "claude-haiku-4-5-20251001"
+        provider.list_models.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_two_different_roles_sharing_a_provider_share_the_cache(
+        self,
+    ) -> None:
+        """Two different roles that both glob-match against the same provider
+        must share the one cached model list -- list_models() is still only
+        awaited once across both role resolutions."""
+        provider = _make_provider(
+            models=["claude-haiku-4-5-20251001", "claude-sonnet-4-20250514"]
+        )
+        providers = {"anthropic": provider}
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-haiku-*"},
+                ],
+            },
+            "coding": {
+                "description": "Code gen",
+                "candidates": [
+                    {"provider": "anthropic", "model": "claude-sonnet-*"},
+                ],
+            },
+        }
+        resolver = MatrixModelRoleResolver(
+            matrix_roles=roles, providers=providers, matrix_name="anthropic"
+        )
+
+        fast_result = await resolver.resolve("fast")
+        coding_result = await resolver.resolve("coding")
+
+        assert fast_result[0].model == "claude-haiku-4-5-20251001"
+        assert coding_result[0].model == "claude-sonnet-4-20250514"
+        assert provider.list_models.await_count == 1
+
+
+# ---------------------------------------------------------------------------
 # MatrixModelRoleResolver.known_roles -- optional part of the
 # model_role_resolver contract. Consumers (tool-delegate) turn this into a
 # JSON-Schema enum, so order and immutability are load-bearing.

@@ -79,6 +79,20 @@ class MatrixModelRoleResolver:
         # context -- so consumers that surface these to a model agree with it.
         # Not sorted: the matrix order is curated (general, fast, coding, ...).
         self.known_roles: tuple[str, ...] = tuple(matrix_roles)
+        # Session-lifetime cache of provider_type -> fetched model names, shared
+        # across every resolve() call this instance ever makes. A resolver
+        # instance is constructed once per mount() (see __init__.py's
+        # ``coordinator.register_capability("model_role_resolver", _resolver)``)
+        # and lives for the session, and a provider's model list does not
+        # change mid-session -- so the first successful list_models() per
+        # provider serves every later role resolution here. Without this,
+        # resolve() re-fetched the full model list on every call (see
+        # resolve_model_role's own ``preresolved_models`` parameter, which
+        # exists precisely to avoid this and was simply never wired in here),
+        # costing a redundant HTTP round-trip per call and -- worse -- turning
+        # any single transient list_models() failure into a silent demotion to
+        # a different model for that call.
+        self._preresolved_models: dict[str, list[str]] = {}
 
     async def resolve(self, model_role: str | list[str]) -> list[ProviderPreference]:
         """Resolve a model role (or ordered fallback list) to provider preferences.
@@ -107,7 +121,11 @@ class MatrixModelRoleResolver:
 
         roles = [model_role] if isinstance(model_role, str) else list(model_role)
         resolved = await resolve_model_role(
-            roles, self._matrix_roles, self._providers, coordinator=self._coordinator
+            roles,
+            self._matrix_roles,
+            self._providers,
+            preresolved_models=self._preresolved_models,
+            coordinator=self._coordinator,
         )
         return [
             ProviderPreference(
