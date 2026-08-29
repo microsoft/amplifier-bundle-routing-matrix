@@ -1,8 +1,9 @@
 """Validation tests for context/routing-instructions.md.
 
-Verifies the routing instructions file contains the updated content
-with all 13 roles, agent author examples, delegation examples,
-and a reference to role-definitions.md.
+Verifies the routing instructions file points agents at the live,
+per-turn-injected role list (rather than a fixed static table), and still
+contains agent author examples, delegation examples, and a reference to
+role-definitions.md.
 """
 
 from __future__ import annotations
@@ -18,23 +19,6 @@ import pytest
 # Walk up from tests/ -> hooks-routing/ -> modules/ -> bundle root -> context/
 BUNDLE_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 INSTRUCTIONS_PATH = BUNDLE_ROOT / "context" / "routing-instructions.md"
-
-# All 13 roles that must appear in the table
-ALL_ROLES = [
-    "general",
-    "fast",
-    "coding",
-    "ui-coding",
-    "security-audit",
-    "reasoning",
-    "critique",
-    "creative",
-    "writing",
-    "research",
-    "vision",
-    "image-gen",
-    "critical-ops",
-]
 
 
 # ---------------------------------------------------------------------------
@@ -71,33 +55,37 @@ class TestFileStructure:
 # ---------------------------------------------------------------------------
 
 
-class TestAvailableRolesTable:
-    """The file must have an 'Available Roles (13)' section with a table."""
+class TestAvailableRolesSection:
+    """The file must point agents at the live, per-turn-injected role list
+    rather than a fixed static table (role sets differ per routing matrix)."""
 
     def test_has_available_roles_heading(self, instructions_content: str) -> None:
-        assert "## Available Roles (13)" in instructions_content
+        assert "## Available Roles" in instructions_content
 
-    @pytest.mark.parametrize("role", ALL_ROLES)
-    def test_table_contains_role(self, instructions_content: str, role: str) -> None:
-        """Each of the 13 roles must appear in the roles table."""
-        # Roles appear as `role` in the table
-        assert f"| `{role}` |" in instructions_content, (
-            f"Role '{role}' not found in Available Roles table"
-        )
+    def test_no_stale_role_count_in_heading(self, instructions_content: str) -> None:
+        """The heading must not claim a fixed role count -- the live matrix decides."""
+        assert "## Available Roles (13)" not in instructions_content
 
-    def test_table_has_13_role_rows(self, instructions_content: str) -> None:
-        """The table should have exactly 13 data rows (excluding header and separator)."""
-        # Extract the Available Roles section
-        start = instructions_content.index("## Available Roles (13)")
+    def _available_roles_section(self, instructions_content: str) -> str:
+        start = instructions_content.index("## Available Roles")
         try:
             next_section = instructions_content.index("\n## ", start + 1)
         except ValueError:
             next_section = len(instructions_content)
-        section = instructions_content[start:next_section]
+        return instructions_content[start:next_section]
 
-        # Count rows that start with "| `" (role rows)
+    def test_no_static_role_table(self, instructions_content: str) -> None:
+        """The static per-role table rows must be gone -- replaced by a pointer paragraph."""
+        section = self._available_roles_section(instructions_content)
         role_rows = [line for line in section.split("\n") if line.startswith("| `")]
-        assert len(role_rows) == 13, f"Expected 13 role rows, found {len(role_rows)}"
+        assert role_rows == [], f"Expected no static role rows, found {role_rows}"
+
+    def test_points_to_live_injection(self, instructions_content: str) -> None:
+        """The section must direct agents to the live per-turn routing injection."""
+        section = self._available_roles_section(instructions_content)
+        assert "injected into your context every turn" in section
+        assert "Active routing matrix" in section
+        assert "Available model roles" in section
 
 
 # ---------------------------------------------------------------------------

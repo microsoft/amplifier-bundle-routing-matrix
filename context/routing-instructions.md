@@ -2,23 +2,12 @@
 
 This session uses the routing matrix system for model selection.
 
-## Available Roles (13)
+## Available Roles
 
-| Role | Description |
-|------|-------------|
-| `general` | Versatile catch-all, no specialization needed |
-| `fast` | Quick utility tasks — parsing, classification, file ops, bulk work |
-| `coding` | Code generation, implementation, debugging |
-| `ui-coding` | Frontend/UI code — components, layouts, styling, spatial reasoning |
-| `security-audit` | Vulnerability assessment, attack surface analysis, code auditing |
-| `reasoning` | Deep architectural reasoning, system design, complex multi-step analysis |
-| `critique` | Analytical evaluation — finding flaws in existing work |
-| `creative` | Design direction, aesthetic judgment, high-quality creative output |
-| `writing` | Long-form content — documentation, marketing, case studies, storytelling |
-| `research` | Deep investigation, information synthesis across multiple sources |
-| `vision` | Understanding visual input — screenshots, diagrams, UI mockups |
-| `image-gen` | Image generation, visual mockup creation, visual ideation |
-| `critical-ops` | High-reliability operational tasks — infrastructure, orchestration |
+The live role list for the active matrix is injected into your context every turn
+(`Active routing matrix: … / Available model roles: …`). Use those role names — they are
+authoritative. Role sets and descriptions differ per matrix; do not rely on any list
+written down here.
 
 ## For Agent Authors
 
