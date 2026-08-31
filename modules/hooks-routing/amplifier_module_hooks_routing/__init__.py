@@ -28,6 +28,13 @@ logger = logging.getLogger(__name__)
 # section 9).
 VALID_PLACEMENTS = ("prefix", "inject")
 
+# The source-attributed marker this module's own banner always opens with
+# (see _render_banner). Used as a CONTENT signal in _ensure_prefix_placement
+# (rr wave 20260831, D1 cache-regression fix) -- see that function's
+# docstring for why identity alone is not a safe re-wrap check once more
+# than one hook wraps the same system-prompt-factory slot.
+_PREFIX_MARKER = '<system-reminder source="routing-matrix">'
+
 
 async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     """Mount the routing matrix hook.
@@ -255,10 +262,14 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
 
     # ------------------------------------------------------------------
     # Banner rendering + prefix-placement plumbing (system-reminder
-    # redesign, W3). Mutable closure state lives in these two names;
-    # nested functions rebind them via `nonlocal`.
+    # redesign, W3). Mutable closure state lives in these names; nested
+    # functions rebind them via `nonlocal`.
     # ------------------------------------------------------------------
     _prefix_factory: Any = None
+    # rr wave 20260831 (D1 cache-regression fix): the last `current`
+    # factory object we CONTENT-VERIFIED already carries our own marker
+    # (see _ensure_prefix_placement below).
+    _prefix_verified_factory: Any = None
     _prefix_unavailable_logged = False
 
     def _render_banner() -> str:
@@ -288,18 +299,49 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     async def _ensure_prefix_placement() -> bool:
         """Ensure the banner rides the system prompt (stable prefix).
 
-        Near-verbatim port of tool-skills' ``_ensure_prefix_placement``
-        (amplifier-bundle-skills modules/tool-skills/hooks.py:232-290),
-        adapted to this module's function-closure style. Same disciplines:
-        defensive coordinator.get("context") lookup, refuse to replace a
-        static system prompt (no factory registered), identity check for
-        re-wrap after re-registration, lazy wrap on first provider:request.
+        Originally a near-verbatim port of tool-skills'
+        ``_ensure_prefix_placement`` (amplifier-bundle-skills
+        modules/tool-skills/hooks.py:232-290): defensive
+        coordinator.get("context") lookup, refuse to replace a static
+        system prompt (no factory registered), lazy wrap on first
+        provider:request.
+
+        rr wave 20260831 (D1 cache-regression fix): the ORIGINAL re-wrap
+        check here was pure object identity -- ``current is _prefix_factory``.
+        That is safe ONLY while this hook is the sole wrapper of the
+        system-prompt-factory slot. Once a SECOND independent hook (e.g.
+        hooks-status-context) ALSO wraps the same slot with the same
+        pattern, identity breaks: every hook whose own wrap is not the
+        OUTERMOST one sees ``current`` change out from under it on every
+        subsequent request (a PEER hook's wrap moved the slot forward),
+        concludes "not wrapped yet", and wraps AGAIN around a chain that
+        already contains its own prior contribution. With N such hooks all
+        doing this, the composed system prompt gains N NEW copies of every
+        hook's block on every single request -- unbounded, per-request
+        growth (confirmed on the wire: rr-anth-01's system prompt grew
+        ~21.7K chars/request, every hook's block count incrementing
+        1 -> 2 -> 3 -> ... in lockstep with the request index). This is what
+        collapsed anthropic's prompt-cache read share from ~90% to ~8% in
+        the 20260831-rr validation wave.
+
+        The fix: keep the identity check as a fast path (nothing has
+        touched the slot since we last verified/wrapped it -> cheap,
+        no-op). When identity fails, do NOT assume "not yet wrapped" --
+        render the CURRENT chain once and check whether our own
+        source-attributed marker (_PREFIX_MARKER) is already present
+        somewhere in it. If so, our content already rides the system
+        prompt (just nested under a peer hook's OUTER wrap) and touching
+        the slot again would only duplicate it -- return True without
+        calling set_system_prompt_factory. Only wrap when our marker is
+        genuinely absent. The verified factory object is cached
+        (_prefix_verified_factory) so this content check runs at most once
+        per distinct factory object, not every request.
 
         Returns True when the banner is (now) riding the system prompt;
         False when the surface is unavailable and the caller should fall
         back to per-request injection.
         """
-        nonlocal _prefix_factory
+        nonlocal _prefix_factory, _prefix_verified_factory
 
         getter = getattr(coordinator, "get", None) if coordinator else None
         context: Any = getter("context") if callable(getter) else None
@@ -313,8 +355,18 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             # precedence over stored system messages in context-simple),
             # so refuse and let the caller fall back.
             return False
-        if current is _prefix_factory:
-            return True  # already wrapped, still active
+        if current is _prefix_factory or current is _prefix_verified_factory:
+            return (
+                True  # fast path -- nothing has touched the slot since we last checked
+            )
+
+        # Slow path: a peer hook has (re-)wrapped the slot since we last
+        # looked. Render once and check CONTENT, not identity -- see
+        # docstring above.
+        current_text = await current()
+        if _PREFIX_MARKER in current_text:
+            _prefix_verified_factory = current
+            return True
 
         base_factory = current
 
