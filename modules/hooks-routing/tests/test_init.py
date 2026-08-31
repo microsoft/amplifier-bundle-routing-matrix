@@ -8,9 +8,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from amplifier_module_hooks_routing import mount
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -23,11 +21,25 @@ def _make_coordinator(
     providers: dict[str, Any] | None = None,
     agents: dict[str, Any] | None = None,
     has_hooks: bool = True,
+    context: Any = None,
 ) -> MagicMock:
-    """Build a mock coordinator that follows the real API."""
+    """Build a mock coordinator that follows the real API.
+
+    ``context``, if given, is returned only for ``coordinator.get("context")``
+    (used by the prefix-placement surface); every other key still returns
+    ``providers``, matching this module's only two real ``.get()`` call
+    sites (``"providers"`` and, as of the system-reminder redesign,
+    ``"context"``).
+    """
     coordinator = MagicMock()
     coordinator.session_state = session_state if session_state is not None else {}
-    coordinator.get = MagicMock(return_value=providers)
+
+    def _get(key: str) -> Any:
+        if key == "context":
+            return context
+        return providers
+
+    coordinator.get = MagicMock(side_effect=_get)
 
     if agents is not None:
         coordinator.config = {"agents": agents}
@@ -43,6 +55,25 @@ def _make_coordinator(
         del coordinator.hooks
 
     return coordinator
+
+
+class FakeSystemPromptContext:
+    """Context module exposing the system-prompt-factory surface
+    (context-simple shape: public async setter, private attribute) --
+    same shape amplifier-bundle-skills' tool-skills tests use."""
+
+    def __init__(self, base_prompt: str = "BASE SYSTEM PROMPT") -> None:
+        self._system_prompt_factory = self._make_base(base_prompt)
+
+    @staticmethod
+    def _make_base(text: str) -> Any:
+        async def _base() -> str:
+            return text
+
+        return _base
+
+    async def set_system_prompt_factory(self, factory: Any) -> None:
+        self._system_prompt_factory = factory
 
 
 def _resolver_from(coordinator: MagicMock) -> Any:
@@ -347,8 +378,7 @@ class TestSessionStartHook:
         # helper should resolve fast → openai
         assert "provider_preferences" in agents["helper"]
         assert (
-            agents["helper"]["provider_preferences"][0]["provider"]
-            == "provider-openai"
+            agents["helper"]["provider_preferences"][0]["provider"] == "provider-openai"
         )
 
         # plain should not have provider_preferences
@@ -425,55 +455,134 @@ class TestSessionStartHook:
         )
 
 
+def _write_balanced_matrix(tmp_path: Path) -> Path:
+    """Write the standard two-role test matrix; returns the bundle root."""
+    bundle_root = tmp_path / "bundle"
+    routing_dir = bundle_root / "routing"
+    routing_dir.mkdir(parents=True)
+    content = textwrap.dedent("""\
+        name: balanced
+        description: "Test"
+        updated: "2026-01-01"
+        roles:
+          general:
+            description: "General purpose"
+            candidates:
+              - provider: anthropic
+                model: claude-sonnet-4-20250514
+          fast:
+            description: "Fast tasks"
+            candidates:
+              - provider: openai
+                model: gpt-4o-mini
+    """)
+    (routing_dir / "balanced.yaml").write_text(content)
+    return bundle_root
+
+
+def _provider_request_handler_of(coordinator: MagicMock) -> Any:
+    """Extract the provider:request handler mount() registered, or None."""
+    for call in coordinator.hooks.register.call_args_list:
+        if call.args and call.args[0] == "provider:request":
+            return call.args[1]
+    return None
+
+
 class TestProviderRequestHook:
+    """Covers both placement modes (system-reminder redesign, W3). Split
+    from the single pre-redesign `test_provider_request_injects_context`
+    (`:429-475` at `1e329ce`) because the default path is now "prefix"
+    (returns `continue`, banner rides the system prompt) rather than an
+    unconditional per-request injection."""
+
     @pytest.mark.asyncio
-    async def test_provider_request_injects_context(self, tmp_path: Path) -> None:
-        """Returns HookResult with inject_context action."""
-        bundle_root = tmp_path / "bundle"
-        routing_dir = bundle_root / "routing"
-        routing_dir.mkdir(parents=True)
-        content = textwrap.dedent("""\
-            name: balanced
-            description: "Test"
-            updated: "2026-01-01"
-            roles:
-              general:
-                description: "General purpose"
-                candidates:
-                  - provider: anthropic
-                    model: claude-sonnet-4-20250514
-              fast:
-                description: "Fast tasks"
-                candidates:
-                  - provider: openai
-                    model: gpt-4o-mini
-        """)
-        (routing_dir / "balanced.yaml").write_text(content)
+    async def test_provider_request_injects_context_in_inject_mode(
+        self, tmp_path: Path
+    ) -> None:
+        """Explicit placement="inject": per-request HookResult, wrapped in
+        the <system-reminder source="routing-matrix"> envelope, role
+        pinned to "user", ephemeral True. This is the pre-redesign shape
+        (`1e329ce`) minus the bare-banner / system-role defects."""
+        bundle_root = _write_balanced_matrix(tmp_path)
 
         coordinator = _make_coordinator()
         await mount(
             coordinator,
-            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
+            config={
+                "default_matrix": "balanced",
+                "_bundle_root": str(bundle_root),
+                "placement": "inject",
+            },
         )
 
-        # Extract the provider:request handler
-        calls = coordinator.hooks.register.call_args_list
-        provider_request_handler = None
-        for call in calls:
-            if call.args[0] == "provider:request":
-                provider_request_handler = call.args[1]
-                break
+        provider_request_handler = _provider_request_handler_of(coordinator)
         assert provider_request_handler is not None
 
-        # Invoke the handler
         result = await provider_request_handler("provider:request", {})
 
         assert result is not None
         assert result.action == "inject_context"
         assert result.ephemeral is True
+        assert result.context_injection_role == "user"
         assert "balanced" in result.context_injection
         assert "general" in result.context_injection
         assert "fast" in result.context_injection
+
+    @pytest.mark.asyncio
+    async def test_provider_request_wrapped_defect_fails_before(
+        self, tmp_path: Path
+    ) -> None:
+        """The exact defect captured in session 0629f373: the banner must
+        be wrapped in <system-reminder source="routing-matrix">...
+        </system-reminder>, not emitted bare. Fails on `1e329ce` (the
+        pre-redesign banner is a bare string with no wrapper at all)."""
+        bundle_root = _write_balanced_matrix(tmp_path)
+
+        coordinator = _make_coordinator()
+        await mount(
+            coordinator,
+            config={
+                "default_matrix": "balanced",
+                "_bundle_root": str(bundle_root),
+                "placement": "inject",
+            },
+        )
+        provider_request_handler = _provider_request_handler_of(coordinator)
+        assert provider_request_handler is not None
+
+        result = await provider_request_handler("provider:request", {})
+
+        injection = result.context_injection
+        assert injection.startswith('<system-reminder source="routing-matrix"')
+        assert injection.endswith("</system-reminder>")
+
+    @pytest.mark.asyncio
+    async def test_provider_request_prefix_mode_returns_continue(
+        self, tmp_path: Path
+    ) -> None:
+        """Default (prefix) placement with a real factory surface: the
+        handler returns `continue` (never a per-request injection -- the
+        banner rides the system prompt instead), and the system prompt
+        factory renders the wrapped, source-attributed banner."""
+        bundle_root = _write_balanced_matrix(tmp_path)
+        context = FakeSystemPromptContext()
+
+        coordinator = _make_coordinator(context=context)
+        await mount(
+            coordinator,
+            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
+        )
+        provider_request_handler = _provider_request_handler_of(coordinator)
+        assert provider_request_handler is not None
+
+        result = await provider_request_handler("provider:request", {})
+        assert result.action == "continue"
+
+        rendered = await context._system_prompt_factory()
+        assert rendered.startswith("BASE SYSTEM PROMPT")
+        assert '<system-reminder source="routing-matrix">' in rendered
+        assert "general" in rendered
+        assert "fast" in rendered
 
 
 class TestModelRoleResolverCapability:
@@ -650,8 +759,7 @@ class TestSessionStartParallelism:
                 f"Agent '{name}' missing provider_preferences after parallel resolution"
             )
             assert (
-                agent_cfg["provider_preferences"][0]["provider"]
-                == "provider-anthropic"
+                agent_cfg["provider_preferences"][0]["provider"] == "provider-anthropic"
             )
 
 

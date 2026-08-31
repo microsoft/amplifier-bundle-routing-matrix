@@ -12,6 +12,22 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Placement of the routing-matrix banner (system-reminder redesign, W3):
+#   "prefix"  (default) -- wraps the context module's system-prompt factory
+#       (the surface amplifier-foundation _prepared.py registers via
+#       context.set_system_prompt_factory; context-simple calls it on EVERY
+#       get_messages_for_request) so the banner rides the provider-cached
+#       system block instead of being re-sent as fresh input tokens every
+#       request. Sessions without a factory surface fall back to "inject"
+#       with a one-time WARNING.
+#   "inject" -- inject_context on every provider:request (pre-redesign
+#       behavior, `1e329ce`). Explicit, fully supported rollback lever.
+# The wrapper (<system-reminder source="routing-matrix">) and the pinned
+# context_injection_role="user" are NOT behind this flag -- they are
+# unconditional defects fixes, not preferences (reminder-redesign-spec.md
+# section 9).
+VALID_PLACEMENTS = ("prefix", "inject")
+
 
 async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     """Mount the routing matrix hook.
@@ -20,6 +36,13 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     ``session:start`` and ``provider:request`` hooks.
     """
     config = config or {}
+
+    placement = config.get("placement", "prefix")
+    if placement not in VALID_PLACEMENTS:
+        raise ValueError(
+            f"Invalid placement={placement!r}. "
+            f"Valid values: {', '.join(VALID_PLACEMENTS)}."
+        )
 
     from .matrix_loader import compose_matrix, load_matrix, validate_matrix_config
 
@@ -231,13 +254,23 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         return HookResult(action="continue")
 
     # ------------------------------------------------------------------
-    # Hook 2: provider:request — inject available roles into context
+    # Banner rendering + prefix-placement plumbing (system-reminder
+    # redesign, W3). Mutable closure state lives in these two names;
+    # nested functions rebind them via `nonlocal`.
     # ------------------------------------------------------------------
-    async def on_provider_request(event: str, data: dict[str, Any]) -> Any:
-        if not effective_matrix:
-            return None
+    _prefix_factory: Any = None
+    _prefix_unavailable_logged = False
 
-        from amplifier_core.models import HookResult
+    def _render_banner() -> str:
+        """Render the routing-matrix banner, wrapped and source-attributed.
+
+        Wrapping (<system-reminder source="routing-matrix">...</system-reminder>)
+        is unconditional -- a bare banner is a defect with no legitimate
+        configuration (reminder-redesign-spec.md section 9), independent of
+        placement mode.
+        """
+        if not effective_matrix:
+            return ""
 
         lines = ["Active routing matrix: " + base_matrix.get("name", "unknown")]
         lines.append(
@@ -249,9 +282,102 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             )
             lines.append(f"  {role_name:16s} — {desc}")
 
+        body = "\n".join(lines)
+        return f'<system-reminder source="routing-matrix">\n{body}\n</system-reminder>'
+
+    async def _ensure_prefix_placement() -> bool:
+        """Ensure the banner rides the system prompt (stable prefix).
+
+        Near-verbatim port of tool-skills' ``_ensure_prefix_placement``
+        (amplifier-bundle-skills modules/tool-skills/hooks.py:232-290),
+        adapted to this module's function-closure style. Same disciplines:
+        defensive coordinator.get("context") lookup, refuse to replace a
+        static system prompt (no factory registered), identity check for
+        re-wrap after re-registration, lazy wrap on first provider:request.
+
+        Returns True when the banner is (now) riding the system prompt;
+        False when the surface is unavailable and the caller should fall
+        back to per-request injection.
+        """
+        nonlocal _prefix_factory
+
+        getter = getattr(coordinator, "get", None) if coordinator else None
+        context: Any = getter("context") if callable(getter) else None
+        if context is None or not hasattr(context, "set_system_prompt_factory"):
+            return False
+
+        current = getattr(context, "_system_prompt_factory", None)
+        if current is None:
+            # No factory registered (static-system-message session).
+            # Wrapping would DROP the static system prompt (factory takes
+            # precedence over stored system messages in context-simple),
+            # so refuse and let the caller fall back.
+            return False
+        if current is _prefix_factory:
+            return True  # already wrapped, still active
+
+        base_factory = current
+
+        async def _routing_prefixed_factory() -> str:
+            base = await base_factory()
+            block = _render_banner()
+            return f"{base}\n\n{block}" if block else base
+
+        await context.set_system_prompt_factory(_routing_prefixed_factory)
+        _prefix_factory = _routing_prefixed_factory
+        logger.info(
+            "Routing matrix banner placement: system-prompt prefix (wrapped "
+            "the registered system-prompt factory)"
+        )
+        return True
+
+    # ------------------------------------------------------------------
+    # Hook 2: provider:request — inject available roles into context
+    # ------------------------------------------------------------------
+    async def on_provider_request(event: str, data: dict[str, Any]) -> Any:
+        nonlocal _prefix_unavailable_logged
+
+        if not effective_matrix:
+            return None
+
+        from amplifier_core.models import HookResult
+
+        if placement == "prefix":
+            # Prefix mode: the banner lives in the system prompt (via the
+            # wrapped factory above), never as a per-request injection --
+            # returning continue here is what guarantees the two modes can
+            # never double-inject.
+            if await _ensure_prefix_placement():
+                return HookResult(action="continue")
+            # Placement surface unavailable (no context module / no
+            # factory support). Warn once, then fall back to per-request
+            # injection so the banner is never silently dropped.
+            if not _prefix_unavailable_logged:
+                logger.warning(
+                    "placement='prefix' (the default) but the context "
+                    "module offers no system-prompt factory surface "
+                    "(set_system_prompt_factory). Falling back to "
+                    "per-request injection -- the routing banner will not "
+                    "ride the stable cached prefix. Set placement='inject' "
+                    "to silence this warning."
+                )
+                _prefix_unavailable_logged = True
+
+        banner = _render_banner()
+        if not banner:
+            return None
+
+        # Role pinned to "user", explicitly, overriding the HookResult
+        # default of "system" (amplifier-core/models.py:231-238). System-
+        # role mid-conversation content is hoisted into the provider's
+        # cached system prefix on anthropic/openai/gemini, so a per-turn-
+        # changing block there rewrites the system cache every turn --
+        # this is not behind a flag; see reminder-redesign-spec.md
+        # section 1.2 / section 9.
         return HookResult(
             action="inject_context",
-            context_injection="\n".join(lines),
+            context_injection=banner,
+            context_injection_role="user",
             ephemeral=True,
         )
 
