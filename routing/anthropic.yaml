@@ -9,10 +9,26 @@
 #
 # Required roles: "general" and "fast" must be defined in every matrix.
 # See docs/MATRIX_CURATOR_GUIDE.md for schema details.
+#
+# --- Review log ---
+# 2026-08-31: Evals-gated review of the claude-opus-4-8 -> claude-opus-5
+#   transition (triggered by the claude-opus-5 release). NO CANDIDATE CHANGE
+#   REQUIRED: every opus-tier role below (reasoning, creative, writing,
+#   research, image-gen, critical-ops) already uses the unversioned
+#   `claude-opus-*` glob, which the resolver's version-aware natural sort
+#   (resolver.py::_version_sort_key) ranks by leading digit run and already
+#   places claude-opus-5 above claude-opus-4-8 (5 > 4) with zero YAML edit --
+#   confirmed by modules/hooks-routing/tests/test_resolver.py's existing
+#   "claude-opus-5" fixtures. Gated by two DTU evaluation waves (dial-in
+#   2026-08-30, rebaseline 2026-09-01); see the PR description that
+#   introduced this log entry for full evidence. This entry records that the
+#   review happened and concluded "no edit needed," per
+#   docs/MATRIX_CURATOR_GUIDE.md's refresh process (trigger: major model
+#   release).
 
 name: anthropic
 description: "Anthropic-only routing. All roles use Claude models exclusively."
-updated: "2026-04-22"
+updated: "2026-08-31"
 
 roles:
   general:
