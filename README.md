@@ -6,7 +6,7 @@ The routing hook tries candidates top-to-bottom and uses the first that matches 
 
 ## Matrices
 
-Eight curated matrices ship with this bundle:
+Nine curated matrices ship with this bundle:
 
 | Matrix | When to use |
 |--------|-------------|
@@ -14,7 +14,8 @@ Eight curated matrices ship with this bundle:
 | **quality** | Maximum capability. Uses the strongest models for every role, regardless of cost. |
 | **economy** | Cost-optimized. Prefers free tiers, smaller models, and local providers like Ollama. |
 | **anthropic** | Anthropic Claude models exclusively. |
-| **openai** | OpenAI models exclusively. |
+| **openai** | OpenAI API-backed models exclusively. |
+| **openai-chatgpt** | ChatGPT subscription provider models exclusively; no native image generation. |
 | **gemini** | Google Gemini models exclusively. |
 | **copilot** | GitHub Copilot-optimized. Balances multiplier costs, avoids the 30x fast-variant trap. |
 | **ollama** | Ollama across two instances: `ollama` (local) + `ollama-cloud` (Ollama Cloud). Routes heavy roles to `gpt-oss:120b` on cloud; local fallbacks. Requires both provider instances configured — see [provider README](https://github.com/microsoft/amplifier-module-provider-ollama#mixed-local--cloud-multi-instance). |

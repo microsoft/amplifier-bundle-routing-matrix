@@ -36,8 +36,11 @@ canonical_effort_key: reasoning_effort
 #   github-copilot: provider-github-copilot `REASONING_EFFORT_LEVELS`
 #                   (request_adapter.py) — the provider-wide superset, also
 #                   surfaced to operators as the ConfigField choice list.
+#   openai-chatgpt: provider-openai-chatgpt static model catalog; all routed
+#                   candidates use its conservative documented subset.
 reasoning_effort_values:
   anthropic: [low, medium, high, xhigh, max]
   openai: [none, minimal, low, medium, high, xhigh, max]
+  openai-chatgpt: [none, low, medium, high]
   gemini: [low, medium, high, xhigh]
   github-copilot: [none, low, medium, high, xhigh, max]
