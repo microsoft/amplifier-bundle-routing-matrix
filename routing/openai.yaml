@@ -20,10 +20,28 @@
 # sort picks the highest available version automatically; an unmatched glob
 # falls through to the next candidate, so accounts mid-migration degrade
 # gracefully.
+#
+# reasoning_effort pin on the workhorse roles (2026-09-01): general, coding,
+# and ui-coding now pin `reasoning_effort: high` on their terra candidates.
+# Evidence: a DTU rebaseline wave (S1 diagnostic + S3 5-turn multi-turn
+# build, n=2 each) found gpt-5.6-terra @ high scored 2/2 on both scenarios,
+# while gpt-5.6-sol @ xhigh could not complete a single run inside a 30-minute
+# cap on either scenario, at ~3-7x the cost. A prior dial-in wave
+# (2026-08-30) corroborated terra-high across S1/S3/S4. Both candidates
+# (terra glob and the base-glob migration fallback) carry the same pin so
+# pre-5.6 accounts inherit the same effort. n=2 per cell; sol's S1
+# non-completions are cap-bounded, not graded-wrong -- see PR description
+# for the full write-up. security-audit and critique were left untouched:
+# they already pin terra @ xhigh (a separate, pre-existing design, not sol),
+# outside this evidence's scope. reasoning and critical-ops were left
+# untouched: they already pin sol (xhigh and high respectively) and the
+# deep-diagnosis (S4) evidence still favors sol at high+ effort over sol at
+# medium. creative/writing/research/vision/image-gen are untouched -- terra
+# is untested on those task shapes.
 
 name: openai
 description: "OpenAI-only routing. All roles use OpenAI models exclusively."
-updated: "2026-07-22"
+updated: "2026-09-01"
 
 roles:
   general:
@@ -31,8 +49,12 @@ roles:
     candidates:
       - provider: openai
         model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
       - provider: openai
         model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
 
   fast:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
@@ -47,16 +69,24 @@ roles:
     candidates:
       - provider: openai
         model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
       - provider: openai
         model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
 
   ui-coding:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: openai
         model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
       - provider: openai
         model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
