@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import textwrap
 from pathlib import Path
 from typing import Any
@@ -1058,3 +1059,121 @@ class TestPreresolvedModelsFlow:
         assert "preresolved_models" in written
         assert "anthropic" in written["preresolved_models"]
         assert written["preresolved_models"]["anthropic"] == models
+
+
+class TestUnsupportedEffortRejection:
+    """mount() must reject an inert effort knob, loudly and structurally.
+
+    THE DEFECT (fail-before): `reasoning_effort: high` on a `claude-haiku-*`
+    candidate is a declared key with a legal value on an installed provider, so
+    `validate_matrix_config`'s "closed on values, OPEN on keys" contract passes
+    it (matrix_loader.py:146-154, :219-221). It then survives all the way into
+    the effective matrix, is handed to the child provider as mount config, and
+    is collapsed to nothing at request-build time because Haiku has
+    supports_output_config=False and supports_adaptive_thinking=False
+    (provider-anthropic __init__.py:1541-1550, :3024-3046). Nothing logs
+    anything. Measured consequence: anth-haiku-high (n=702) and
+    anth-haiku-medium (n=736) were byte-identical configurations for a whole
+    wave -- two of sixteen cells silently duplicated.
+    """
+
+    @staticmethod
+    def _haiku_effort_bundle(tmp_path: Path) -> Path:
+        bundle_root = tmp_path / "bundle"
+        routing_dir = bundle_root / "routing"
+        routing_dir.mkdir(parents=True)
+        (routing_dir / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Test balanced"
+                updated: "2026-01-01"
+                roles:
+                  general:
+                    description: "General purpose"
+                    candidates:
+                      - provider: anthropic
+                        model: claude-sonnet-5
+                        config:
+                          reasoning_effort: xhigh
+                  fast:
+                    description: "Fast tasks"
+                    candidates:
+                      - provider: anthropic
+                        model: claude-haiku-*
+                        config:
+                          reasoning_effort: high
+                          temperature: 1.0
+            """)
+        )
+        return bundle_root
+
+    @pytest.mark.asyncio
+    async def test_mount_strips_inert_effort_from_the_effective_matrix(
+        self, tmp_path: Path
+    ) -> None:
+        bundle_root = self._haiku_effort_bundle(tmp_path)
+        coordinator = _make_coordinator(providers={"provider-anthropic": MagicMock()})
+        coordinator.register_capability = MagicMock()
+
+        await mount(
+            coordinator,
+            config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
+        )
+
+        stored = _resolver_from(coordinator)._matrix_roles
+        haiku_cfg = stored["fast"]["candidates"][0]["config"]
+        assert "reasoning_effort" not in haiku_cfg, (
+            "mount() left an inert reasoning_effort on a claude-haiku-* candidate. "
+            "Haiku collapses every effort above 'low' to the same request, so this "
+            "setting is dead data that downstream consumers will report as applied."
+        )
+        # A targeted rejection, not a purge: unrelated knobs survive...
+        assert haiku_cfg["temperature"] == 1.0
+        # ...and a model that DOES honour effort is untouched.
+        assert (
+            stored["general"]["candidates"][0]["config"]["reasoning_effort"] == "xhigh"
+        )
+
+    @pytest.mark.asyncio
+    async def test_mount_logs_a_named_actionable_error(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Silent is the bug. The rejection must name key, candidate and fix."""
+        bundle_root = self._haiku_effort_bundle(tmp_path)
+        coordinator = _make_coordinator(providers={"provider-anthropic": MagicMock()})
+        coordinator.register_capability = MagicMock()
+
+        with caplog.at_level(logging.ERROR, logger="amplifier_module_hooks_routing"):
+            await mount(
+                coordinator,
+                config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
+            )
+
+        blob = "\n".join(r.getMessage() for r in caplog.records)
+        assert "reasoning_effort" in blob
+        assert "claude-haiku-*" in blob
+        assert "fast" in blob
+        assert "REJECTED" in blob
+        # actionable: names the replacement knob AND its exact value
+        assert "thinking_budget_tokens" in blob
+        assert "32000" in blob
+
+    @pytest.mark.asyncio
+    async def test_clean_matrix_logs_no_rejection(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """No false positives: a matrix with no inert effort stays quiet."""
+        routing_dir = _write_matrix(tmp_path)
+        coordinator = _make_coordinator(providers={"provider-anthropic": MagicMock()})
+        coordinator.register_capability = MagicMock()
+
+        with caplog.at_level(logging.ERROR, logger="amplifier_module_hooks_routing"):
+            await mount(
+                coordinator,
+                config={
+                    "default_matrix": "balanced",
+                    "_bundle_root": str(routing_dir.parent),
+                },
+            )
+
+        assert not [r for r in caplog.records if "REJECTED" in r.getMessage()]

@@ -51,7 +51,12 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             f"Valid values: {', '.join(VALID_PLACEMENTS)}."
         )
 
-    from .matrix_loader import compose_matrix, load_matrix, validate_matrix_config
+    from .matrix_loader import (
+        compose_matrix,
+        load_matrix,
+        strip_unsupported_effort,
+        validate_matrix_config,
+    )
 
     # --- Locate the routing directory ---
     # Accept an explicit override for testing; otherwise use __file__ traversal
@@ -131,6 +136,39 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         )
         if capability_overrides:
             effective_matrix = compose_matrix(effective_matrix, capability_overrides)
+
+    # --- Reject effort keys the MODEL will never honour ---
+    # A DIFFERENT class from the value validation below, which structurally
+    # cannot catch this one: `reasoning_effort: high` on a claude-haiku-*
+    # candidate is a DECLARED key with a LEGAL value on an INSTALLED provider,
+    # so it passes -- and is then collapsed to nothing when the request is
+    # built, because Haiku resolves every effort above 'low' to the same
+    # thinking budget. Measured consequence: anth-haiku-high (n=702) and
+    # anth-haiku-medium (n=736) were byte-identical configurations for a whole
+    # evaluation wave. Name it, then REMOVE it, so nothing downstream can carry
+    # an effort the model ignored and report it as applied.
+    #
+    # ERROR, not WARNING: the value-validation block below warns about a
+    # mistyped value, which is a typo. This is a config that cannot work as
+    # written on any value.
+    #
+    # Strip-and-continue rather than raise: a bad matrix must not take a
+    # session down, and the offending key is dead data either way -- removing
+    # it changes no wire behaviour, it only stops the lie.
+    if effective_matrix:
+        effective_matrix, unsupported_errors = strip_unsupported_effort(
+            {"roles": effective_matrix}
+        )
+        effective_matrix = effective_matrix.get("roles", {})
+        if unsupported_errors:
+            logger.error("[ROUTING] Inert config in matrix %s:", matrix_path)
+            for err in unsupported_errors:
+                logger.error("[ROUTING]   %s", err)
+            logger.error(
+                "[ROUTING]   Key REMOVED from the effective matrix. "
+                "Fix with: amplifier routing edit %s",
+                default_matrix_name,
+            )
 
     # --- Validate composed matrix config values ---
     # Catches provider-declared `choice` fields (e.g. reasoning_effort) set to
