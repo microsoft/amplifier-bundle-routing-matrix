@@ -51,7 +51,12 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             f"Valid values: {', '.join(VALID_PLACEMENTS)}."
         )
 
-    from .matrix_loader import compose_matrix, load_matrix, validate_matrix_config
+    from .matrix_loader import (
+        compose_matrix,
+        load_matrix,
+        strip_inert_config,
+        validate_matrix_config,
+    )
 
     # --- Locate the routing directory ---
     # Accept an explicit override for testing; otherwise use __file__ traversal
@@ -131,6 +136,42 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         )
         if capability_overrides:
             effective_matrix = compose_matrix(effective_matrix, capability_overrides)
+
+    # --- Reject config keys the target will never act on ---
+    # A DIFFERENT class from the value validation below, which structurally
+    # cannot catch this one: `reasoning_effort` on a `gemini` candidate is an
+    # UNDECLARED key, so validate_matrix_config takes its explicit
+    # "undeclared key -- the open-key rule. Pass silently" branch
+    # (matrix_loader.py:219-221). The key then rides into the effective
+    # matrix, is merged into the child provider's mount config, and is read by
+    # nobody -- gemini consumes a closed set of 15 mount-config keys and no
+    # effort key is among them. The VALUE is irrelevant: every level is
+    # equally inert, because the read never happens.
+    #
+    # Name it, then REMOVE it, so nothing downstream can carry a setting the
+    # target ignored and report it as applied.
+    #
+    # ERROR, not WARNING: the value-validation block below warns about a
+    # mistyped value, which is a typo. This is a config that cannot work as
+    # written on ANY value.
+    #
+    # Strip-and-continue rather than raise: a bad matrix must not take a
+    # session down, and the offending key is dead data either way -- removing
+    # it changes no wire behaviour, it only stops the lie.
+    if effective_matrix:
+        effective_matrix, inert_errors = strip_inert_config(
+            {"roles": effective_matrix}
+        )
+        effective_matrix = effective_matrix.get("roles", {})
+        if inert_errors:
+            logger.error("[ROUTING] Inert config in matrix %s:", matrix_path)
+            for err in inert_errors:
+                logger.error("[ROUTING]   %s", err)
+            logger.error(
+                "[ROUTING]   Key REMOVED from the effective matrix. "
+                "Fix with: amplifier routing edit %s",
+                default_matrix_name,
+            )
 
     # --- Validate composed matrix config values ---
     # Catches provider-declared `choice` fields (e.g. reasoning_effort) set to

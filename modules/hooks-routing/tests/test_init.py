@@ -1058,3 +1058,203 @@ class TestPreresolvedModelsFlow:
         assert "preresolved_models" in written
         assert "anthropic" in written["preresolved_models"]
         assert written["preresolved_models"]["anthropic"] == models
+
+
+# ---------------------------------------------------------------------------
+# Inert config-key rejection (model_performance-565)
+# ---------------------------------------------------------------------------
+
+
+def _write_gemini_effort_matrix(tmp_path: Path) -> Path:
+    """Write a matrix whose gemini candidate carries an inert effort key.
+
+    This is the shape 14 shipped candidates had: a `gemini` candidate whose
+    only `config:` entry is `reasoning_effort`, a key provider-gemini never
+    reads from mount config at any value.
+    """
+    bundle_root = tmp_path / "bundle"
+    routing_dir = bundle_root / "routing"
+    routing_dir.mkdir(parents=True)
+    content = textwrap.dedent("""\
+        name: balanced
+        description: "Test balanced"
+        updated: "2026-01-01"
+        roles:
+          general:
+            description: "General purpose"
+            candidates:
+              - provider: anthropic
+                model: claude-sonnet-4-20250514
+          reasoning:
+            description: "Deep reasoning"
+            candidates:
+              - provider: gemini
+                model: gemini-*-pro-preview
+                config:
+                  reasoning_effort: high
+          critique:
+            description: "Analytical evaluation"
+            candidates:
+              - provider: gemini
+                model: gemini-*-pro-preview
+                config:
+                  reasoning_effort: xhigh
+                  temperature: 1.0
+    """)
+    (routing_dir / "balanced.yaml").write_text(content)
+    return bundle_root
+
+
+class TestInertConfigRejection:
+    """mount() must not hand a gemini candidate an effort key it never reads."""
+
+    @pytest.mark.asyncio
+    async def test_mount_strips_inert_effort_from_the_effective_matrix(
+        self, tmp_path: Path
+    ) -> None:
+        """The defect itself: an inert key surviving into the effective matrix.
+
+        This is the strong fail-before -- it asserts the DEFECT, not a missing
+        import. Before the guard, the key rode all the way into the resolver's
+        matrix and every downstream consumer would report it as applied.
+        """
+        bundle_root = _write_gemini_effort_matrix(tmp_path)
+        coordinator = _make_coordinator()
+
+        await mount(
+            coordinator,
+            config={
+                "default_matrix": "balanced",
+                "_bundle_root": str(bundle_root),
+            },
+        )
+
+        stored = _resolver_from(coordinator)._matrix_roles
+        gemini_cfg = stored["reasoning"]["candidates"][0].get("config", {})
+        assert "reasoning_effort" not in gemini_cfg, (
+            "mount() left an inert reasoning_effort on a gemini candidate. "
+            "provider-gemini never reads an effort key from mount config at "
+            "any value, so this setting is dead data that downstream "
+            "consumers will report as applied."
+        )
+
+    @pytest.mark.asyncio
+    async def test_mount_preserves_sibling_keys_on_a_stripped_candidate(
+        self, tmp_path: Path
+    ) -> None:
+        """Only the inert key is removed -- a live sibling key survives."""
+        bundle_root = _write_gemini_effort_matrix(tmp_path)
+        coordinator = _make_coordinator()
+
+        await mount(
+            coordinator,
+            config={
+                "default_matrix": "balanced",
+                "_bundle_root": str(bundle_root),
+            },
+        )
+
+        stored = _resolver_from(coordinator)._matrix_roles
+        critique_cfg = stored["critique"]["candidates"][0]["config"]
+        assert "reasoning_effort" not in critique_cfg
+        assert critique_cfg["temperature"] == 1.0
+
+    @pytest.mark.asyncio
+    async def test_mount_leaves_non_gemini_candidates_untouched(
+        self, tmp_path: Path
+    ) -> None:
+        """The guard is scoped by evidence -- it must not strip anything else.
+
+        A provider this guard has no evidence about is not asserted to ignore
+        anything; over-reaching would silently delete working settings.
+        """
+        bundle_root = tmp_path / "bundle"
+        routing_dir = bundle_root / "routing"
+        routing_dir.mkdir(parents=True)
+        (routing_dir / "balanced.yaml").write_text(
+            textwrap.dedent("""\
+                name: balanced
+                description: "Test balanced"
+                updated: "2026-01-01"
+                roles:
+                  reasoning:
+                    description: "Deep reasoning"
+                    candidates:
+                      - provider: openai
+                        model: gpt-5.2
+                        config:
+                          reasoning_effort: high
+            """)
+        )
+        coordinator = _make_coordinator()
+
+        await mount(
+            coordinator,
+            config={
+                "default_matrix": "balanced",
+                "_bundle_root": str(bundle_root),
+            },
+        )
+
+        stored = _resolver_from(coordinator)._matrix_roles
+        assert (
+            stored["reasoning"]["candidates"][0]["config"]["reasoning_effort"]
+            == "high"
+        )
+
+    @pytest.mark.asyncio
+    async def test_mount_logs_a_named_actionable_error(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The operator must be told the key, the candidate, and the fix.
+
+        Before the guard this assertion failed against the EMPTY STRING --
+        the loader had nothing at all to say about a key it was dropping.
+        """
+        import logging
+
+        bundle_root = _write_gemini_effort_matrix(tmp_path)
+        coordinator = _make_coordinator()
+
+        with caplog.at_level(logging.ERROR):
+            await mount(
+                coordinator,
+                config={
+                    "default_matrix": "balanced",
+                    "_bundle_root": str(bundle_root),
+                },
+            )
+
+        blob = "\n".join(r.getMessage() for r in caplog.records)
+        # names the KEY
+        assert "reasoning_effort" in blob
+        # names the CANDIDATE
+        assert "gemini/gemini-*-pro-preview" in blob
+        assert "Role 'reasoning' candidate 0" in blob
+        # names WHAT TO USE INSTEAD
+        assert "extra_request_params" in blob
+        assert "thinking_level" in blob
+        # names the remediation command
+        assert "amplifier routing edit balanced" in blob
+
+    @pytest.mark.asyncio
+    async def test_mount_stays_silent_on_a_clean_matrix(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """No inert keys -> no ERROR noise."""
+        import logging
+
+        routing_dir = _write_matrix(tmp_path)
+        coordinator = _make_coordinator()
+
+        with caplog.at_level(logging.ERROR):
+            await mount(
+                coordinator,
+                config={
+                    "default_matrix": "balanced",
+                    "_bundle_root": str(routing_dir.parent),
+                },
+            )
+
+        blob = "\n".join(r.getMessage() for r in caplog.records)
+        assert "Inert config" not in blob

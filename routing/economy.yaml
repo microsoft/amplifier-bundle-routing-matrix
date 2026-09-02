@@ -113,8 +113,6 @@ roles:
           reasoning_effort: high
       - provider: gemini
         model: gemini-*-pro-preview
-        config:
-          reasoning_effort: high
       - provider: github-copilot
         model: claude-sonnet-4.6
         config:
@@ -154,8 +152,6 @@ roles:
           reasoning_effort: xhigh
       - provider: gemini
         model: gemini-*-pro-preview
-        config:
-          reasoning_effort: xhigh
       - provider: github-copilot
         model: gpt-5.5
         config:
