@@ -203,6 +203,19 @@ Only include `config` when a candidate genuinely needs different parameters from
 > each annotated with the provider constant it was read from. Read them
 > there, and extend them there when providers add keys or values.
 
+> **A legal value is not the same as an honoured one.** Value validation is
+> *closed on values and open on keys*: it can only catch a value the provider
+> declares as invalid. It cannot catch a legal value on a model that will not
+> act on it. `reasoning_effort` on a `claude-haiku-*` candidate is the
+> measured case — Haiku collapses every level above `low` into one identical
+> request, so `anth-haiku-high` and `anth-haiku-medium` were byte-identical
+> configurations for a whole evaluation wave (n=1,438 requests, effort ABSENT
+> on the wire, `thinking.budget_tokens` pinned at 32000). The loader now
+> **rejects** those keys at mount: it logs a named ERROR and **removes the key
+> from the effective matrix**, so nothing downstream can report an effort as
+> applied that the model ignored. To move Haiku's reasoning dial, set
+> `thinking_budget_tokens` directly.
+
 ---
 
 ## Adding a New Role
