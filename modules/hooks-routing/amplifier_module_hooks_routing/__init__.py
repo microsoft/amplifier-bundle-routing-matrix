@@ -132,6 +132,27 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         if capability_overrides:
             effective_matrix = compose_matrix(effective_matrix, capability_overrides)
 
+    # --- Knob-consistent routing: parse the optional `preset:` block ---
+    # A matrix with no `preset:` key yields None here, and None is the
+    # default-off signal every downstream branch checks. Every shipped matrix
+    # in routing/ except the explicitly-named knob-consistent one has no
+    # `preset:` key, so this is None for all of them.
+    from .knob_consistency import EscalationState, parse_preset, validate_preset
+
+    preset = parse_preset(base_matrix)
+    if preset is not None:
+        preset_errors = validate_preset(base_matrix)
+        if preset_errors:
+            raise ValueError(
+                f"Invalid preset: block in matrix {matrix_path}:\n  "
+                + "\n  ".join(preset_errors)
+            )
+    escalations = (
+        EscalationState(max_uses=preset.escalate_max_uses)
+        if preset is not None and preset.active
+        else None
+    )
+
     # --- Validate composed matrix config values ---
     # Catches provider-declared `choice` fields (e.g. reasoning_effort) set to
     # invalid values that the provider would otherwise silently warn about and
@@ -142,6 +163,19 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             {"roles": effective_matrix}, _validation_providers, coordinator
         )
         if config_errors:
+            # "Fail loud on an unknown effort value" (ROUTING-PROPOSAL.md
+            # section 2.2). Today this validation only warns, because it has
+            # always run against every legacy matrix and cannot start
+            # rejecting them. A matrix that opts into `preset:` is new by
+            # definition, so it can be held to the stricter bar without
+            # breaking anyone -- and a preset whose effort values are inert is
+            # a preset that silently does not do what it says.
+            if preset is not None:
+                raise ValueError(
+                    f"Invalid config in preset-bearing matrix {matrix_path} "
+                    f"(these values are IGNORED by the provider):\n  "
+                    + "\n  ".join(config_errors)
+                )
             logger.warning("[ROUTING] Invalid config in matrix %s:", matrix_path)
             for err in config_errors:
                 logger.warning("[ROUTING]   %s", err)
@@ -150,6 +184,27 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                 "Fix with: amplifier routing edit %s",
                 default_matrix_name,
             )
+
+    # --- Clamp reporting: emit, never inject ---
+    # W2-S4 anti-pattern #6: injected telemetry becomes class-B context at
+    # best and prefix mutation at worst. The record goes to the event log.
+    async def _emit_clamp(record: Any) -> None:
+        logger.info(
+            "[ROUTING] intent-clamped role=%s mode=%s honored=%s "
+            "requested=%s granted=%s reason=%s",
+            record.role,
+            record.mode,
+            record.honored,
+            record.requested_model,
+            record.granted_model,
+            record.reason,
+        )
+        hooks_bus = coordinator.get("hooks") if hasattr(coordinator, "get") else None
+        # Duck-typed on purpose: a coordinator-like object without an event
+        # bus must degrade to log-only, never raise into resolution. Routing
+        # a delegate is the job; reporting on it is not allowed to break it.
+        if hooks_bus is not None and hasattr(hooks_bus, "emit"):
+            await hooks_bus.emit("routing:intent-clamped", record.to_dict())
 
     # --- Register the model_role_resolver capability ---
     # Consumers: tool-delegate, hooks-session-naming, tool-recipes, tool-skills.
@@ -166,6 +221,9 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             providers=_resolver_providers,
             matrix_name=base_matrix.get("name", default_matrix_name),
             coordinator=coordinator,
+            preset=preset,
+            on_clamp=_emit_clamp,
+            escalations=escalations,
         )
         coordinator.register_capability("model_role_resolver", _resolver)
 
@@ -202,11 +260,40 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             (routing_cap or {}).get("preresolved_models", {})
         )
 
+        # Knob-consistent routing, level 3. Derived ONCE per session:start from
+        # this session's own provider mount config -- the caller's resolved
+        # (family, model, effort) is already recorded there by whoever spawned
+        # or configured this session. See knob_consistency.derive_caller_context.
+        caller_context = None
+        if preset is not None and preset.active:
+            from .knob_consistency import derive_caller_context
+
+            caller_context = derive_caller_context(coordinator, preset)
+            if caller_context is None:
+                logger.warning(
+                    "[ROUTING] preset %r requests inherit=%s but this session's "
+                    "own model could not be determined from its provider mount "
+                    "config -- inheritance is INACTIVE for this session "
+                    "(matrix candidates used as-is).",
+                    base_matrix.get("name", default_matrix_name),
+                    preset.inherit,
+                )
+
         async def _resolve_one(agent_cfg: dict[str, Any]) -> None:
             """Resolve model_role for a single agent and patch agent_cfg in-place."""
             model_role = agent_cfg.get("model_role")
             if not model_role:
                 return
+            # Precedence: an agent whose frontmatter carries an explicit
+            # `provider_preferences` pin is at level 2, ABOVE inherited caller
+            # intent at level 3. Inheritance is a default, never a ceiling on
+            # explicit intent -- so an author who deliberately asked for a
+            # specialist model still gets one. (This does not change the
+            # pre-existing behaviour of overwriting that key from model_role:
+            # only the clamp is skipped, and only when a preset is active.)
+            agent_caller_context = (
+                None if "provider_preferences" in agent_cfg else caller_context
+            )
             # Normalise to list
             if isinstance(model_role, str):
                 model_role = [model_role]
@@ -215,6 +302,10 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                 effective_matrix,
                 providers,
                 preresolved_models=preresolved_models,
+                caller_context=agent_caller_context,
+                preset=preset if agent_caller_context is not None else None,
+                escalations=escalations,
+                on_clamp=_emit_clamp,
             )
             if resolved:
                 # Preserve the per-candidate `config` block (e.g. reasoning_effort)
