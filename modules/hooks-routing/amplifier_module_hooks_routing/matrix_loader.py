@@ -3,10 +3,145 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Sequence
+from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+# ---------------------------------------------------------------------------
+# Where a matrix actually came from (shadowing observability)
+# ---------------------------------------------------------------------------
+#
+# The search order is `[*custom_routing_dirs, bundle routing/]`, first hit wins
+# (``mount()`` in __init__.py). That precedence is DELIBERATE -- a user file is
+# meant to beat the shipped default -- and this module does not change it.
+#
+# What it does change is that the outcome used to be invisible. A same-named
+# file in ~/.amplifier/routing/ made the shipped matrix dead, and nothing
+# logged, warned about, or exposed that fact; the winning path appeared only
+# inside the "Matrix file not found" warning, i.e. only when loading FAILED.
+# Every matrix change shipped in the bundle is inert on such a host, and the
+# operator has no way to tell. `resolve_matrix_source` returns the whole
+# picture -- winner, source, and everything the winner shadowed -- so the
+# caller can say so out loud.
+
+USER_SOURCE = "user"
+BUNDLE_SOURCE = "bundle"
+
+
+@dataclass(frozen=True)
+class MatrixSource:
+    """The resolved provenance of one named matrix.
+
+    Attributes:
+        name: The REQUESTED matrix name (the file stem, e.g. ``"openai"``),
+            which is what ``amplifier routing edit <name>`` takes. This is not
+            necessarily the ``name:`` field declared inside the YAML.
+        path: The file that won, or ``None`` when no candidate exists.
+        source: ``"user"`` or ``"bundle"`` for the winner; ``None`` when
+            nothing was found.
+        shadowed: ``(path, source)`` for every same-named file that exists but
+            lost, in search order. Empty when nothing is shadowed.
+        searched: Every candidate path considered, in precedence order.
+    """
+
+    name: str
+    path: Path | None = None
+    source: str | None = None
+    shadowed: tuple[tuple[Path, str], ...] = ()
+    searched: tuple[Path, ...] = field(default=())
+
+    @property
+    def is_shadowed(self) -> bool:
+        """True when the winner suppressed at least one same-named file."""
+        return bool(self.shadowed)
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-safe telemetry payload (paths stringified)."""
+        return {
+            "matrix_name": self.name,
+            "matrix_path": str(self.path) if self.path is not None else None,
+            "matrix_source": self.source,
+            "matrix_shadowed": self.is_shadowed,
+            "shadowed_paths": [str(p) for p, _ in self.shadowed],
+        }
+
+
+def resolve_matrix_source(
+    name: str,
+    custom_routing_dirs: Sequence[Path],
+    bundle_routing_dir: Path,
+) -> MatrixSource:
+    """Resolve which ``<name>.yaml`` wins, and what it shadows.
+
+    **Precedence is unchanged** and is the single rule implemented here: the
+    first existing ``<name>.yaml`` in ``[*custom_routing_dirs,
+    bundle_routing_dir]`` wins. The extra return values describe that outcome;
+    they never influence it.
+
+    Two aliasing details, both of which would otherwise produce a FALSE
+    shadowing report:
+
+    * A custom dir that IS the bundle's own routing dir (or a symlink/relative
+      path to it) is labelled ``"bundle"``, not ``"user"`` -- provenance is
+      decided by where the file actually lives, not by which argument carried
+      the directory.
+    * The same file reached twice (duplicate entry, symlink, ``.`` segments)
+      is counted once. A file cannot shadow itself.
+
+    Args:
+        name: Matrix name without the ``.yaml`` suffix.
+        custom_routing_dirs: User routing dirs, highest priority first.
+        bundle_routing_dir: The bundle's own ``routing/`` dir (lowest priority).
+
+    Returns:
+        A :class:`MatrixSource`. ``path`` is ``None`` when no candidate exists.
+    """
+    filename = f"{name}.yaml"
+
+    def _key(path: Path) -> Path:
+        try:
+            return path.resolve()
+        except OSError:  # pragma: no cover - exotic filesystem states
+            return path
+
+    bundle_key = _key(bundle_routing_dir)
+
+    candidates: list[tuple[Path, str]] = [
+        (
+            Path(d) / filename,
+            BUNDLE_SOURCE if _key(Path(d)) == bundle_key else USER_SOURCE,
+        )
+        for d in custom_routing_dirs
+    ]
+    candidates.append((bundle_routing_dir / filename, BUNDLE_SOURCE))
+
+    searched: list[Path] = []
+    present: list[tuple[Path, str]] = []
+    seen: set[Path] = set()
+    for candidate, origin in candidates:
+        candidate_key = _key(candidate)
+        if candidate_key in seen:
+            continue
+        seen.add(candidate_key)
+        searched.append(candidate)
+        if candidate.exists():
+            present.append((candidate, origin))
+
+    if not present:
+        return MatrixSource(name=name, searched=tuple(searched))
+
+    winner, winner_source = present[0]
+    return MatrixSource(
+        name=name,
+        path=winner,
+        source=winner_source,
+        shadowed=tuple(present[1:]),
+        searched=tuple(searched),
+    )
 
 
 def load_matrix(path: str | Path) -> dict[str, Any]:

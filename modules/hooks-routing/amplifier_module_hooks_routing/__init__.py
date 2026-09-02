@@ -54,6 +54,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     from .matrix_loader import (
         compose_matrix,
         load_matrix,
+        resolve_matrix_source,
         strip_unsupported_effort,
         validate_matrix_config,
     )
@@ -90,19 +91,51 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # Search custom dirs first (priority), then fall back to the bundle's own
     # routing/ dir so shipped matrices (balanced, anthropic, etc.) still work.
     default_matrix_name = config.get("default_matrix", "balanced")
-    search_dirs = [*custom_routing_dirs, routing_dir]
-    matrix_path = next(
-        (
-            candidate
-            for search_dir in search_dirs
-            if (candidate := search_dir / f"{default_matrix_name}.yaml").exists()
-        ),
-        None,
+    # PRECEDENCE IS UNCHANGED by this call: `resolve_matrix_source` implements
+    # the same "first existing <name>.yaml in [*custom_routing_dirs,
+    # routing_dir] wins" rule this line has always had. What it adds is the
+    # REST of the picture -- which file won, whether it is a user file or the
+    # shipped one, and every same-named file it suppressed -- so the outcome
+    # can be reported instead of silently applied.
+    matrix_origin = resolve_matrix_source(
+        default_matrix_name, custom_routing_dirs, routing_dir
     )
+    matrix_path = matrix_origin.path
 
     base_matrix: dict[str, Any] = {}
     if matrix_path is not None:
         base_matrix = load_matrix(matrix_path)
+        # Unconditional, at INFO: before this, the winning path appeared ONLY
+        # inside the not-found warning below -- i.e. the file that actually
+        # decided this session's routing was named only when loading FAILED.
+        # Forensics on a successful load had to guess, and did guess wrong.
+        logger.info(
+            "[ROUTING] matrix %r loaded from %s (source=%s)",
+            default_matrix_name,
+            matrix_path,
+            matrix_origin.source,
+        )
+        if matrix_origin.is_shadowed:
+            # WARNING, not INFO: a shipped matrix being dead is not a status
+            # detail. Every bundle-side change to the shadowed file -- including
+            # anything a bundle update delivers -- is inert on this host, and
+            # nothing else anywhere says so. Report; do NOT change precedence:
+            # the user file winning may be exactly what its author intended.
+            logger.warning(
+                "[ROUTING] matrix %r is SHADOWED — %s (source=%s) WINS and is "
+                "the only file in effect; same-named matrix file(s) IGNORED: "
+                "%s. Edits to the ignored file(s), including anything shipped "
+                "in a bundle update, have NO effect on this session. To use a "
+                "shadowed file instead, remove or rename %s.",
+                default_matrix_name,
+                matrix_path,
+                matrix_origin.source,
+                ", ".join(
+                    f"{path} (source={origin})"
+                    for path, origin in matrix_origin.shadowed
+                ),
+                matrix_path,
+            )
     else:
         logger.warning(
             "Matrix file not found: %s — routing disabled",
@@ -262,6 +295,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             preset=preset,
             on_clamp=_emit_clamp,
             escalations=escalations,
+            matrix_origin=matrix_origin,
         )
         coordinator.register_capability("model_role_resolver", _resolver)
 
@@ -269,6 +303,28 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # Hook 1: session:start — resolve model_role for all agents
     # ------------------------------------------------------------------
     async def on_session_start(event: str, data: dict[str, Any]) -> Any:
+        # Effective-source telemetry, emitted ONCE per session on the same
+        # event surface this module already uses for clamp records (never
+        # injected -- W2-S4 anti-pattern #6). Emitted here rather than at
+        # mount() because listeners are not registered yet at mount time, so a
+        # mount-time emit would land in an empty room.
+        #
+        # This is what makes the shadowed-file class of forensic error
+        # impossible to repeat: the file that decided routing is now IN the
+        # event log, alongside what it shadowed, instead of having to be
+        # inferred from a raw wire capture after the fact.
+        if matrix_path is not None:
+            try:
+                _hooks_bus = (
+                    coordinator.get("hooks") if hasattr(coordinator, "get") else None
+                )
+                if _hooks_bus is not None and hasattr(_hooks_bus, "emit"):
+                    await _hooks_bus.emit(
+                        "routing:matrix-loaded", matrix_origin.to_dict()
+                    )
+            except Exception:  # pragma: no cover - reporting must never break routing
+                logger.warning("routing matrix-source reporting failed", exc_info=True)
+
         providers = coordinator.get("providers") or {}
         agents = (
             coordinator.config.get("agents", {})

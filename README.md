@@ -263,6 +263,24 @@ roles:
 
 Place custom matrix files in `routing/` within this bundle, or reference them from your own bundle.
 
+### Where a matrix is loaded from (and what shadows what)
+
+`hooks-routing` resolves `default_matrix: <name>` to the **first existing `<name>.yaml`** in this order:
+
+1. each configured user routing dir, in order (`custom_routing_dirs`, which the CLI populates with `~/.amplifier/routing/`)
+2. this bundle's own `routing/` dir
+
+First hit wins; nothing is merged. A user file therefore **shadows** a shipped matrix of the same name — deliberately, so a local override beats the default — which also means **every change shipped in this bundle's copy of that matrix has no effect on that host.** `amplifier routing create` / `edit` write into `~/.amplifier/routing/`, so this is easy to end up in without noticing.
+
+Because that outcome used to be invisible, the loader now reports it:
+
+- the winning file is logged at INFO on every load: `[ROUTING] matrix 'openai' loaded from <path> (source=user|bundle)`
+- when a same-named file is shadowed, a **WARNING** names the winner *and* every file it suppressed
+- the registered `model_role_resolver` capability exposes `matrix_path`, `matrix_source` (`"user"` / `"bundle"`) and `shadowed_paths`
+- a `routing:matrix-loaded` event carries the same fields once per session
+
+To make a shipped matrix take effect again, remove or rename the shadowing file (or point `default_matrix` at a name the user dir does not define).
+
 See [docs/MATRIX_CURATOR_GUIDE.md](docs/MATRIX_CURATOR_GUIDE.md) for detailed authoring guidance.
 
 ## Contributing
