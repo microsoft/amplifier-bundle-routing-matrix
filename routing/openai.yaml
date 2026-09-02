@@ -38,6 +38,27 @@
 # deep-diagnosis (S4) evidence still favors sol at high+ effort over sol at
 # medium. creative/writing/research/vision/image-gen are untouched -- terra
 # is untested on those task shapes.
+#
+# reasoning role effort pin (2026-09-02): `reasoning` keeps sol @ xhigh, and
+# that value is now MEASURED rather than inherited. LEAD-6
+# (`model_performance-bm1`, $0.25, n=5/arm, 10 interleaved requests on
+# gpt-5.6-sol, all raw wire fields) compared xhigh against max and found them
+# NOT SEPARABLE: reasoning_tokens max:xhigh 1.091, wall 1.068, cost/request
+# 1.084 -- all far under the pre-registered 1.5x gate -- while within-arm
+# spread EXCEEDED the between-arm difference (xhigh 565-980 = 1.73x, max
+# 463-1110 = 2.40x, ranges fully overlapping; both the cheapest and the most
+# expensive request in the probe were `max`). `response.reasoning.effort`
+# echoed the sent value 10/10, so max is genuinely accepted, not silently
+# coerced -- the null is real, not a rejected-parameter artefact. NO QUALITY
+# CLAIM is attached (blocked on cb2) and the probe is one short single-turn
+# shape at n=5; this is de-risking an unbounded-latency default, not a win.
+# Raising this role to `max` needs NEW evidence --
+# tests/test_reasoning_role_effort.py locks the value and says why. Evidence:
+# probes/lead6-xhigh-vs-max/FINDINGS.md in the evals repo, raw captures under
+# .amplifier/evaluation/treatment-validation/20260902-bm1/.
+# NOTE: a candidate that pins NO effort inherits the resolved provider
+# INSTANCE's own default -- which is how a `sol` candidate can run at max
+# without any matrix saying so. Keep the pin explicit.
 
 name: openai
 description: "OpenAI-only routing. All roles use OpenAI models exclusively."
