@@ -1,28 +1,42 @@
 # Routing Matrix: copilot
 #
-# GitHub Copilot-optimized routing. Balances Copilot multiplier costs.
-# Avoids the 30x claude-opus-fast trap. Uses Haiku (0.33x) for budget roles.
-# Use when GitHub Copilot is your primary or only provider.
+# GitHub Copilot-only routing. All roles use models Copilot serves.
+# Use when you want to run entirely on your GitHub Copilot subscription.
 #
-# NOTE: Copilot models are PINNED (not globbed). The github-copilot provider's
-# list_models() has NO static fallback — if the SDK or disk cache is unavailable,
-# it raises and glob resolution fails. Pinning avoids this fragility. Bump
-# manually when new model versions appear in the Copilot API.
+# Pin strategy: exact names, no globs. A glob needs a successful list_models(),
+# which this provider serves from the API, then a disk cache, then gives up —
+# so bump these pins manually as new versions appear.
+#
+# One candidate per role: every candidate here is an exact pin on the same
+# provider, and the resolver stops at the first one without checking that the
+# model exists, so a second would be unreachable. Fallback needs a candidate on
+# a different provider.
+#
+# reasoning_effort is an operator default; a caller-supplied effort wins. A
+# level the pinned model does not advertise is dropped rather than rejected, so
+# check `amplifier provider models github-copilot` before changing one.
+#
+# Required roles: "general" and "fast" must be defined in every matrix.
+# See docs/MATRIX_CURATOR_GUIDE.md for schema details.
 
 name: copilot
-description: "GitHub Copilot-optimized routing. Balances multiplier costs, avoids 30x trap."
-updated: "2026-06-30"
+description: "GitHub Copilot-only routing. Strongest model per role across the Claude, GPT and Gemini families Copilot serves."
+updated: "2026-07-28"
 
 roles:
   general:
     description: "Versatile catch-all, no specialization needed"
     candidates:
       - provider: github-copilot
-        model: claude-haiku-4.5
+        model: claude-sonnet-5
+        config:
+          reasoning_effort: high
 
   fast:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
+      # Keep this non-reasoning: the session-naming hook caps this role's output
+      # at 256 tokens, and reasoning tokens count against that budget.
       - provider: github-copilot
         model: claude-haiku-4.5
 
@@ -30,45 +44,39 @@ roles:
     description: "Code generation, implementation, debugging"
     candidates:
       - provider: github-copilot
-        model: claude-sonnet-4.6
+        model: claude-opus-5
+        config:
+          reasoning_effort: xhigh
 
   ui-coding:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: github-copilot
-        model: claude-sonnet-4.6
-      - provider: github-copilot
-        model: gpt-5.4
+        model: claude-opus-5
+        config:
+          reasoning_effort: xhigh
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
       - provider: github-copilot
-        model: claude-sonnet-4.6
+        model: gpt-5.6-sol
         config:
-          reasoning_effort: high
-      - provider: github-copilot
-        model: gpt-5.4
-        config:
-          reasoning_effort: high
+          reasoning_effort: xhigh
 
   reasoning:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.8
+        model: claude-opus-5
         config:
-          reasoning_effort: high
+          reasoning_effort: max
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
       - provider: github-copilot
-        model: claude-sonnet-4.6
-        config:
-          reasoning_effort: xhigh
-      - provider: github-copilot
-        model: gpt-5.4
+        model: claude-opus-5
         config:
           reasoning_effort: xhigh
 
@@ -76,27 +84,33 @@ roles:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.8
+        model: claude-opus-5
+        config:
+          reasoning_effort: high
 
   writing:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.8
+        model: claude-opus-5
+        config:
+          reasoning_effort: high
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.8
+        model: claude-opus-5
+        config:
+          reasoning_effort: high
 
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
       - provider: github-copilot
-        model: claude-sonnet-4.6
-      - provider: github-copilot
-        model: gpt-5.4
+        model: gemini-3.1-pro-preview
+        config:
+          reasoning_effort: high
 
   image-gen:
     # Copilot has no native image generation API. Falls back to the best
@@ -104,10 +118,12 @@ roles:
     description: "Image generation (limited — no native Copilot image API)"
     candidates:
       - provider: github-copilot
-        model: claude-sonnet-4.6
+        model: claude-opus-5
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
       - provider: github-copilot
-        model: claude-opus-4.8
+        model: claude-opus-5
+        config:
+          reasoning_effort: xhigh
