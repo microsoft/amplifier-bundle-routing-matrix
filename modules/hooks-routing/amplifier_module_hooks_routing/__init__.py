@@ -51,6 +51,14 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             f"Valid values: {', '.join(VALID_PLACEMENTS)}."
         )
 
+    # model_performance-74w: restore this session's own model_role pin at
+    # session:start when the live mount ordering has drifted away from it
+    # (a RESUME re-imposes settings priority over a child's promotion --
+    # upstream defect model_performance-rc0). No-op unless there is a real
+    # disagreement; see role_pin.reassert_own_role_pin. Escape hatch for an
+    # operator who wants the pre-fix behaviour back.
+    reassert_role_pin: bool = config.get("reassert_role_pin", True)
+
     from .matrix_loader import (
         compose_matrix,
         load_matrix,
@@ -324,6 +332,23 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                     )
             except Exception:  # pragma: no cover - reporting must never break routing
                 logger.warning("routing matrix-source reporting failed", exc_info=True)
+
+        # Restore this session's OWN role pin before anything else reads the
+        # provider ordering. Runs on every session:start -- including the one
+        # a RESUME fires, which is the leg where the promotion has been lost.
+        # Emits rather than staying silent: a corrected pin is exactly the
+        # signal the 74w capture had no way to surface.
+        if reassert_role_pin:
+            from .role_pin import reassert_own_role_pin
+
+            pin_record = reassert_own_role_pin(coordinator)
+            if pin_record is not None:
+                # Same emit shape as _emit_clamp above: resolve the bus from the
+                # coordinator and duck-type it, so a session without a hooks bus
+                # still gets the correction, just unreported.
+                pin_bus = coordinator.get("hooks") if hasattr(coordinator, "get") else None
+                if pin_bus is not None and hasattr(pin_bus, "emit"):
+                    await pin_bus.emit("routing:role-pin-reasserted", pin_record)
 
         providers = coordinator.get("providers") or {}
         agents = (
