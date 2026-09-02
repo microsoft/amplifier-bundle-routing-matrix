@@ -172,6 +172,10 @@ async def resolve_model_role(
     providers: dict[str, Any],
     preresolved_models: dict[str, list[str]] | None = None,
     coordinator: Any = None,
+    caller_context: Any = None,
+    preset: Any = None,
+    escalations: Any = None,
+    on_clamp: Any = None,
 ) -> list[dict[str, Any]]:
     """Resolve model role(s) against routing matrix.
 
@@ -198,6 +202,18 @@ async def resolve_model_role(
             type (e.g. ``"anthropic"``) that isn't a key in ``providers``
             directly — the case where 2+ named instances of that module
             exist but none is keyed by the bare type itself.
+        caller_context: Optional ``CallerContext`` (see
+            :mod:`amplifier_module_hooks_routing.knob_consistency`) -- the
+            calling session's own resolved (family, model, effort). This is
+            the level-3 "inherited caller intent" slot of the precedence
+            chain. **Default-off:** when this or *preset* is ``None``, or the
+            preset's ``inherit`` mode is ``none``, the loop below runs exactly
+            as it did before knob-consistent routing existed.
+        preset: Optional parsed ``Preset``.
+        escalations: Optional per-session ``EscalationState``.
+        on_clamp: Optional callable invoked with the ``ClampRecord`` for the
+            role that actually resolved. Emit-only: the record goes to the
+            event log, never into the conversation.
 
     Returns:
         List of ``{provider, model, config}`` dicts representing resolved
@@ -225,12 +241,26 @@ async def resolve_model_role(
         ``amplifier_foundation.spawn_utils._build_provider_lookup()``,
         which already indexes by ``id:``) finds an exact hit.
     """
+    # Level 3 of the precedence chain. `plan_candidates` returns its input
+    # unchanged, and a None record, whenever the feature is off -- so when no
+    # preset is active this block is a no-op and the loop below is the one
+    # that shipped before this feature existed.
+    _knob_active = preset is not None and getattr(preset, "active", False)
+
     for role in roles:
         role_data = matrix.get(role)
         if role_data is None:
             continue
 
         candidates = role_data.get("candidates", [])
+        clamp_record = None
+        if _knob_active:
+            from .knob_consistency import plan_candidates
+
+            candidates, clamp_record = plan_candidates(
+                role, candidates, caller_context, preset, escalations
+            )
+
         for candidate in candidates:
             provider_type = candidate.get("provider", "")
             model_pattern = candidate.get("model", "")
@@ -255,6 +285,15 @@ async def resolve_model_role(
                     continue
             else:
                 resolved_model = model_pattern
+
+            # Report only for the role that actually resolved -- a record for
+            # a role that fell through would describe a decision nothing
+            # acted on. Emit, never inject.
+            if clamp_record is not None and on_clamp is not None:
+                try:
+                    await on_clamp(clamp_record)
+                except Exception:  # pragma: no cover - reporting must not break routing
+                    logger.warning("routing clamp reporting failed", exc_info=True)
 
             return [
                 {

@@ -1,0 +1,218 @@
+# Routing Matrix: openai-knob-consistent
+#
+# The `openai` matrix, byte-identical in its `roles:` block, plus ONE optional
+# top-level `preset:` block that turns on knob-consistent sub-agent routing.
+#
+# WHAT PROBLEM THIS SOLVES
+# ------------------------
+# A session pins model/effort for the ROOT only. Sub-agents are routed by the
+# matrix, so the caller's dial governs only the root's own work. Measured
+# (00-what-we-know.md section 2c): a terra S1 tree sent 85-96% of its LLM calls
+# to sol; a haiku cell billed $2.225 with 26 of 49 calls on sol; luna costs
+# $1.5 when it delegates to sol vs $0.48-0.78 when it does not.
+#
+# With `inherit: strict`, a session running on gpt-5.6-terra @ medium resolves
+# EVERY role at or below terra, at medium -- including `reasoning`, which the
+# stock matrix sends to `gpt-?.?-sol*` @ xhigh. When intent cannot be honored,
+# a `routing:intent-clamped` event is emitted with {role, requested, granted,
+# reason}. Emitted to the event log, never injected into the conversation.
+#
+# WHY IT IS SAFE ON ANTHROPIC
+# ---------------------------
+# A delegate SPAWNS A NEW SESSION with its own request prefix, so setting the
+# child's effort at creation is not a mid-session effort change and cannot
+# invalidate a parent's message blocks (G-EFFORT-CONSTANT). Nothing here
+# re-configures a running session.
+#
+# WHAT THIS FILE DELIBERATELY DOES NOT SET
+# ----------------------------------------
+# No fan-out cap, no delegate timeout, no partial-result policy, no
+# `session_scoped` block, no `context` block. Those knobs are parseable and
+# validated by the loader but are a SEPARATE treatment, per the design source:
+# "Bound the tree; do not vary effort inside it. These must not ship as one
+# treatment." Keeping them out is what makes this arm single-variable.
+#
+# STATUS: experimental. Opt in explicitly with `routing.matrix:
+# openai-knob-consistent`. No shipped default references it, and the eight
+# pre-existing matrices are untouched.
+
+name: openai-knob-consistent
+description: "OpenAI-only routing with knob-consistent delegation: sub-agents resolve at or below the caller's tier and effort."
+updated: "2026-09-02"
+
+# ---------------------------------------------------------------------------
+# OPTIONAL. A matrix without this block resolves exactly as it always has.
+# ---------------------------------------------------------------------------
+preset:
+  # Documentation only; never read by code.
+  axis: [cheap, fast]
+
+  # Cheapest -> most expensive, per provider family. Declared, never inferred
+  # from price: no per-token price for the 5.6 family exists in any guide, so
+  # this encodes the vendor's own ordinal statements (luna lowest cost, terra
+  # mid, sol flagship). A rung may be one glob or a list of globs.
+  #
+  # `gpt-[0-9].[0-9]` sits on the SOL rung on purpose: since the 5.6 rename the
+  # bare alias points at the flagship tier (see routing/openai.yaml's header).
+  # Putting it anywhere else would let the migration fallback smuggle a
+  # flagship model past the ceiling.
+  tier_ladder:
+    openai:
+      - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
+      - ["gpt-?.?-terra*"]
+      - ["gpt-?.?-sol*", "gpt-[0-9].[0-9]"]
+
+  delegation:
+    # none | effort | tier-and-effort | strict
+    #
+    # `strict` is chosen here rather than `tier-and-effort` + an escalation
+    # allowance so this matrix is a single-variable arm: it answers "does
+    # propagating the ceiling collapse the sol share, and what does that cost
+    # in quality?" without a second, differently-motivated knob in the way.
+    # Escalation is implemented and unit-tested; it is simply not exercised by
+    # this file. A curator who wants it writes:
+    #   inherit: tier-and-effort
+    #   escalate: {allow_roles: [reasoning], max_uses: 3, on_exhausted: fall_back}
+    inherit: strict
+    report_unhonored: true
+
+
+roles:
+  general:
+    description: "Versatile catch-all, no specialization needed"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
+
+  fast:
+    description: "Quick utility tasks — parsing, classification, file ops, bulk work"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-luna*
+      - provider: openai
+        model: gpt-?.?-mini*
+
+  coding:
+    description: "Code generation, implementation, debugging"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
+
+  ui-coding:
+    description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
+
+  security-audit:
+    description: "Vulnerability assessment, attack surface analysis, code auditing"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: xhigh
+
+  reasoning:
+    description: "Deep architectural reasoning, system design, complex multi-step analysis"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: xhigh
+
+  critique:
+    description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: xhigh
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: xhigh
+
+  creative:
+    description: "Design direction, aesthetic judgment, high-quality creative output"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-sol*
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+
+  writing:
+    description: "Long-form content — documentation, marketing, case studies, storytelling"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-sol*
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+
+  research:
+    description: "Deep investigation, information synthesis across multiple sources"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
+
+  vision:
+    description: "Understanding visual input — screenshots, diagrams, UI mockups"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+
+  image-gen:
+    # OpenAI image generation (gpt-image-*) is not yet available through the
+    # chat-completions interface used by this provider. Falls back to the best
+    # creative model for image planning, prompt crafting, and SVG generation.
+    description: "Image generation (limited — gpt-image not available via chat API)"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-sol*
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+
+  critical-ops:
+    description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high

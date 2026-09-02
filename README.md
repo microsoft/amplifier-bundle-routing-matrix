@@ -6,7 +6,8 @@ The routing hook tries candidates top-to-bottom and uses the first that matches 
 
 ## Matrices
 
-Eight curated matrices ship with this bundle:
+Eight curated matrices ship with this bundle, plus one experimental matrix
+([knob-consistent delegation](#knob-consistent-delegation-experimental-default-off)):
 
 | Matrix | When to use |
 |--------|-------------|
@@ -18,6 +19,7 @@ Eight curated matrices ship with this bundle:
 | **gemini** | Google Gemini models exclusively. |
 | **copilot** | GitHub Copilot-optimized. Balances multiplier costs, avoids the 30x fast-variant trap. |
 | **ollama** | Ollama across two instances: `ollama` (local) + `ollama-cloud` (Ollama Cloud). Routes heavy roles to `gpt-oss:120b` on cloud; local fallbacks. Requires both provider instances configured — see [provider README](https://github.com/microsoft/amplifier-module-provider-ollama#mixed-local--cloud-multi-instance). |
+| **openai-knob-consistent** *(experimental)* | The `openai` matrix, roles byte-identical, plus a `preset:` block so sub-agents inherit the caller's tier and effort instead of escalating to the flagship. Opt in explicitly. |
 
 Browse the matrix files directly in the [`routing/`](routing/) directory.
 
@@ -107,6 +109,60 @@ The net effect:
 - Smart matrix resolution that activates automatically when a routing bundle is loaded (`model_role:`)
 
 Per-delegate `model_role` overrides (e.g. `delegate(agent="...", model_role="research")`) take precedence over BOTH the agent's frontmatter and the matrix-resolved agent-config preferences. That precedence is the spawner's policy, not this bundle's — see [`amplifier-app-cli/docs/SPAWN_PRECEDENCE.md`](https://github.com/microsoft/amplifier-app-cli/blob/main/docs/SPAWN_PRECEDENCE.md).
+
+## Knob-consistent delegation (experimental, default-off)
+
+**The problem.** A session pins its model and effort for the **root only**. Sub-agents are routed by the matrix, so the dial you chose governs only the root's own work. Measured on real runs: a `gpt-5.6-terra` tree sent **85–96%** of its LLM calls to `gpt-5.6-sol`; a `claude-haiku-4-5` cell billed **$2.225** with 26 of 49 calls on sol; `gpt-5.6-luna` costs **$1.5** when it delegates to sol versus **$0.48–0.78** when it does not. Choosing a cheap tier does not buy a cheap tree.
+
+**The fix.** An optional top-level `preset:` block adds one step to resolution — *inherited caller intent* — between the agent's explicit pin and the matrix candidate:
+
+| # | Level | Where it lives |
+|---|---|---|
+| 1 | `delegate(provider_preferences=[…])` | tool-delegate (unchanged) |
+| 2 | agent frontmatter `provider_preferences` | tool-delegate / this bundle (unchanged) |
+| 3 | **inherited caller tier + effort** | **`preset:` in the matrix file** |
+| 4 | agent `model_role` → matrix candidate | this bundle (unchanged) |
+| 5 | matrix `general` fallback | this bundle (unchanged) |
+
+Levels 1 and 2 stay strictly above level 3, so an author who deliberately pinned a specialist model still gets one. Inheritance is a default, never a ceiling on explicit intent.
+
+**It is off unless you ask for it, twice.** A matrix must carry a `preset:` block *and* the resolution must be able to determine the caller's own model. Every matrix shipped before this feature has no `preset:` key and resolves byte-identically — asserted, not asserted-to, by `tests/test_default_resolution_unchanged.py`, which replays a recording taken from the commit immediately before the feature landed.
+
+```yaml
+# routing/openai-knob-consistent.yaml (the one shipped example)
+preset:
+  tier_ladder:                       # cheapest -> most expensive, declared
+    openai:
+      - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
+      - ["gpt-?.?-terra*"]
+      - ["gpt-?.?-sol*", "gpt-[0-9].[0-9]"]
+  delegation:
+    inherit: strict                  # none | effort | tier-and-effort | strict
+    report_unhonored: true
+```
+
+| `inherit` | Behaviour |
+|---|---|
+| `none` | Today's behaviour. The default, and what an absent `preset:` means. |
+| `effort` | Keep the matrix's model; carry the caller's effort. |
+| `tier-and-effort` | Clamp the model to at most the caller's rung; carry the caller's effort; allow declared escalations. |
+| `strict` | As above, and escalation is denied outright for every role. |
+
+Under `strict` with a `gpt-5.6-terra @ medium` root, `model_role: reasoning` resolves to `gpt-5.6-terra @ medium` instead of `gpt-5.6-sol @ xhigh`.
+
+**When intent cannot be honoured, you are told.** Every clamp, denial, substitution and no-op emits a `routing:intent-clamped` event carrying `{role, mode, honored, requested, granted, reason, escalations_remaining}`. It goes to the event log — never injected into the conversation, which would mutate the cached prefix.
+
+**Enable it:**
+
+```yaml
+# ~/.amplifier/settings.yaml
+routing:
+  matrix: openai-knob-consistent
+```
+
+**Cross-vendor safety.** A delegate spawns a *new session* with its own request prefix, so setting a child's effort at creation is not a mid-session effort change and cannot invalidate a parent's cached message blocks. Nothing here re-configures a running session.
+
+**Not included, on purpose.** The `preset:` schema also accepts `fan_out_max`, `delegate_timeout_s`, `on_timeout`, `session_scoped` and `context`. Those are parsed and validated but **never applied** — bounding the delegation tree is a separate treatment from varying effort within it, and mixing them makes neither measurable. See `modules/hooks-routing/amplifier_module_hooks_routing/knob_consistency.py`.
 
 ## Selecting a Matrix
 
