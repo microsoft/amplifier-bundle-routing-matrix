@@ -181,11 +181,29 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # --- Knob-consistent routing: parse the optional `preset:` block ---
     # A matrix with no `preset:` key yields None here, and None is the
     # default-off signal every downstream branch checks. Every shipped matrix
-    # in routing/ except the explicitly-named knob-consistent one has no
-    # `preset:` key, so this is None for all of them.
+    # in routing/ except `openai.yaml` (default ON, measured win -- see
+    # README "Knob-consistent delegation") and `openai-knob-consistent.yaml`
+    # (the same block, kept as an explicit-name pin) has no `preset:` key, so
+    # this is None for all of them.
     from .knob_consistency import EscalationState, parse_preset, validate_preset
 
     preset = parse_preset(base_matrix)
+
+    # Explicit opt-out: restores legacy (pre-knob-consistent) behaviour for
+    # ANY matrix, including one that ships a `preset:` block by default
+    # (`openai.yaml`). Treated identically to the matrix having no `preset:`
+    # key at all -- no validation runs, no escalation budget is created, and
+    # every downstream branch takes its `preset is None` path.
+    disable_delegation_preset = bool(config.get("disable_delegation_preset", False))
+    if disable_delegation_preset and preset is not None:
+        logger.info(
+            "[ROUTING] disable_delegation_preset=true: ignoring preset: "
+            "block in matrix %s -- resolving as if it were absent (legacy "
+            "behaviour restored).",
+            matrix_path,
+        )
+        preset = None
+
     if preset is not None:
         preset_errors = validate_preset(base_matrix)
         if preset_errors:

@@ -291,7 +291,7 @@ class TestValidatePreset:
         assert any("not on the declared invalidator allow-list" in e for e in errors)
 
     def test_shipped_knob_consistent_matrix_validates(self) -> None:
-        """The one matrix in this repo that carries a preset must pass."""
+        """The explicit-name pin matrix must pass validation."""
         import yaml
         from pathlib import Path
 
@@ -300,6 +300,16 @@ class TestValidatePreset:
             / "routing"
             / "openai-knob-consistent.yaml"
         )
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        assert validate_preset(data) == []
+
+    def test_shipped_openai_matrix_preset_validates(self) -> None:
+        """`openai.yaml` itself ships the same preset by default (2026-09-02)
+        -- it must pass the same validation bar as the explicit-name pin."""
+        import yaml
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parents[3] / "routing" / "openai.yaml"
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert validate_preset(data) == []
 

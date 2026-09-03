@@ -32,9 +32,12 @@
 # "Bound the tree; do not vary effort inside it. These must not ship as one
 # treatment." Keeping them out is what makes this arm single-variable.
 #
-# STATUS: experimental. Opt in explicitly with `routing.matrix:
-# openai-knob-consistent`. No shipped default references it, and the eight
-# pre-existing matrices are untouched.
+# STATUS (2026-09-02): the measurement this file existed to gather PASSED
+# (see l1-knob-consistent-routing DONE.json + ROUTING-PROPOSAL.md) and the
+# same `preset:` block now ships ON BY DEFAULT in `routing/openai.yaml`
+# itself -- this file is kept only as an explicit-name pin (`routing.matrix:
+# openai-knob-consistent`) for anyone who selects a matrix by name; the two
+# now resolve identically. No other shipped matrix carries a preset.
 
 name: openai-knob-consistent
 description: "OpenAI-only routing with knob-consistent delegation: sub-agents resolve at or below the caller's tier and effort."
