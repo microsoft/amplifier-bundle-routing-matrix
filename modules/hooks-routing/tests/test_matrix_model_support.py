@@ -39,11 +39,40 @@ import pytest
 import yaml
 from amplifier_module_hooks_routing.matrix_loader import (
     EFFORT_KEYS,
-    effort_remediation,
-    model_ignores_effort,
-    strip_unsupported_effort,
-    validate_matrix_model_support,
+    inert_config_rule,
+    strip_inert_config,
+    validate_matrix_inert_config,
 )
+
+# ---------------------------------------------------------------------------
+# PORT NOTE (model_performance-iai)
+# ---------------------------------------------------------------------------
+# These are PR #48's tests, unchanged in what they ASSERT. Only the entry
+# points moved: the model-keyed haiku guard was re-homed into the generic
+# per-(provider, model) inert-key table PR #49 introduced, which subsumes it.
+#
+#   validate_matrix_model_support(matrix) -> validate_matrix_inert_config(matrix)
+#   strip_unsupported_effort(matrix)      -> strip_inert_config(matrix)
+#   model_ignores_effort(model)           -> inert_config_rule(p, model, key)
+#   effort_remediation(model, value)      -> the matched rule's .remediation
+#
+# The first two are drop-in (identical signatures and return shapes). The last
+# two took a provider argument they did not have, so the two helpers below
+# preserve the old single-argument semantics the assertions were written
+# against, rather than rewriting the assertions themselves.
+
+
+def _haiku_reason(model: str) -> str | None:
+    """#48's ``model_ignores_effort(model)``, expressed on the new table."""
+    rule = inert_config_rule("anthropic", model, "reasoning_effort")
+    return rule.reason if rule is not None else None
+
+
+def _haiku_remediation_for(model: str, value: Any) -> str | None:
+    """#48's ``effort_remediation(model, value)``, expressed on the new table."""
+    rule = inert_config_rule("anthropic", model, "reasoning_effort")
+    return rule.remediation(model, value) if rule is not None else None
+
 
 # Walk up from tests/ -> hooks-routing/ -> modules/ -> bundle root -> routing/
 BUNDLE_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -77,7 +106,7 @@ def _matrix(
     ],
 )
 def test_effort_on_any_haiku_spelling_is_rejected(model: str, key: str) -> None:
-    errors = validate_matrix_model_support(_matrix(model, {key: "high"}))
+    errors = validate_matrix_inert_config(_matrix(model, {key: "high"}))
     assert len(errors) == 1, errors
     # The error must NAME the role, the candidate, the model, the key and the
     # value. An unnamed "invalid config" is the failure mode being fixed.
@@ -92,7 +121,7 @@ def test_effort_on_any_haiku_spelling_is_rejected(model: str, key: str) -> None:
 
 
 def test_both_effort_spellings_on_one_candidate_are_each_named() -> None:
-    errors = validate_matrix_model_support(
+    errors = validate_matrix_inert_config(
         _matrix("claude-haiku-*", {"effort": "high", "reasoning_effort": "medium"})
     )
     assert len(errors) == 2, errors
@@ -103,7 +132,7 @@ def test_both_effort_spellings_on_one_candidate_are_each_named() -> None:
 def test_rejection_is_structural_not_advisory() -> None:
     """The key must not survive into the effective matrix."""
     matrix = _matrix("claude-haiku-*", {"reasoning_effort": "high", "temperature": 1.0})
-    cleaned, errors = strip_unsupported_effort(matrix)
+    cleaned, errors = strip_inert_config(matrix)
     assert errors
     cfg = cleaned["roles"]["fast"]["candidates"][0]["config"]
     assert "reasoning_effort" not in cfg
@@ -141,7 +170,7 @@ def test_every_haiku_role_and_candidate_index_is_named_separately() -> None:
             },
         }
     }
-    errors = validate_matrix_model_support(matrix)
+    errors = validate_matrix_inert_config(matrix)
     assert len(errors) == 2, errors
     assert any("'fast' candidate 1" in e for e in errors)
     assert any("'general' candidate 0" in e for e in errors)
@@ -161,16 +190,16 @@ def test_remediation_is_value_specific() -> None:
     thinking_budget_tokens" without the number is not actionable; telling them
     the wrong number silently changes behaviour.
     """
-    assert "4096" in effort_remediation("claude-haiku-4.5", "low")
+    assert "4096" in _haiku_remediation_for("claude-haiku-4.5", "low")
     for value in ("medium", "high", "xhigh", "max"):
-        assert "32000" in effort_remediation("claude-haiku-4.5", value)
+        assert "32000" in _haiku_remediation_for("claude-haiku-4.5", value)
 
 
 def test_remediation_appears_in_the_error() -> None:
-    low = validate_matrix_model_support(
+    low = validate_matrix_inert_config(
         _matrix("claude-haiku-*", {"reasoning_effort": "low"})
     )
-    high = validate_matrix_model_support(
+    high = validate_matrix_inert_config(
         _matrix("claude-haiku-*", {"reasoning_effort": "high"})
     )
     assert "4096" in low[0]
@@ -178,7 +207,7 @@ def test_remediation_appears_in_the_error() -> None:
 
 
 def test_remediation_is_none_for_models_that_honour_effort() -> None:
-    assert effort_remediation("claude-sonnet-5", "xhigh") is None
+    assert _haiku_remediation_for("claude-sonnet-5", "xhigh") is None
 
 
 # ---------------------------------------------------------------------------
@@ -201,22 +230,22 @@ def test_remediation_is_none_for_models_that_honour_effort() -> None:
 )
 def test_effort_on_effort_honouring_models_is_untouched(model: str) -> None:
     matrix = _matrix(model, {"reasoning_effort": "xhigh"})
-    assert validate_matrix_model_support(matrix) == []
-    cleaned, errors = strip_unsupported_effort(matrix)
+    assert validate_matrix_inert_config(matrix) == []
+    cleaned, errors = strip_inert_config(matrix)
     assert errors == []
     assert cleaned is matrix  # no copy taken when there is nothing to strip
 
 
 def test_haiku_without_any_effort_key_is_fine() -> None:
-    assert validate_matrix_model_support(_matrix("claude-haiku-*", None)) == []
-    assert validate_matrix_model_support(_matrix("claude-haiku-*", {})) == []
+    assert validate_matrix_inert_config(_matrix("claude-haiku-*", None)) == []
+    assert validate_matrix_inert_config(_matrix("claude-haiku-*", {})) == []
 
 
 def test_haiku_with_a_non_effort_knob_is_fine() -> None:
     """Haiku's real reasoning dial IS thinking_budget_tokens -- do not block it."""
     matrix = _matrix("claude-haiku-*", {"thinking_budget_tokens": 32000})
-    assert validate_matrix_model_support(matrix) == []
-    cleaned, errors = strip_unsupported_effort(matrix)
+    assert validate_matrix_inert_config(matrix) == []
+    cleaned, errors = strip_inert_config(matrix)
     assert errors == []
     assert cleaned is matrix
 
@@ -245,8 +274,8 @@ def test_base_keyword_and_malformed_shapes_do_not_crash() -> None:
             "null_candidates": {"description": "d", "candidates": None},
         }
     }
-    assert validate_matrix_model_support(matrix) == []
-    cleaned, errors = strip_unsupported_effort(matrix)
+    assert validate_matrix_inert_config(matrix) == []
+    cleaned, errors = strip_inert_config(matrix)
     assert errors == []
     assert cleaned is matrix
 
@@ -270,21 +299,21 @@ def test_malformed_shapes_survive_the_strip_path_too() -> None:
             "broken": ["not", "a", "mapping"],
         }
     }
-    cleaned, errors = strip_unsupported_effort(matrix)
+    cleaned, errors = strip_inert_config(matrix)
     assert len(errors) == 1, errors
     assert "effort" not in cleaned["roles"]["fast"]["candidates"][3]["config"]
 
 
 def test_empty_and_missing_matrix_are_fine() -> None:
-    assert validate_matrix_model_support({}) == []
-    assert validate_matrix_model_support({"roles": {}}) == []
-    assert validate_matrix_model_support({"roles": None}) == []
+    assert validate_matrix_inert_config({}) == []
+    assert validate_matrix_inert_config({"roles": {}}) == []
+    assert validate_matrix_inert_config({"roles": None}) == []
 
 
 def test_non_string_model_is_not_matched() -> None:
-    assert model_ignores_effort(None) is None  # type: ignore[arg-type]
-    assert model_ignores_effort(42) is None  # type: ignore[arg-type]
-    assert model_ignores_effort("") is None
+    assert _haiku_reason(None) is None  # type: ignore[arg-type]
+    assert _haiku_reason(42) is None  # type: ignore[arg-type]
+    assert _haiku_reason("") is None
 
 
 def test_candidate_with_no_model_key_does_not_crash() -> None:
@@ -296,7 +325,7 @@ def test_candidate_with_no_model_key_does_not_crash() -> None:
             }
         }
     }
-    assert validate_matrix_model_support(matrix) == []
+    assert validate_matrix_inert_config(matrix) == []
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +334,7 @@ def test_candidate_with_no_model_key_does_not_crash() -> None:
 
 
 def test_reason_cites_measured_evidence() -> None:
-    reason = model_ignores_effort("claude-haiku-4.5")
+    reason = _haiku_reason("claude-haiku-4.5")
     assert reason is not None
     assert "1,438" in reason  # the measured n, not an assertion of belief
     assert "32000" in reason
@@ -330,5 +359,5 @@ def test_shipped_matrix_has_no_rejected_effort_keys(matrix_path: Path) -> None:
     inert for a wave.
     """
     data = yaml.safe_load(matrix_path.read_text(encoding="utf-8"))
-    errors = validate_matrix_model_support(data)
+    errors = validate_matrix_inert_config(data)
     assert errors == [], f"{matrix_path.name}: " + "; ".join(errors)

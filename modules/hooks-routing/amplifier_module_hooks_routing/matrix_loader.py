@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 from collections.abc import Sequence
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import yaml
 
@@ -376,38 +377,140 @@ def validate_matrix_config(
 
 
 # ---------------------------------------------------------------------------
-# Model-aware effort support
+# Inert config keys: settings the target will never act on
 # ---------------------------------------------------------------------------
 #
 # WHY THIS EXISTS, AND WHY validate_matrix_config CANNOT DO IT
 #
 # `validate_matrix_config` above is closed on VALUES and OPEN on KEYS: it flags
-# a config value only when the provider declares that key as a `choice` field
-# and the value is not among the declared choices (see :219-221). That is
-# exactly the wrong shape for this defect.
+# a config value only when the provider DECLARES that key as a `choice` field
+# and the value is not among the declared choices (:217-238). A key the
+# provider does not declare at all takes the explicit "undeclared key -- the
+# open-key rule. Pass silently" branch (:219-221).
 #
-# `reasoning_effort: high` on a `claude-haiku-*` candidate is a DECLARED key
-# (provider-anthropic declares it, __init__.py:1017) carrying a LEGAL value on
-# an INSTALLED provider -- so it sails through. It then rides all the way into
-# the effective matrix, is handed to the child provider as mount config, and is
-# collapsed to nothing at request-build time. Nothing logs anything. The
-# operator is told the effort was applied; the wire says otherwise.
+# That branch is exactly where `reasoning_effort` on a `gemini` candidate
+# lands. provider-gemini declares ONE ConfigField (`api_key`) and consumes a
+# closed set of 15 mount-config keys, none of which is an effort key -- so the
+# key passes validation, is merged into the child provider's mount config, and
+# is then read by nobody. The value is irrelevant: `low`, `high`, `xhigh` and
+# `max` are equally inert, because the read never happens.
 #
-# This function is a THIRD check with a different question: not "is this value
-# legal for this provider?" but "will this MODEL do anything with it?"
+# This is a THIRD check asking a different question from the other two: not
+# "is this value legal for this provider?" but "will this target act on this
+# KEY at all?"
+#
+# WHY THE TABLE IS KEYED ON (provider, model) AND NOT ON MODEL ALONE
+#
+# Two distinct shapes of this defect exist, and they key differently:
+#
+#   * PROVIDER-keyed (gemini): the provider never reads the key from mount
+#     config, so EVERY model it serves is affected. Keying on the model would
+#     need one row per model id and would silently miss the next one Google
+#     ships.
+#   * MODEL-keyed (haiku): the provider DOES read the key, but one model
+#     collapses every level above `low` into one identical request. The
+#     provider is fine; one model is not. Keying on the provider would reject
+#     effort on every Anthropic model, most of which honour it.
+#
+# BOTH shapes are now enforced here, in ONE table. Neither special case
+# generalises to the other -- a model-keyed table cannot express gemini
+# without one row per model id, and a provider-keyed table cannot express
+# haiku at all, since anthropic-the-provider is fine. A single table with a
+# provider field and a model-substring field expresses both, so a third
+# finding is a new ROW rather than a third mechanism. Two mechanisms would
+# mean two places to look, two chances to strip the wrong key, and -- the real
+# hazard -- two possible answers to "is this key live on this candidate?"
+# that can disagree.
+#
+# The per-row `remediation` callable is what makes one table possible without
+# losing precision: haiku's exact replacement is a `thinking_budget_tokens`
+# number, gemini's is an `extra_request_params.thinking_config` block. One
+# shared remediation sentence structurally could not name both.
 #
 # SCOPE, STATED HONESTLY: this table is not a general capability model. It
-# carries only rules backed by a named measurement or a cited provider code
-# path. A model absent from the table is not asserted to honour effort -- it is
-# simply not something this guard has evidence about. See the PR body for the
-# gemini finding, which is real but not enforced here.
+# carries only rules backed by a cited provider code path or a named
+# measurement. A (provider, model) pair absent from it is NOT asserted to
+# honour anything -- it is simply a pair this guard has no evidence about.
 
-# Both spellings a matrix candidate can use. provider-anthropic consumes the
-# canonical `reasoning_effort` and the legacy `effort` alias
-# (provider-anthropic __init__.py:641-654, :2926-2936); a guard covering only
-# one spelling leaves the other silently dropping.
+# Both spellings a matrix candidate can use for the portable effort knob.
+# provider-anthropic consumes the canonical `reasoning_effort` and the legacy
+# `effort` alias (provider-anthropic __init__.py:892-897, :3452-3455), so a
+# curator can reasonably write either; a guard covering only one spelling
+# leaves the other silently dropping.
 EFFORT_KEYS: tuple[str, ...] = ("effort", "reasoning_effort")
 
+# provider-gemini's effort -> thinking_level ladder, mirrored here so the
+# remediation can name the EXACT level a given effort value targets rather
+# than offering generic advice (provider-gemini __init__.py:348-355).
+_GEMINI_EFFORT_TO_LEVEL: dict[str, str] = {
+    "minimal": "minimal",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "xhigh": "high",
+    "max": "high",
+}
+
+_GEMINI_EFFORT_REASON = (
+    "provider-gemini never reads an effort key from mount config, so this "
+    "setting is inert at EVERY value -- not collapsed, not clamped, simply "
+    "never read. VERIFIED against the installed provider "
+    "(amplifier-module-provider-gemini, cache 06d1437d03d6b064): the closed "
+    "set of mount-config keys it consumes is _CONSUMED_CONFIG_KEYS "
+    "(__init__.py:551-566) and contains neither 'reasoning_effort' nor "
+    "'effort'; there is no `self.config.get(\"reasoning_effort\")` call site "
+    "anywhere in the module; and its only declared ConfigField is `api_key` "
+    "(__init__.py:832-840). The provider's single effort read is "
+    "`request.reasoning_effort` (__init__.py:1325) -- a ChatRequest field, "
+    "which amplifier_core only DECLARES (message_models.py:212) and never "
+    "populates from mount config. Bridging config -> request is each "
+    "provider's own job (anthropic does it at __init__.py:892-897, openai at "
+    "__init__.py:1046-1049); gemini has no such bridge, so a matrix `config:` "
+    "block cannot reach the effort ladder at all."
+)
+
+
+def _gemini_effort_remediation(model: str, value: Any) -> str:
+    """Return the exact replacement setting for an inert gemini effort value.
+
+    Naming the replacement knob without its value is not actionable; naming
+    the WRONG value silently changes behaviour. Gemini's thinking control is
+    also split by model generation, and getting that wrong turns an inert key
+    into a hard 400 -- so the split is named here rather than left for the
+    curator to discover in production.
+    """
+    level = _GEMINI_EFFORT_TO_LEVEL.get(str(value).strip().lower())
+    target = (
+        f"`extra_request_params: {{thinking_config: {{thinking_level: {level}}}}}`"
+        if level is not None
+        else "`extra_request_params: {thinking_config: {...}}`"
+    )
+    return (
+        f"Use {target} instead -- `extra_request_params` is the only "
+        f"mount-config key gemini merges into the outgoing request "
+        f"(provider-gemini __init__.py:571-611, read at :752), and "
+        f"thinking_level is what the effort ladder targets (:348-355). "
+        f"CAUTION: gemini-2.x models REJECT thinking_level outright with a "
+        f"400 and accept only the legacy `thinking_budget` "
+        f"(_THINKING_LEVEL_TABLE, :318-336), so a class glob like "
+        f"`gemini-*-pro-preview` that can resolve to a 2.x id must pin an "
+        f"exact 3.x model before using thinking_level."
+    )
+
+
+# --- MODEL-keyed row: anthropic haiku ---------------------------------
+#
+# Carried over VERBATIM from the haiku guard this table subsumes (PR #48,
+# commit 68bba65). That lane made the wire measurement; this one only
+# re-homes the rule into the generic table, so the reason string and the
+# per-value remediation are unchanged from the measurement that earned
+# them.
+#
+# `provider="*"` deliberately, NOT `provider="anthropic"`: the guard on
+# main matched the model substring under ANY provider name, and narrowing
+# it here would silently stop rejecting an inert effort key on a haiku
+# model served under some other provider id. The wildcard preserves the
+# shipped matching semantics exactly.
 _HAIKU_REASON = (
     "Anthropic Haiku collapses every effort level above 'low' into one "
     "identical request, so the knob measures nothing. MEASURED on the wire "
@@ -424,13 +527,6 @@ _HAIKU_REASON = (
     "falls back to type='enabled' (provider-anthropic __init__.py:3024-3046)."
 )
 
-# Models that do NOT honour a reasoning-effort parameter as a gradient.
-# Each entry is (lowercase model-name substring, named reason).
-# Matching is substring-on-lowercase so it catches every spelling a candidate
-# can use: `claude-haiku-*`, `claude-haiku-4.5`, `claude-haiku-4-5-20251001`,
-# and any provider-qualified form.
-EFFORT_UNSUPPORTED_MODELS: tuple[tuple[str, str], ...] = (("haiku", _HAIKU_REASON),)
-
 # The exact `thinking_budget_tokens` value that reproduces each effort level on
 # an affected model, so the error can name a lossless replacement rather than
 # generic advice. Haiku's ladder: 'low' -> 4096, everything above -> the model
@@ -445,43 +541,18 @@ _HAIKU_BUDGETS: dict[str, int] = {
 _HAIKU_DEFAULT_BUDGET = 32000
 
 
-def model_ignores_effort(model: str) -> str | None:
-    """Return the named reason a model ignores effort, or ``None``.
+def _haiku_remediation(model: str, value: Any) -> str:
+    """Return the exact replacement setting for an inert haiku effort value.
 
-    Args:
-        model: The candidate's ``model`` value. May be a glob
-            (``claude-haiku-*``), an exact id, or provider-qualified.
+    Naming the replacement knob without its value is not actionable; naming
+    the WRONG value silently changes behaviour. On Haiku ``low`` and the
+    collapsed tiers have genuinely different equivalents, so the remediation
+    is resolved per value rather than as one fixed sentence.
 
-    Returns:
-        The named reason string when the model does not honour a
-        reasoning-effort parameter, otherwise ``None``.
+    This is PR #48's ``effort_remediation`` unchanged apart from its name:
+    its ``(model, value) -> str`` signature already matches this table's
+    ``remediation`` field.
     """
-    if not isinstance(model, str) or not model:
-        return None
-    needle = model.lower()
-    for marker, reason in EFFORT_UNSUPPORTED_MODELS:
-        if marker in needle:
-            return reason
-    return None
-
-
-def effort_remediation(model: str, value: Any) -> str | None:
-    """Return the exact replacement setting for an inert effort value.
-
-    Naming the replacement knob without its value is not actionable; naming the
-    WRONG value silently changes behaviour. On Haiku ``low`` and the collapsed
-    tiers have genuinely different equivalents, so the remediation is resolved
-    per value rather than as one fixed sentence.
-
-    Args:
-        model: The candidate's ``model`` value.
-        value: The effort value the candidate set.
-
-    Returns:
-        A remediation sentence, or ``None`` when the model honours effort.
-    """
-    if model_ignores_effort(model) is None:
-        return None
     normalized = str(value).strip().lower()
     budget = _HAIKU_BUDGETS.get(normalized, _HAIKU_DEFAULT_BUDGET)
     return (
@@ -490,24 +561,96 @@ def effort_remediation(model: str, value: Any) -> str | None:
     )
 
 
-def validate_matrix_model_support(matrix: dict[str, Any]) -> list[str]:
-    """Reject effort keys on candidates whose model will not honour them.
+class InertKeyRule(NamedTuple):
+    """One (provider, model) -> inert-keys rule.
 
-    Complements :func:`validate_matrix_config`, which cannot catch this class:
-    the key is declared, the value is legal, the provider is installed -- and
-    the parameter still does nothing, because the *model* collapses it.
+    Attributes:
+        provider: Exact provider name to match, or ``"*"`` for any provider.
+        model_marker: Lowercase substring the candidate's ``model`` must
+            contain, or ``""`` to match any model of that provider. Substring
+            matching catches every spelling a candidate can use -- globs
+            (``gemini-*-pro-preview``), exact ids, and provider-qualified
+            forms alike.
+        keys: The config keys this rule rejects.
+        reason: Named, evidence-carrying reason the keys are inert.
+        remediation: ``(model, value) -> sentence`` naming the exact
+            replacement setting.
+    """
+
+    provider: str
+    model_marker: str
+    keys: tuple[str, ...]
+    reason: str
+    remediation: Callable[[str, Any], str]
+
+
+# The enforced rules. One row per (provider, model) pair with evidence.
+#
+# ORDER MATTERS: the first matching row wins. The provider-specific gemini row
+# is listed before the `provider="*"` haiku row so a wildcard row can never
+# shadow a narrower one.
+INERT_CONFIG_RULES: tuple[InertKeyRule, ...] = (
+    InertKeyRule(
+        provider="gemini",
+        model_marker="",  # every model this provider serves
+        keys=EFFORT_KEYS,
+        reason=_GEMINI_EFFORT_REASON,
+        remediation=_gemini_effort_remediation,
+    ),
+    InertKeyRule(
+        provider="*",  # matched on the MODEL substring, under any provider
+        model_marker="haiku",
+        keys=EFFORT_KEYS,
+        reason=_HAIKU_REASON,
+        remediation=_haiku_remediation,
+    ),
+)
+
+
+def inert_config_rule(provider: str, model: str, key: str) -> InertKeyRule | None:
+    """Return the rule making ``key`` inert for this candidate, or ``None``.
+
+    Args:
+        provider: The candidate's ``provider`` value.
+        model: The candidate's ``model`` value. May be a glob, an exact id,
+            or provider-qualified.
+        key: The config key being checked.
+
+    Returns:
+        The matching :class:`InertKeyRule`, or ``None`` when this guard has
+        no evidence that the key is inert for this candidate.
+    """
+    if not isinstance(provider, str) or not isinstance(key, str):
+        return None
+    model_needle = model.lower() if isinstance(model, str) else ""
+    provider_needle = provider.lower()
+    for rule in INERT_CONFIG_RULES:
+        if rule.provider != "*" and rule.provider.lower() != provider_needle:
+            continue
+        if rule.model_marker and rule.model_marker not in model_needle:
+            continue
+        if key in rule.keys:
+            return rule
+    return None
+
+
+def validate_matrix_inert_config(matrix: dict[str, Any]) -> list[str]:
+    """Reject config keys the candidate's target will never act on.
+
+    Complements :func:`validate_matrix_config`, which structurally cannot
+    catch this class: the key is undeclared, so the open-key rule passes it
+    silently, and the value is irrelevant because the read never happens.
 
     Unlike :func:`validate_matrix_config` this needs no provider instances and
-    no coordinator: it is a pure function of the composed matrix, so it runs
-    even when providers are not resolvable.
+    no coordinator -- it is a pure function of the composed matrix, so it runs
+    even when providers are not installed or not resolvable.
 
     Args:
         matrix: Composed matrix dict with a ``roles`` key (the same shape
             :func:`validate_matrix_config` takes).
 
     Returns:
-        List of named error strings. Empty list means no inert effort keys
-        were found.
+        List of named error strings. Empty list means no inert keys found.
     """
     errors: list[str] = []
 
@@ -522,47 +665,46 @@ def validate_matrix_model_support(matrix: dict[str, Any]) -> list[str]:
             if not isinstance(cfg, dict) or not cfg:
                 continue
 
-            model = candidate.get("model", "")
-            reason = model_ignores_effort(model)
-            if reason is None:
-                continue
-
             provider = candidate.get("provider", "")
-            for key in EFFORT_KEYS:
-                if key not in cfg:
+            model = candidate.get("model", "")
+            for key in cfg:
+                rule = inert_config_rule(provider, model, key)
+                if rule is None:
                     continue
                 errors.append(
                     f"Role '{role_name}' candidate {i} ({provider}/{model}): "
-                    f"{key}={cfg[key]!r} is REJECTED — {reason} "
-                    f"{effort_remediation(model, cfg[key])}"
+                    f"{key}={cfg[key]!r} is REJECTED — {rule.reason} "
+                    f"{rule.remediation(model, cfg[key])}"
                 )
 
     return errors
 
 
-def strip_unsupported_effort(
+def strip_inert_config(
     matrix: dict[str, Any],
 ) -> tuple[dict[str, Any], list[str]]:
-    """Return a copy of ``matrix`` with inert effort keys removed.
+    """Return a copy of ``matrix`` with inert config keys removed.
 
     Rejection is enforced structurally, not merely reported. Once
-    :func:`validate_matrix_model_support` has named the offending keys they are
+    :func:`validate_matrix_inert_config` has named the offending keys they are
     removed from the effective matrix, so no downstream consumer (resolver,
-    delegate, session naming) can carry an effort the model will never honour
+    delegate, session naming) can carry a setting the target will never act on
     and report it as applied. Logging alone would leave the dead setting in
-    place -- which is the state that let two byte-identical cells run for a
-    whole wave.
+    place -- which is the state that let 14 shipped candidates carry an inert
+    effort knob.
+
+    Removing the key changes NO wire behaviour: it was never read.
 
     Args:
         matrix: Composed matrix dict with a ``roles`` key. Not mutated.
 
     Returns:
         ``(cleaned_matrix, errors)`` -- the cleaned copy and the same named
-        errors :func:`validate_matrix_model_support` would return. When there
+        errors :func:`validate_matrix_inert_config` would return. When there
         is nothing to strip the ORIGINAL object is returned, so a clean matrix
         costs no copy.
     """
-    errors = validate_matrix_model_support(matrix)
+    errors = validate_matrix_inert_config(matrix)
     if not errors:
         return matrix, errors
 
@@ -576,8 +718,9 @@ def strip_unsupported_effort(
             cfg = candidate.get("config")
             if not isinstance(cfg, dict) or not cfg:
                 continue
-            if model_ignores_effort(candidate.get("model", "")) is None:
-                continue
-            for key in EFFORT_KEYS:
-                cfg.pop(key, None)
+            provider = candidate.get("provider", "")
+            model = candidate.get("model", "")
+            for key in list(cfg):
+                if inert_config_rule(provider, model, key) is not None:
+                    cfg.pop(key, None)
     return cleaned, errors

@@ -63,7 +63,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         compose_matrix,
         load_matrix,
         resolve_matrix_source,
-        strip_unsupported_effort,
+        strip_inert_config,
         validate_matrix_config,
     )
 
@@ -217,32 +217,45 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         else None
     )
 
-    # --- Reject effort keys the MODEL will never honour ---
+    # --- Reject config keys the target will never act on ---
     # A DIFFERENT class from the value validation below, which structurally
-    # cannot catch this one: `reasoning_effort: high` on a claude-haiku-*
-    # candidate is a DECLARED key with a LEGAL value on an INSTALLED provider,
-    # so it passes -- and is then collapsed to nothing when the request is
-    # built, because Haiku resolves every effort above 'low' to the same
-    # thinking budget. Measured consequence: anth-haiku-high (n=702) and
-    # anth-haiku-medium (n=736) were byte-identical configurations for a whole
-    # evaluation wave. Name it, then REMOVE it, so nothing downstream can carry
-    # an effort the model ignored and report it as applied.
+    # cannot catch EITHER shape of it. One table, two enforced rules:
+    #
+    #   * gemini (PROVIDER-keyed): `reasoning_effort` on a gemini candidate is
+    #     an UNDECLARED key, so validate_matrix_config takes its explicit
+    #     "undeclared key -- the open-key rule. Pass silently" branch
+    #     (matrix_loader.py). The key rides into the effective matrix, is
+    #     merged into the child provider's mount config, and is read by nobody
+    #     -- gemini consumes a closed set of 15 mount-config keys and no effort
+    #     key is among them. The VALUE is irrelevant: every level is equally
+    #     inert, because the read never happens.
+    #
+    #   * claude-haiku-* (MODEL-keyed): `reasoning_effort: high` on a haiku
+    #     candidate is a DECLARED key with a LEGAL value on an INSTALLED
+    #     provider, so it passes -- and is then collapsed to nothing when the
+    #     request is built, because Haiku resolves every effort above 'low' to
+    #     the same thinking budget. Measured consequence: anth-haiku-high
+    #     (n=702) and anth-haiku-medium (n=736) were byte-identical
+    #     configurations for a whole evaluation wave.
+    #
+    # Name it, then REMOVE it, so nothing downstream can carry a setting the
+    # target ignored and report it as applied.
     #
     # ERROR, not WARNING: the value-validation block below warns about a
     # mistyped value, which is a typo. This is a config that cannot work as
-    # written on any value.
+    # written on ANY value.
     #
     # Strip-and-continue rather than raise: a bad matrix must not take a
     # session down, and the offending key is dead data either way -- removing
     # it changes no wire behaviour, it only stops the lie.
     if effective_matrix:
-        effective_matrix, unsupported_errors = strip_unsupported_effort(
+        effective_matrix, inert_errors = strip_inert_config(
             {"roles": effective_matrix}
         )
         effective_matrix = effective_matrix.get("roles", {})
-        if unsupported_errors:
+        if inert_errors:
             logger.error("[ROUTING] Inert config in matrix %s:", matrix_path)
-            for err in unsupported_errors:
+            for err in inert_errors:
                 logger.error("[ROUTING]   %s", err)
             logger.error(
                 "[ROUTING]   Key REMOVED from the effective matrix. "

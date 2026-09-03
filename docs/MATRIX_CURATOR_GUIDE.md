@@ -194,6 +194,54 @@ Common values:
 
 Only include `config` when a candidate genuinely needs different parameters from the provider default. Most candidates don't need it.
 
+> **A key only works if the target actually reads it.** Validation of the
+> `config` map is closed on VALUES but open on KEYS — a key the provider does
+> not declare passes silently and is then read by nobody. The loader now
+> rejects known-inert combinations up front (`INERT_CONFIG_RULES` in
+> `modules/hooks-routing/amplifier_module_hooks_routing/matrix_loader.py`),
+> logging an ERROR that names the key, the candidate and the replacement, and
+> removing the key from the effective matrix so nothing downstream reports it
+> as applied.
+>
+> **Two rules are enforced today, and they key differently:**
+>
+> | rule | keys on | why |
+> |---|---|---|
+> | `reasoning_effort` / `effort` on any **`gemini`** candidate | the PROVIDER | provider-gemini never reads an effort key from mount config, so *every* model it serves is affected |
+> | `reasoning_effort` / `effort` on any **`claude-haiku-*`** model | the MODEL | provider-anthropic *does* read the key, but Haiku collapses every level above `low` into one identical request |
+>
+> **Gemini.** provider-gemini consumes a closed set of 15 mount-config keys
+> and no effort key is among them, so the setting is inert at *every* value.
+> To control Gemini's thinking depth from a matrix, use the one mount-config
+> key gemini does merge into the request:
+>
+> ```yaml
+> - provider: gemini
+>   model: gemini-3.7-flash        # pin an exact 3.x id — see caution below
+>   config:
+>     extra_request_params:
+>       thinking_config:
+>         thinking_level: high     # minimal | low | medium | high
+> ```
+>
+> Caution: gemini-2.x models reject `thinking_level` with a 400 and accept
+> only the legacy `thinking_budget`, so a class glob like
+> `gemini-*-pro-preview` that can resolve to a 2.x id must be pinned first.
+>
+> **Haiku.** Measured on the wire (20260901-threeknob capture root): across
+> 1,438 `claude-haiku-4-5` requests the effort parameter was absent and
+> `thinking.budget_tokens` was pinned at 32000 regardless of the effort the
+> matrix asked for, making an `high` cell and a `medium` cell byte-identical.
+> Use the dial Haiku actually reads, with the exact value the effort level
+> already resolved to (`low` → 4096, everything above → 32000):
+>
+> ```yaml
+> - provider: anthropic
+>   model: claude-haiku-4-5
+>   config:
+>     thinking_budget_tokens: 32000
+> ```
+
 > **Key spelling and valid values are enforced by tests.** `reasoning_effort`
 > is the single canonical spelling — legacy spellings like `effort` are inert
 > on some providers and must not appear in matrix files. Valid values differ
