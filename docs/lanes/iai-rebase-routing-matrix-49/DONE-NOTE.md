@@ -33,7 +33,10 @@ The publication claim in `DONE.json` names the branch that carries PR #49.
 
 ## PR review state — READY (final), after two owner-directed reversals
 
-**Final state: `draft=false`, `state=open`, `merged=false`, head `3269f8c`.**
+**Final state: `draft=false`, `state=open`, `merged=false`.**
+The verified head sha lives in `DONE.json`'s `publication` block, read back from
+the remote — deliberately NOT repeated here, because a sha written into a
+committed file changes the very sha it names.
 All three transitions are on the PR timeline, with actor and timestamp — the
 record is complete rather than tidied:
 
