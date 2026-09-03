@@ -11,6 +11,12 @@ BEFORE this feature -- over every shipped matrix and every role, against a
 fixed fake provider roster. This test replays the identical harness against the
 current tree and asserts the results are equal, entry for entry.
 
+A matrix added AFTER that commit has no pre-feature answer, so it cannot be in
+the recording. It is declared in ``NEW_SINCE_RECORDING`` and locked instead by
+``NEW_MATRIX_EXPECTATIONS`` -- an explicit, hand-written role -> (provider,
+model, effort) map checked by ``test_new_matrix_resolution_is_locked``. Both
+declarations are required: a name in one without the other fails.
+
 If this test fails, the default path moved. That is either a bug in the feature
 or a deliberate routing change; either way it must be named in a PR body and
 the fixture regenerated on purpose, never silently.
@@ -81,6 +87,50 @@ FAKE_MODELS: dict[str, list[str]] = {
 # does not need to re-derive that this file carries one on purpose.
 PRESET_BEARING = {"openai-knob-consistent.yaml", "openai.yaml"}
 
+# Matrices that did not EXIST when the pre-feature recording was taken, and so
+# have no pre-feature answer to be identical to. They are not exempt from
+# checking -- they are checked by `test_new_matrix_resolution_is_locked` below,
+# against an explicit expectation written out in full here.
+#
+# This set exists so the two honest options for a NEW matrix are both visible:
+# either it belongs in the recording (it does not -- the recording is a
+# snapshot of commit 99d9b08, and appending to it would misstate the fixture's
+# provenance), or it carries a `preset:` block (it does not -- see the file's
+# own header for why that is deliberate). Silently adding it to either set
+# would exempt it from every check in this module, which is the exact failure
+# `test_golden_covers_every_pre_existing_matrix` was written to prevent.
+#
+# `openai-cheap-fast.yaml` added 2026-09-02 (lane ytg-presets-revision): a
+# cheap-rung-everywhere OpenAI matrix. Gate evidence:
+# docs/lanes/ytg-presets-revision/{PREREGISTRATION,FINDINGS}.md.
+NEW_SINCE_RECORDING = {"openai-cheap-fast.yaml"}
+
+# The lock for every name in NEW_SINCE_RECORDING: role -> (provider, model,
+# reasoning_effort) under FAKE_MODELS. Written by hand from the matrix's stated
+# contract, NOT generated from the file -- a generated expectation would agree
+# with any future edit and check nothing.
+NEW_MATRIX_EXPECTATIONS: dict[str, dict[str, tuple[str, str, str | None]]] = {
+    # Contract: EVERY role on the cheap rung at medium, whatever the root.
+    "openai-cheap-fast.yaml": {
+        role: ("openai", "gpt-5.6-luna", "medium")
+        for role in (
+            "general",
+            "fast",
+            "coding",
+            "ui-coding",
+            "security-audit",
+            "reasoning",
+            "critique",
+            "creative",
+            "writing",
+            "research",
+            "vision",
+            "image-gen",
+            "critical-ops",
+        )
+    },
+}
+
 
 def _fake_providers() -> dict[str, Any]:
     providers: dict[str, Any] = {}
@@ -129,11 +179,14 @@ def test_golden_covers_every_pre_existing_matrix() -> None:
     """
     on_disk = {p.name for p in ROUTING_DIR.glob("*.yaml")}
     recorded = set(_load_golden())
-    unaccounted = on_disk - recorded - PRESET_BEARING
+    unaccounted = on_disk - recorded - PRESET_BEARING - NEW_SINCE_RECORDING
     assert not unaccounted, (
-        "these matrices are neither in the pre-feature recording nor declared "
-        f"preset-bearing: {sorted(unaccounted)}"
+        "these matrices are neither in the pre-feature recording, nor declared "
+        "preset-bearing, nor declared new-since-recording (with a lock in "
+        f"NEW_MATRIX_EXPECTATIONS): {sorted(unaccounted)}"
     )
+    stale = NEW_SINCE_RECORDING - on_disk
+    assert not stale, f"declared new-since-recording but not on disk: {sorted(stale)}"
     vanished = recorded - on_disk
     assert not vanished, f"recorded matrices no longer on disk: {sorted(vanished)}"
 
@@ -149,6 +202,54 @@ def test_resolution_is_byte_identical_to_pre_feature(matrix_name: str) -> None:
         f"{matrix_name}: default-path resolution CHANGED.\n"
         f"  expected (pre-feature): {json.dumps(golden, sort_keys=True)}\n"
         f"  actual   (this tree):   {json.dumps(current, sort_keys=True)}"
+    )
+
+
+def test_every_new_matrix_declares_a_lock() -> None:
+    """No name may sit in NEW_SINCE_RECORDING without an explicit expectation.
+
+    Without this, adding a name to that set would be a silent exemption from
+    every check in this module -- exactly what the coverage test above exists
+    to prevent.
+    """
+    missing = NEW_SINCE_RECORDING - set(NEW_MATRIX_EXPECTATIONS)
+    assert not missing, (
+        f"declared new-since-recording but unlocked: {sorted(missing)} -- add "
+        "their full role->(provider, model, effort) expectation to "
+        "NEW_MATRIX_EXPECTATIONS"
+    )
+    orphan = set(NEW_MATRIX_EXPECTATIONS) - NEW_SINCE_RECORDING
+    assert not orphan, f"locked but not declared new-since-recording: {sorted(orphan)}"
+
+
+@pytest.mark.parametrize(
+    "matrix_name", sorted(NEW_SINCE_RECORDING), ids=lambda n: n.replace(".yaml", "")
+)
+def test_new_matrix_resolution_is_locked(matrix_name: str) -> None:
+    """A matrix added after the recording resolves exactly as it declares.
+
+    Same harness, same fake roster, same cold (no-caller) resolution as the
+    identity check above -- only the reference differs: a hand-written
+    expectation instead of a recording.
+    """
+    expected = NEW_MATRIX_EXPECTATIONS[matrix_name]
+    current = asyncio.run(_snapshot())[matrix_name]
+    actual = {
+        role: (
+            (
+                str(res[0].get("provider")),
+                str(res[0].get("model")),
+                (res[0].get("config") or {}).get("reasoning_effort"),
+            )
+            if (res := current.get(role))
+            else None
+        )
+        for role in expected
+    }
+    assert actual == expected, (
+        f"{matrix_name}: resolution does not match its declared contract.\n"
+        f"  expected: {json.dumps({k: list(v) for k, v in expected.items()}, sort_keys=True)}\n"
+        f"  actual:   {json.dumps({k: list(v) if v else None for k, v in actual.items()}, sort_keys=True)}"
     )
 
 
@@ -170,7 +271,8 @@ def test_preset_bearing_matrix_is_stock_without_a_caller() -> None:
 if __name__ == "__main__":  # pragma: no cover - maintenance entry point
     if "--regenerate" in sys.argv:
         snapshot = asyncio.run(_snapshot())
-        snapshot = {k: v for k, v in snapshot.items() if k not in PRESET_BEARING}
+        skip = PRESET_BEARING | NEW_SINCE_RECORDING
+        snapshot = {k: v for k, v in snapshot.items() if k not in skip}
         GOLDEN_PATH.write_text(
             json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )

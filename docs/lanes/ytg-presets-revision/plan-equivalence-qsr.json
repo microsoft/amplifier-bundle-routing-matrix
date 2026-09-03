@@ -1,0 +1,971 @@
+{
+  "callers": {
+    "COLD (no caller)": {
+      "shipped_openai": {
+        "coding": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "creative": {
+          "effort": null,
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "critical-ops": {
+          "effort": "high",
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "critique": {
+          "effort": "xhigh",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "fast": {
+          "effort": null,
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "general": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "image-gen": {
+          "effort": null,
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "reasoning": {
+          "effort": "xhigh",
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "research": {
+          "effort": "high",
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "security-audit": {
+          "effort": "xhigh",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "ui-coding": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "vision": {
+          "effort": null,
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "writing": {
+          "effort": null,
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        }
+      },
+      "vs": {
+        "docs/lanes/ytg-presets-revision/tools/cand/cand-qsr.yaml": {
+          "differing_roles": {
+            "coding": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "creative": {
+              "A": {
+                "effort": null,
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "critical-ops": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "critique": {
+              "A": {
+                "effort": "xhigh",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "fast": {
+              "A": {
+                "effort": null,
+                "model": "gpt-5.6-luna",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-luna",
+                "provider": "openai"
+              }
+            },
+            "general": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "image-gen": {
+              "A": {
+                "effort": null,
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "reasoning": {
+              "A": {
+                "effort": "xhigh",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              }
+            },
+            "research": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "security-audit": {
+              "A": {
+                "effort": "xhigh",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "ui-coding": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "vision": {
+              "A": {
+                "effort": null,
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "writing": {
+              "A": {
+                "effort": null,
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            }
+          },
+          "identical_to_shipped_openai": false,
+          "plan": {
+            "coding": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "creative": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "critical-ops": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "critique": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "fast": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "general": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "image-gen": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "reasoning": {
+              "effort": "high",
+              "model": "gpt-5.6-sol",
+              "provider": "openai"
+            },
+            "research": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "security-audit": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "ui-coding": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "vision": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "writing": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            }
+          }
+        }
+      }
+    },
+    "luna@medium": {
+      "shipped_openai": {
+        "coding": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "creative": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "critical-ops": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "critique": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "fast": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "general": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "image-gen": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "reasoning": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "research": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "security-audit": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "ui-coding": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "vision": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "writing": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        }
+      },
+      "vs": {
+        "docs/lanes/ytg-presets-revision/tools/cand/cand-qsr.yaml": {
+          "differing_roles": {
+            "reasoning": {
+              "A": {
+                "effort": "medium",
+                "model": "gpt-5.6-luna",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              }
+            }
+          },
+          "identical_to_shipped_openai": false,
+          "plan": {
+            "coding": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "creative": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "critical-ops": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "critique": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "fast": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "general": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "image-gen": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "reasoning": {
+              "effort": "high",
+              "model": "gpt-5.6-sol",
+              "provider": "openai"
+            },
+            "research": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "security-audit": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "ui-coding": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "vision": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "writing": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            }
+          }
+        }
+      }
+    },
+    "sol@high": {
+      "shipped_openai": {
+        "coding": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "creative": {
+          "effort": "high",
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "critical-ops": {
+          "effort": "high",
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "critique": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "fast": {
+          "effort": "high",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "general": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "image-gen": {
+          "effort": "high",
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "reasoning": {
+          "effort": "high",
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "research": {
+          "effort": "high",
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        },
+        "security-audit": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "ui-coding": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "vision": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "writing": {
+          "effort": "high",
+          "model": "gpt-5.6-sol",
+          "provider": "openai"
+        }
+      },
+      "vs": {
+        "docs/lanes/ytg-presets-revision/tools/cand/cand-qsr.yaml": {
+          "differing_roles": {
+            "creative": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "high",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "critical-ops": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "high",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "image-gen": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "high",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "research": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "high",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            },
+            "writing": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "high",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              }
+            }
+          },
+          "identical_to_shipped_openai": false,
+          "plan": {
+            "coding": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "creative": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "critical-ops": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "critique": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "fast": {
+              "effort": "high",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "general": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "image-gen": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "reasoning": {
+              "effort": "high",
+              "model": "gpt-5.6-sol",
+              "provider": "openai"
+            },
+            "research": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "security-audit": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "ui-coding": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "vision": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "writing": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            }
+          }
+        }
+      }
+    },
+    "terra@high": {
+      "shipped_openai": {
+        "coding": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "creative": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "critical-ops": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "critique": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "fast": {
+          "effort": "high",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "general": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "image-gen": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "reasoning": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "research": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "security-audit": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "ui-coding": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "vision": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "writing": {
+          "effort": "high",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        }
+      },
+      "vs": {
+        "docs/lanes/ytg-presets-revision/tools/cand/cand-qsr.yaml": {
+          "differing_roles": {
+            "reasoning": {
+              "A": {
+                "effort": "high",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              }
+            }
+          },
+          "identical_to_shipped_openai": false,
+          "plan": {
+            "coding": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "creative": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "critical-ops": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "critique": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "fast": {
+              "effort": "high",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "general": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "image-gen": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "reasoning": {
+              "effort": "high",
+              "model": "gpt-5.6-sol",
+              "provider": "openai"
+            },
+            "research": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "security-audit": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "ui-coding": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "vision": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "writing": {
+              "effort": "high",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            }
+          }
+        }
+      }
+    },
+    "terra@medium": {
+      "shipped_openai": {
+        "coding": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "creative": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "critical-ops": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "critique": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "fast": {
+          "effort": "medium",
+          "model": "gpt-5.6-luna",
+          "provider": "openai"
+        },
+        "general": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "image-gen": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "reasoning": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "research": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "security-audit": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "ui-coding": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "vision": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        },
+        "writing": {
+          "effort": "medium",
+          "model": "gpt-5.6-terra",
+          "provider": "openai"
+        }
+      },
+      "vs": {
+        "docs/lanes/ytg-presets-revision/tools/cand/cand-qsr.yaml": {
+          "differing_roles": {
+            "reasoning": {
+              "A": {
+                "effort": "medium",
+                "model": "gpt-5.6-terra",
+                "provider": "openai"
+              },
+              "B": {
+                "effort": "high",
+                "model": "gpt-5.6-sol",
+                "provider": "openai"
+              }
+            }
+          },
+          "identical_to_shipped_openai": false,
+          "plan": {
+            "coding": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "creative": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "critical-ops": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "critique": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "fast": {
+              "effort": "medium",
+              "model": "gpt-5.6-luna",
+              "provider": "openai"
+            },
+            "general": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "image-gen": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "reasoning": {
+              "effort": "high",
+              "model": "gpt-5.6-sol",
+              "provider": "openai"
+            },
+            "research": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "security-audit": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "ui-coding": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "vision": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            },
+            "writing": {
+              "effort": "medium",
+              "model": "gpt-5.6-terra",
+              "provider": "openai"
+            }
+          }
+        }
+      }
+    }
+  }
+}

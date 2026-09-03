@@ -1,0 +1,117 @@
+name: cand-qsr
+description: "quality-slow-reasonable candidate"
+updated: "2026-09-02"
+
+preset:
+  tier_ladder:
+    openai:
+      - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
+      - ["gpt-?.?-terra*"]
+      - ["gpt-?.?-sol*", "gpt-[0-9].[0-9]"]
+  delegation:
+    inherit: tier-and-effort
+    escalate:
+      allow_roles: [reasoning]
+      max_uses: 3
+      on_exhausted: fall_back
+
+roles:
+  general:
+    description: "general"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  fast:
+    description: "fast"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-luna*
+        config:
+          reasoning_effort: medium
+      - provider: openai
+        model: gpt-?.?-mini*
+        config:
+          reasoning_effort: medium
+      - provider: openai
+        model: gpt-?.?-nano*
+        config:
+          reasoning_effort: medium
+  coding:
+    description: "coding"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  ui-coding:
+    description: "ui-coding"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  security-audit:
+    description: "security-audit"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  reasoning:
+    description: "reasoning"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-sol*
+        config:
+          reasoning_effort: high
+  critique:
+    description: "critique"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  creative:
+    description: "creative"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  writing:
+    description: "writing"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  research:
+    description: "research"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  vision:
+    description: "vision"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  image-gen:
+    description: "image-gen"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
+  critical-ops:
+    description: "critical-ops"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
