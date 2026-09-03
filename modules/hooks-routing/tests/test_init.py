@@ -188,13 +188,17 @@ class TestMount:
             config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
         )
 
-        # Should have registered two hooks
-        assert coordinator.hooks.register.call_count == 2
+        # Should have registered three hooks. session:resume joined
+        # session:start in model_performance-fde: the kernel emits one XOR the
+        # other per process (amplifier_core/session.py:151), so a resumed ROOT
+        # session never fires session:start and routed on nothing.
+        assert coordinator.hooks.register.call_count == 3
 
         # Check the event names
         calls = coordinator.hooks.register.call_args_list
         events_registered = {call.args[0] for call in calls}
         assert "session:start" in events_registered
+        assert "session:resume" in events_registered
         assert "provider:request" in events_registered
 
     @pytest.mark.asyncio
@@ -206,9 +210,10 @@ class TestMount:
         # which has no routing/ subdirectory
         await mount(coordinator, config={"default_matrix": "nonexistent"})
 
-        # Should still register hooks (graceful degradation)
+        # Should still register hooks (graceful degradation):
+        # session:start, session:resume, provider:request.
         if hasattr(coordinator, "hooks"):
-            assert coordinator.hooks.register.call_count == 2
+            assert coordinator.hooks.register.call_count == 3
 
     @pytest.mark.asyncio
     async def test_mount_with_config_overrides(self, tmp_path: Path) -> None:

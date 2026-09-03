@@ -1,0 +1,18 @@
+events.jsonl files scanned (excluding context-intelligence mirrors): 1462
+
+--- Q1: root sessions ---
+  root sessions                     : 633
+  ... that resumed at least once    : 212
+  lifecycle legs across those       : 1238
+  legs that fired session:start     : 212
+  legs with the handler NOT invoked : 1026  (82.9%)
+
+--- Q2: delegate children ---
+  delegate child sessions           : 825
+  ... that resumed at least once    : 68
+  (their resumed legs fire fork -> resume -> START; see
+   delegate-resume-order.txt for the verbatim ordering)
+
+--- Q3: is `turn_count` a sound discriminator? ---
+  delegate_child  session:resume with turn_count=True : 102
+  root            session:resume with turn_count=False: 1029

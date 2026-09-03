@@ -1,0 +1,262 @@
+FFFF..FF                                                                 [100%]
+=================================== FAILURES ===================================
+_______________ test_mount_registers_the_resume_lifecycle_event ________________
+
+tmp_path = PosixPath('/tmp/pytest-of-bkrabach/pytest-3305/test_mount_registers_the_resum0')
+
+    @pytest.mark.asyncio
+    async def test_mount_registers_the_resume_lifecycle_event(tmp_path: Path) -> None:
+        """Without a session:resume registration, a root resume routes on nothing."""
+        coordinator, _bus = _make_coordinator(_captured_providers())
+        await _mount(coordinator, tmp_path)
+    
+        registered = {c.args[0] for c in coordinator.hooks.register.call_args_list}
+>       assert "session:resume" in registered, (
+            "hooks-routing must handle the lifecycle event a RESUMED ROOT session "
+            f"actually emits. Registered: {sorted(registered)}"
+        )
+E       AssertionError: hooks-routing must handle the lifecycle event a RESUMED ROOT session actually emits. Registered: ['provider:request', 'session:start']
+E       assert 'session:resume' in {'provider:request', 'session:start'}
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:180: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  amplifier_module_hooks_routing:__init__.py:132 [ROUTING] matrix 'balanced' is SHADOWED — /tmp/pytest-of-bkrabach/pytest-3305/test_mount_registers_the_resum0/routing/balanced.yaml (source=user) WINS and is the only file in effect; same-named matrix file(s) IGNORED: /home/bkrabach/dev/hw-model-performance/lanes/fde-resume-session-routing/amplifier-bundle-routing-matrix/routing/balanced.yaml (source=bundle). Edits to the ignored file(s), including anything shipped in a bundle update, have NO effect on this session. To use a shadowed file instead, remove or rename /tmp/pytest-of-bkrabach/pytest-3305/test_mount_registers_the_resum0/routing/balanced.yaml.
+_____________ test_resume_only_lifecycle_resolves_agent_model_role _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-bkrabach/pytest-3305/test_resume_only_lifecycle_res0')
+
+    @pytest.mark.asyncio
+    async def test_resume_only_lifecycle_resolves_agent_model_role(
+        tmp_path: Path,
+    ) -> None:
+        """Layer B on a resume-only leg: the deliverable's decisive assertion."""
+        agents = {"scout": {"model_role": "fast"}}
+        coordinator, _bus = _make_coordinator(_captured_providers(), agents=agents)
+        await _mount(coordinator, tmp_path)
+    
+        # A resumed ROOT session's ONLY lifecycle event. No session:start ever fires.
+>       await _handler_for(coordinator, "session:resume")("session:resume", {})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:200: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+coordinator = <MagicMock id='247599747510496'>, event = 'session:resume'
+
+    def _handler_for(coordinator: MagicMock, event: str) -> Any:
+        """The handler hooks-routing registered for ``event``.
+    
+        Fails with a readable message rather than a bare StopIteration when the
+        event was never registered -- which is exactly the pre-fix state.
+        """
+        for call in coordinator.hooks.register.call_args_list:
+            if call.args[0] == event:
+                return call.args[1]
+        registered = sorted({c.args[0] for c in coordinator.hooks.register.call_args_list})
+>       raise AssertionError(
+            f"hooks-routing registered no handler for {event!r}. Registered: {registered}. "
+            "A resumed ROOT session emits session:resume INSTEAD of session:start "
+            "(amplifier_core/session.py:151), so nothing in on_session_start runs."
+        )
+E       AssertionError: hooks-routing registered no handler for 'session:resume'. Registered: ['provider:request', 'session:start']. A resumed ROOT session emits session:resume INSTEAD of session:start (amplifier_core/session.py:151), so nothing in on_session_start runs.
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:156: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  amplifier_module_hooks_routing:__init__.py:132 [ROUTING] matrix 'balanced' is SHADOWED — /tmp/pytest-of-bkrabach/pytest-3305/test_resume_only_lifecycle_res0/routing/balanced.yaml (source=user) WINS and is the only file in effect; same-named matrix file(s) IGNORED: /home/bkrabach/dev/hw-model-performance/lanes/fde-resume-session-routing/amplifier-bundle-routing-matrix/routing/balanced.yaml (source=bundle). Edits to the ignored file(s), including anything shipped in a bundle update, have NO effect on this session. To use a shadowed file instead, remove or rename /tmp/pytest-of-bkrabach/pytest-3305/test_resume_only_lifecycle_res0/routing/balanced.yaml.
+________________ test_resume_only_lifecycle_reasserts_role_pin _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-bkrabach/pytest-3305/test_resume_only_lifecycle_rea0')
+
+    @pytest.mark.asyncio
+    async def test_resume_only_lifecycle_reasserts_role_pin(tmp_path: Path) -> None:
+        """The 74w reassert on the leg its own docstring claimed to cover."""
+        providers = _captured_providers()
+        coordinator, bus = _make_coordinator(
+            providers,
+            own_prefs=[
+                {
+                    "provider": "luna",
+                    "model": "gpt-5.6-luna",
+                    "config": {"reasoning_effort": "high"},
+                }
+            ],
+        )
+        await _mount(coordinator, tmp_path)
+    
+        # Precondition: this IS the captured broken state.
+        assert _priority_winner(providers) == "sol"
+    
+>       await _handler_for(coordinator, "session:resume")("session:resume", {})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:229: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+coordinator = <MagicMock id='247599747682992'>, event = 'session:resume'
+
+    def _handler_for(coordinator: MagicMock, event: str) -> Any:
+        """The handler hooks-routing registered for ``event``.
+    
+        Fails with a readable message rather than a bare StopIteration when the
+        event was never registered -- which is exactly the pre-fix state.
+        """
+        for call in coordinator.hooks.register.call_args_list:
+            if call.args[0] == event:
+                return call.args[1]
+        registered = sorted({c.args[0] for c in coordinator.hooks.register.call_args_list})
+>       raise AssertionError(
+            f"hooks-routing registered no handler for {event!r}. Registered: {registered}. "
+            "A resumed ROOT session emits session:resume INSTEAD of session:start "
+            "(amplifier_core/session.py:151), so nothing in on_session_start runs."
+        )
+E       AssertionError: hooks-routing registered no handler for 'session:resume'. Registered: ['provider:request', 'session:start']. A resumed ROOT session emits session:resume INSTEAD of session:start (amplifier_core/session.py:151), so nothing in on_session_start runs.
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:156: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  amplifier_module_hooks_routing:__init__.py:132 [ROUTING] matrix 'balanced' is SHADOWED — /tmp/pytest-of-bkrabach/pytest-3305/test_resume_only_lifecycle_rea0/routing/balanced.yaml (source=user) WINS and is the only file in effect; same-named matrix file(s) IGNORED: /home/bkrabach/dev/hw-model-performance/lanes/fde-resume-session-routing/amplifier-bundle-routing-matrix/routing/balanced.yaml (source=bundle). Edits to the ignored file(s), including anything shipped in a bundle update, have NO effect on this session. To use a shadowed file instead, remove or rename /tmp/pytest-of-bkrabach/pytest-3305/test_resume_only_lifecycle_rea0/routing/balanced.yaml.
+___________ test_resume_only_lifecycle_emits_matrix_source_telemetry ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-bkrabach/pytest-3305/test_resume_only_lifecycle_emi0')
+
+    @pytest.mark.asyncio
+    async def test_resume_only_lifecycle_emits_matrix_source_telemetry(
+        tmp_path: Path,
+    ) -> None:
+        """routing:matrix-loaded is the forensic record; a resume must not lose it."""
+        coordinator, bus = _make_coordinator(_captured_providers())
+        await _mount(coordinator, tmp_path)
+    
+>       await _handler_for(coordinator, "session:resume")("session:resume", {})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:248: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+coordinator = <MagicMock id='247599747506848'>, event = 'session:resume'
+
+    def _handler_for(coordinator: MagicMock, event: str) -> Any:
+        """The handler hooks-routing registered for ``event``.
+    
+        Fails with a readable message rather than a bare StopIteration when the
+        event was never registered -- which is exactly the pre-fix state.
+        """
+        for call in coordinator.hooks.register.call_args_list:
+            if call.args[0] == event:
+                return call.args[1]
+        registered = sorted({c.args[0] for c in coordinator.hooks.register.call_args_list})
+>       raise AssertionError(
+            f"hooks-routing registered no handler for {event!r}. Registered: {registered}. "
+            "A resumed ROOT session emits session:resume INSTEAD of session:start "
+            "(amplifier_core/session.py:151), so nothing in on_session_start runs."
+        )
+E       AssertionError: hooks-routing registered no handler for 'session:resume'. Registered: ['provider:request', 'session:start']. A resumed ROOT session emits session:resume INSTEAD of session:start (amplifier_core/session.py:151), so nothing in on_session_start runs.
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:156: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  amplifier_module_hooks_routing:__init__.py:132 [ROUTING] matrix 'balanced' is SHADOWED — /tmp/pytest-of-bkrabach/pytest-3305/test_resume_only_lifecycle_emi0/routing/balanced.yaml (source=user) WINS and is the only file in effect; same-named matrix file(s) IGNORED: /home/bkrabach/dev/hw-model-performance/lanes/fde-resume-session-routing/amplifier-bundle-routing-matrix/routing/balanced.yaml (source=bundle). Edits to the ignored file(s), including anything shipped in a bundle update, have NO effect on this session. To use a shadowed file instead, remove or rename /tmp/pytest-of-bkrabach/pytest-3305/test_resume_only_lifecycle_emi0/routing/balanced.yaml.
+________ test_delegate_resume_leg_runs_once_and_still_at_session_start _________
+
+tmp_path = PosixPath('/tmp/pytest-of-bkrabach/pytest-3305/test_delegate_resume_leg_runs_0')
+
+    @pytest.mark.asyncio
+    async def test_delegate_resume_leg_runs_once_and_still_at_session_start(
+        tmp_path: Path,
+    ) -> None:
+        """The production sequence that the naive fix would have double-run.
+    
+        ``fork -> resume(turn_count) -> START`` -- both events reach the same bus.
+        The spawner's observability emit must be ignored, so the delegate leg runs at
+        ``session:start`` exactly where it ran before this change, exactly once.
+        """
+        agents = {"scout": {"model_role": "fast"}}
+        coordinator, bus = _make_coordinator(_captured_providers(), agents=agents)
+        await _mount(coordinator, tmp_path)
+    
+        spawner_payload = {
+            "session_id": "0000000000000000-dc081e8b5a0b43c3_anchors-amp-dev-git-ops",
+            "parent_id": "20d86f3e-444a-4f5c-9632-18318304faba",
+            "agent_name": "anchors-amp-dev:git-ops",
+            "turn_count": 25,
+        }
+    
+>       await _handler_for(coordinator, "session:resume")("session:resume", spawner_payload)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:344: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+coordinator = <MagicMock id='247599747177248'>, event = 'session:resume'
+
+    def _handler_for(coordinator: MagicMock, event: str) -> Any:
+        """The handler hooks-routing registered for ``event``.
+    
+        Fails with a readable message rather than a bare StopIteration when the
+        event was never registered -- which is exactly the pre-fix state.
+        """
+        for call in coordinator.hooks.register.call_args_list:
+            if call.args[0] == event:
+                return call.args[1]
+        registered = sorted({c.args[0] for c in coordinator.hooks.register.call_args_list})
+>       raise AssertionError(
+            f"hooks-routing registered no handler for {event!r}. Registered: {registered}. "
+            "A resumed ROOT session emits session:resume INSTEAD of session:start "
+            "(amplifier_core/session.py:151), so nothing in on_session_start runs."
+        )
+E       AssertionError: hooks-routing registered no handler for 'session:resume'. Registered: ['provider:request', 'session:start']. A resumed ROOT session emits session:resume INSTEAD of session:start (amplifier_core/session.py:151), so nothing in on_session_start runs.
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:156: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  amplifier_module_hooks_routing:__init__.py:132 [ROUTING] matrix 'balanced' is SHADOWED — /tmp/pytest-of-bkrabach/pytest-3305/test_delegate_resume_leg_runs_0/routing/balanced.yaml (source=user) WINS and is the only file in effect; same-named matrix file(s) IGNORED: /home/bkrabach/dev/hw-model-performance/lanes/fde-resume-session-routing/amplifier-bundle-routing-matrix/routing/balanced.yaml (source=bundle). Edits to the ignored file(s), including anything shipped in a bundle update, have NO effect on this session. To use a shadowed file instead, remove or rename /tmp/pytest-of-bkrabach/pytest-3305/test_delegate_resume_leg_runs_0/routing/balanced.yaml.
+________ test_two_kernel_shaped_lifecycle_events_cannot_double_resolve _________
+
+tmp_path = PosixPath('/tmp/pytest-of-bkrabach/pytest-3305/test_two_kernel_shaped_lifecyc0')
+
+    @pytest.mark.asyncio
+    async def test_two_kernel_shaped_lifecycle_events_cannot_double_resolve(
+        tmp_path: Path,
+    ) -> None:
+        """Hard latch: correctness must not rest on another package's emit count.
+    
+        The ``turn_count`` discriminator covers today's known second emitter. The
+        latch covers the one nobody has written yet.
+        """
+        agents = {"scout": {"model_role": "fast"}}
+        coordinator, bus = _make_coordinator(_captured_providers(), agents=agents)
+        await _mount(coordinator, tmp_path)
+    
+>       await _handler_for(coordinator, "session:resume")("session:resume", {})
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:373: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+coordinator = <MagicMock id='247599745902896'>, event = 'session:resume'
+
+    def _handler_for(coordinator: MagicMock, event: str) -> Any:
+        """The handler hooks-routing registered for ``event``.
+    
+        Fails with a readable message rather than a bare StopIteration when the
+        event was never registered -- which is exactly the pre-fix state.
+        """
+        for call in coordinator.hooks.register.call_args_list:
+            if call.args[0] == event:
+                return call.args[1]
+        registered = sorted({c.args[0] for c in coordinator.hooks.register.call_args_list})
+>       raise AssertionError(
+            f"hooks-routing registered no handler for {event!r}. Registered: {registered}. "
+            "A resumed ROOT session emits session:resume INSTEAD of session:start "
+            "(amplifier_core/session.py:151), so nothing in on_session_start runs."
+        )
+E       AssertionError: hooks-routing registered no handler for 'session:resume'. Registered: ['provider:request', 'session:start']. A resumed ROOT session emits session:resume INSTEAD of session:start (amplifier_core/session.py:151), so nothing in on_session_start runs.
+
+modules/hooks-routing/tests/test_resume_lifecycle.py:156: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  amplifier_module_hooks_routing:__init__.py:132 [ROUTING] matrix 'balanced' is SHADOWED — /tmp/pytest-of-bkrabach/pytest-3305/test_two_kernel_shaped_lifecyc0/routing/balanced.yaml (source=user) WINS and is the only file in effect; same-named matrix file(s) IGNORED: /home/bkrabach/dev/hw-model-performance/lanes/fde-resume-session-routing/amplifier-bundle-routing-matrix/routing/balanced.yaml (source=bundle). Edits to the ignored file(s), including anything shipped in a bundle update, have NO effect on this session. To use a shadowed file instead, remove or rename /tmp/pytest-of-bkrabach/pytest-3305/test_two_kernel_shaped_lifecyc0/routing/balanced.yaml.
+=========================== short test summary info ============================
+FAILED modules/hooks-routing/tests/test_resume_lifecycle.py::test_mount_registers_the_resume_lifecycle_event
+FAILED modules/hooks-routing/tests/test_resume_lifecycle.py::test_resume_only_lifecycle_resolves_agent_model_role
+FAILED modules/hooks-routing/tests/test_resume_lifecycle.py::test_resume_only_lifecycle_reasserts_role_pin
+FAILED modules/hooks-routing/tests/test_resume_lifecycle.py::test_resume_only_lifecycle_emits_matrix_source_telemetry
+FAILED modules/hooks-routing/tests/test_resume_lifecycle.py::test_delegate_resume_leg_runs_once_and_still_at_session_start
+FAILED modules/hooks-routing/tests/test_resume_lifecycle.py::test_two_kernel_shaped_lifecycle_events_cannot_double_resolve
+6 failed, 2 passed in 0.09s

@@ -23,11 +23,27 @@ time and simply ignored by the mount plan.
 Why hooks-routing can fix it here
 ---------------------------------
 ``loop-streaming._select_provider`` reads ``priority`` off the LIVE provider
-objects on every request -- not from a frozen plan. ``session:start`` fires on
-the resumed leg *before* the first ``provider:resolve``. So restoring the
-promotion on those live objects at ``session:start`` is sufficient, and it is
-squarely this module's business: hooks-routing owns model_role -> provider
-intent.
+objects on every request -- not from a frozen plan. The session's lifecycle
+event fires *before* the first ``provider:resolve``, so restoring the promotion
+on those live objects there is sufficient, and it is squarely this module's
+business: hooks-routing owns model_role -> provider intent.
+
+WHICH lifecycle event, corrected (model_performance-fde)
+--------------------------------------------------------
+This docstring used to say ``session:start`` fires on the resumed leg, and
+``__init__.py`` used to register only for it. That is TRUE for a resumed
+DELEGATE child -- the population 74w was measured on -- because the child is
+reconstructed with ``is_resumed=False`` and so emits ``session:start``; the
+capture above is exactly such a child. It is FALSE for a resumed ROOT session,
+which emits ``session:resume`` INSTEAD (``amplifier_core/session.py:151``). For
+those legs this file never ran at all between 74w landing and fde.
+
+Measured blast radius of that gap, committed captures: **nil**. 0 of 212 resumed
+root sessions in the corpus declared a session-level ``provider_preferences``,
+so there was no pin to reassert on any of them -- root sessions do not carry
+role pins, delegates do. The gap was real, and the reassert it silenced was a
+no-op every time. The materially affected half of fde was layer-B
+``model_role`` resolution, not this file.
 
 THIS IS DEFENSE IN DEPTH, NOT THE ROOT CAUSE
 --------------------------------------------
