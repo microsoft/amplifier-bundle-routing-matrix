@@ -13,6 +13,15 @@ objects on every request, so hooks-routing can restore the promotion at
 
 Capture: 20260901-rebaseline/runs/val-rb-oai-sol-xhigh-s1-01
          .../0000000000000000-25443a97b60d4965_anchors-amp-dev-git-ops
+
+SCOPE, corrected (model_performance-fde)
+----------------------------------------
+Every test below simulates a resume by firing ``session:start`` -- which is
+right for the DELEGATE child this file was measured on (reconstructed with
+``is_resumed=False``, so it really does emit ``session:start`` on its resumed
+leg), and wrong as a general statement about resumes. A resumed ROOT session
+emits ``session:resume`` instead (``amplifier_core/session.py:151``), and until
+fde nothing here ran on that leg. ``test_resume_lifecycle.py`` covers it.
 """
 
 from __future__ import annotations

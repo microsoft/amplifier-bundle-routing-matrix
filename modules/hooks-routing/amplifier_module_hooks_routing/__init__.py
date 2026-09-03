@@ -40,7 +40,12 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     """Mount the routing matrix hook.
 
     Loads the default matrix, composes with user overrides, registers
-    ``session:start`` and ``provider:request`` hooks.
+    ``session:start``, ``session:resume`` and ``provider:request`` hooks.
+
+    ``session:start`` and ``session:resume`` share one handler, because the
+    kernel emits one XOR the other per process depending on whether the session
+    was resumed (``amplifier_core/session.py:151``). See the handler for why
+    "share one handler" is not the same as "may run twice".
     """
     config = config or {}
 
@@ -51,8 +56,8 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             f"Valid values: {', '.join(VALID_PLACEMENTS)}."
         )
 
-    # model_performance-74w: restore this session's own model_role pin at
-    # session:start when the live mount ordering has drifted away from it
+    # model_performance-74w: restore this session's own model_role pin at the
+    # session's lifecycle event when the live mount ordering has drifted from it
     # (a RESUME re-imposes settings priority over a child's promotion --
     # upstream defect model_performance-rc0). No-op unless there is a real
     # disagreement; see role_pin.reassert_own_role_pin. Escape hatch for an
