@@ -33,7 +33,7 @@ The publication claim in `DONE.json` names the branch that carries PR #49.
 
 ## PR review state — READY (final), after two owner-directed reversals
 
-**Final state: `draft=false`, `state=open`, `merged=false`, head `7374c7a`.**
+**Final state: `draft=false`, `state=open`, `merged=false`, head `3269f8c`.**
 All three transitions are on the PR timeline, with actor and timestamp — the
 record is complete rather than tidied:
 
