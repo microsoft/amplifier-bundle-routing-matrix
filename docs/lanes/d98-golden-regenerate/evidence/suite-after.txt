@@ -1,0 +1,13 @@
+=== FULL SUITE (lane, fixed) ===
+........................................................................ [ 98%]
+........                                                                 [100%]
+584 passed in 2.55s
+5 | import textwrap
+  |        ^^^^^^^^
+6 | from pathlib import Path
+  |
+help: Remove unused import: `textwrap`
+
+Found 2 errors.
+[*] 1 fixable with the `--fix` option.
+ M tests/test_default_resolution_unchanged.py
