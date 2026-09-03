@@ -339,9 +339,61 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         coordinator.register_capability("model_role_resolver", _resolver)
 
     # ------------------------------------------------------------------
-    # Hook 1: session:start — resolve model_role for all agents
+    # Hook 1: session:start / session:resume — resolve model_role for all agents
     # ------------------------------------------------------------------
+    # model_performance-fde. The kernel picks ONE lifecycle event per process,
+    # mutually exclusively (amplifier_core/session.py:151):
+    #
+    #     event_base = SESSION_RESUME if self._is_resumed else SESSION_START
+    #
+    # Registering on "session:start" alone therefore skipped this entire handler
+    # on a RESUMED ROOT session -- every interactive `amplifier` resume and every
+    # multi-turn eval driver. Measured across the committed capture corpus: 212
+    # root sessions resumed over 1238 lifecycle legs, of which only 212 fired
+    # session:start; 1026 legs (82.9%) ran with layer-B resolution, the 74w
+    # role-pin reassert and the routing:matrix-loaded telemetry all skipped.
+    #
+    # Registering on both events is NECESSARY BUT NOT SUFFICIENT, and the naive
+    # form is a regression: a resumed DELEGATE child receives BOTH events on the
+    # same bus, ~5ms apart. amplifier_app_cli/session_spawner.py:1763-1774 emits
+    # its own observability "session:resume" on the child coordinator's hooks
+    # bus, and the reconstructed child session (is_resumed=False) then emits the
+    # kernel "session:start". Measured in the corpus: fork -> resume -> START on
+    # every delegate resume leg. Two guards keep that from double-running:
+    #
+    #   1. _lifecycle_handled -- a hard latch. The body runs at most once per
+    #      mount() no matter how many lifecycle emitters exist, now or later.
+    #      This is what makes "no double resolution, no duplicate
+    #      routing:matrix-loaded emit" a property of this module rather than a
+    #      bet on another package's emit count.
+    #   2. The spawner-emit discriminator below, so a delegate leg still runs at
+    #      session:start exactly as it did before -- byte-identical, same
+    #      ordering, not merely "once".
+    _lifecycle_handled = False
+
     async def on_session_start(event: str, data: dict[str, Any]) -> Any:
+        nonlocal _lifecycle_handled
+
+        from amplifier_core.models import HookResult
+
+        # session_spawner's observability emit, NOT the kernel lifecycle event.
+        # Discriminated on `turn_count`, which only the spawner's payload
+        # carries: measured over the whole committed corpus, 102/102 delegate
+        # resume payloads have it and 1029/1029 kernel root-resume payloads do
+        # not -- 100% separation, n=1131. A kernel session:start is guaranteed to
+        # follow on this leg (the child is reconstructed with is_resumed=False),
+        # so defer to it and leave the latch UNTOUCHED.
+        if (
+            event == "session:resume"
+            and isinstance(data, dict)
+            and "turn_count" in data
+        ):
+            return HookResult(action="continue")
+
+        if _lifecycle_handled:
+            return HookResult(action="continue")
+        _lifecycle_handled = True
+
         # Effective-source telemetry, emitted ONCE per session on the same
         # event surface this module already uses for clamp records (never
         # injected -- W2-S4 anti-pattern #6). Emitted here rather than at
@@ -365,8 +417,12 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                 logger.warning("routing matrix-source reporting failed", exc_info=True)
 
         # Restore this session's OWN role pin before anything else reads the
-        # provider ordering. Runs on every session:start -- including the one
-        # a RESUME fires, which is the leg where the promotion has been lost.
+        # provider ordering. Runs on whichever lifecycle event this process
+        # actually fires -- session:start for a new session or a resumed
+        # DELEGATE child, session:resume for a resumed ROOT session. Before
+        # model_performance-fde only the first two were covered, so on a root
+        # resume -- the leg where the promotion has been lost -- this never ran
+        # at all.
         # Emits rather than staying silent: a corrected pin is exactly the
         # signal the 74w capture had no way to surface.
         if reassert_role_pin:
@@ -515,8 +571,6 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                 "session.routing",
                 {**existing_routing, "preresolved_models": preresolved_models},
             )
-
-        from amplifier_core.models import HookResult
 
         return HookResult(action="continue")
 
@@ -716,6 +770,21 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             on_session_start,
             priority=5,
             name="routing-resolve",
+        )
+        # model_performance-fde: the kernel emits session:resume INSTEAD of
+        # session:start when a session is resumed (amplifier_core/session.py:151),
+        # so without this a resumed ROOT session skipped layer-B model_role
+        # resolution, the role-pin reassert and the routing:matrix-loaded
+        # telemetry entirely. Same handler object on purpose -- the two legs must
+        # not be able to drift apart. Double-running is prevented inside the
+        # handler (latch + spawner-emit discriminator), not by assuming the
+        # events are mutually exclusive: on a resumed delegate child they are
+        # measurably NOT.
+        hooks.register(
+            "session:resume",
+            on_session_start,
+            priority=5,
+            name="routing-resolve-resume",
         )
         hooks.register(
             "provider:request",
