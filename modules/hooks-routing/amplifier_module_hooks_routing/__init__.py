@@ -452,6 +452,25 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                 effective_matrix,
                 providers,
                 preresolved_models=preresolved_models,
+                # model_performance-cly: WITHOUT this, layer B (an agent's OWN
+                # frontmatter `model_role`) was silently inert on every
+                # multi-instance provider install. find_provider_by_type()
+                # matches a matrix candidate's bare `provider:` type (e.g.
+                # "anthropic") against the mounted providers dict first; when
+                # every instance is mounted under its own explicit `id:`
+                # ("opus", "sonnet", "haiku", ...) and none is keyed by the
+                # bare type, that direct match fails and the ONLY remaining
+                # strategy is the coordinator-backed fallback, which reads
+                # coordinator.config["providers"] to map instance ids back to
+                # module types. Omitting `coordinator` here disabled that
+                # fallback, so every candidate was skipped, resolve_model_role
+                # returned [], and no provider_preferences was ever written --
+                # leaving session_spawner.py:568-575's documented read with
+                # nothing to find and routing every such agent by session
+                # default instead. Layer A (the model_role_resolver
+                # capability) always passed it (resolver_class.py:220); this
+                # is the parity fix, not a new capability.
+                coordinator=coordinator,
                 caller_context=agent_caller_context,
                 preset=preset if agent_caller_context is not None else None,
                 escalations=escalations,
