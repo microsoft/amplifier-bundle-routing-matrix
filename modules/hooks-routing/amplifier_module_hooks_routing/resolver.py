@@ -94,10 +94,41 @@ def _module_type_of(spec: dict[str, Any] | None) -> str | None:
     return module.replace("provider-", "")
 
 
+def _instance_serves_model(spec: dict[str, Any] | None, model_pattern: str) -> bool:
+    """Whether this instance's own ``default_model`` satisfies *model_pattern*.
+
+    Used to break the bare-type fallback tie by INTENT rather than by
+    priority alone. An instance whose ``default_model`` already matches the
+    candidate's model pattern was configured *for that model*, so its
+    remaining knobs (``reasoning_effort``, ``fallback_on_overload``,
+    ``enable_1m_context``, ...) are the ones tuned for it.
+
+    Returns False for any spec that declares no ``default_model`` -- such an
+    instance expresses no model intent, so it can only be selected by the
+    priority tie-break (preserving pre-existing behaviour exactly).
+    """
+    if spec is None or not model_pattern:
+        return False
+    default_model = spec.get("config", {}).get("default_model", "")
+    if not isinstance(default_model, str) or not default_model:
+        return False
+
+    have = default_model.lower()
+    want = model_pattern.lower()
+    if _is_glob(model_pattern):
+        return fnmatch.fnmatch(have, want)
+    # Exact patterns: an instance pinned to a dated snapshot of the same
+    # model still serves it (claude-haiku-4-5 vs claude-haiku-4-5-20251001).
+    return have == want or _DATE_SUFFIX_RE.sub("", have) == _DATE_SUFFIX_RE.sub(
+        "", want
+    )
+
+
 def find_provider_by_type(
     providers: dict[str, Any],
     type_name: str,
     coordinator: Any = None,
+    model_pattern: str = "",
 ) -> tuple[str, Any] | None:
     """Find an installed provider by module type name or instance ID.
 
@@ -120,6 +151,11 @@ def find_provider_by_type(
             plan config (module/id/priority) when ``type_name`` is a bare
             module type that doesn't match any dict key directly (see
             fallback below).
+        model_pattern: Optional model name or glob from the same matrix
+            candidate (e.g. ``"claude-haiku-*"``). Used ONLY in the fallback
+            below, to break the multi-instance tie by model intent before
+            falling back to priority. Omitting it preserves the exact
+            pre-existing priority-only behaviour.
 
     Returns:
         ``(module_id, provider_instance)`` or ``None``.
@@ -134,9 +170,16 @@ def find_provider_by_type(
            explicit ``id:`` (needed for routing-matrix disambiguation) and
            none of them is the bare type itself. Search the mount plan's
            provider config list for every instance whose underlying module
-           type matches, and return the one configured with the highest
-           priority (lowest priority number) — mirroring the "default
-           provider" convention used elsewhere in the ecosystem.
+           type matches. Among those, prefer any instance whose own
+           ``default_model`` satisfies *model_pattern* — that instance was
+           configured FOR this model, so its knobs
+           (``reasoning_effort``, ``fallback_on_overload``, ...) are the
+           ones tuned for it, and ``spawn_utils._apply_single_override``
+           clones the WHOLE config of whichever instance is returned here.
+           Only when no instance declares a matching ``default_model`` does
+           this fall back to the one configured with the highest priority
+           (lowest priority number) — mirroring the "default provider"
+           convention used elsewhere in the ecosystem.
     """
     for name, provider in providers.items():
         if type_name in (
@@ -151,18 +194,70 @@ def find_provider_by_type(
         return None
 
     candidates: list[tuple[int, str]] = []
+    model_matched: list[tuple[int, str]] = []
     for name in providers:
         spec = _spec_for_instance(provider_specs, name)
         if _module_type_of(spec) == type_name:
             assert spec is not None  # narrowed by _module_type_of returning non-None
             priority = spec.get("config", {}).get("priority", 0)
             candidates.append((priority, name))
+            if _instance_serves_model(spec, model_pattern):
+                model_matched.append((priority, name))
 
     if not candidates:
         return None
 
-    candidates.sort(key=lambda c: c[0])
-    best_name = candidates[0][1]
+    # Prefer an instance configured FOR this model over the bare
+    # highest-priority one.
+    #
+    # The priority-only tie-break is correct while every instance of a module
+    # type is interchangeable, but it is actively wrong once instances are
+    # differentiated BY MODEL -- the common multi-instance Anthropic setup
+    # (an opus instance, a sonnet instance, a haiku instance, each carrying
+    # the knobs tuned for its own tier). There, a `fast` role asking for
+    # `provider: anthropic, model: claude-haiku-*` resolved to whichever
+    # instance held the lowest priority number -- typically the *opus*
+    # instance -- and amplifier_foundation.spawn_utils._apply_single_override
+    # then clones that instance's ENTIRE config, overriding only
+    # `default_model`. The child provider mounted as haiku while still
+    # carrying opus's `reasoning_effort: xhigh`, `fallback_on_overload: true`
+    # and `enable_1m_context: true`, none of which haiku honours -- producing
+    # the paired provider warnings:
+    #
+    #   [PROVIDER] fallback_on_overload is enabled for
+    #     default_model='claude-haiku-4-5-20251001' (family 'haiku'), but
+    #     'haiku' is the lowest tier on the Anthropic fallback ladder ...
+    #   [PROVIDER] reasoning_effort='xhigh' has no effect on
+    #     claude-haiku-4-5-20251001 (no output_config support) ...
+    #
+    # -- while the purpose-built haiku instance sat unused. Matching on the
+    # instance's own `default_model` picks the instance whose configuration
+    # was actually written for the requested model.
+    #
+    # Strictly narrowing: an instance is only preferred when it declares a
+    # `default_model` that matches. When no instance declares one, or none
+    # matches, `model_matched` is empty and the priority-only tie-break below
+    # runs byte-identically to before.
+    pool = model_matched or candidates
+    pool.sort(key=lambda t: t[0])
+    best_name = pool[0][1]
+
+    if model_matched:
+        candidates.sort(key=lambda t: t[0])
+        priority_only_name = candidates[0][1]
+        if priority_only_name != best_name:
+            # Observable, not silent: this is a routing decision a curator
+            # reading the matrix alone cannot see.
+            logger.info(
+                "Provider instance for bare type %r resolved by model intent: "
+                "%r (default_model matches %r) instead of %r (priority-only "
+                "pick)",
+                type_name,
+                best_name,
+                model_pattern,
+                priority_only_name,
+            )
+
     return (best_name, providers[best_name])
 
 
@@ -267,7 +362,9 @@ async def resolve_model_role(
             config = candidate.get("config", {})
 
             # Is this provider installed?
-            match = find_provider_by_type(providers, provider_type, coordinator)
+            match = find_provider_by_type(
+                providers, provider_type, coordinator, model_pattern=model_pattern
+            )
             if match is None:
                 continue
 

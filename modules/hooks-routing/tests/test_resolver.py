@@ -1204,3 +1204,243 @@ class TestKnownRoles:
 
     def test_empty_matrix_yields_empty_tuple(self) -> None:
         assert self._make({}).known_roles == ()
+
+
+# ---------------------------------------------------------------------------
+# Model-intent instance selection.
+#
+# Regression for the production defect: a multi-instance Anthropic setup where
+# every instance carries the knobs tuned for ITS OWN tier. `fast` asks for
+# `provider: anthropic, model: claude-haiku-*`; the bare-type fallback picked
+# the lowest-priority-NUMBER instance (opus, priority 1), and
+# amplifier_foundation.spawn_utils._apply_single_override then cloned that
+# instance's ENTIRE config while overriding only `default_model` -- mounting
+# haiku with opus's `reasoning_effort: xhigh` and `fallback_on_overload: true`
+# and producing the two `[PROVIDER]` warnings, while the purpose-built haiku
+# instance sat unused.
+#
+# The provider KEY returned here is the thing whose config gets cloned, so
+# these assertions are on the key, not merely on the resolved model name.
+# ---------------------------------------------------------------------------
+
+
+# Mirrors the reported settings.yaml: opus is priority 1 (so it wins any
+# priority-only tie-break) and carries knobs haiku does not honour.
+_TIERED_ANTHROPIC_SPECS = [
+    {
+        "module": "provider-anthropic",
+        "id": "opus",
+        "config": {
+            "priority": 1,
+            "default_model": "claude-opus-5",
+            "reasoning_effort": "xhigh",
+            "fallback_on_overload": "true",
+            "enable_1m_context": "true",
+        },
+    },
+    {
+        "module": "provider-anthropic",
+        "id": "opus-4.8",
+        "config": {
+            "priority": 4,
+            "default_model": "claude-opus-4-8",
+            "reasoning_effort": "xhigh",
+            "fallback_on_overload": "true",
+        },
+    },
+    {
+        "module": "provider-anthropic",
+        "id": "sonnet",
+        "config": {
+            "priority": 5,
+            "default_model": "claude-sonnet-5",
+            "reasoning_effort": "high",
+        },
+    },
+    {
+        "module": "provider-anthropic",
+        "id": "haiku",
+        "config": {
+            "priority": 12,
+            "default_model": "claude-haiku-4-5",
+            "reasoning_effort": "high",
+        },
+    },
+]
+
+
+def _tiered_providers() -> dict[str, Any]:
+    catalog = [
+        "claude-opus-5",
+        "claude-opus-4-8",
+        "claude-sonnet-5",
+        "claude-haiku-4-5-20251001",
+    ]
+    return {
+        spec["id"]: _make_provider(models=catalog) for spec in _TIERED_ANTHROPIC_SPECS
+    }
+
+
+class TestModelIntentInstanceSelection:
+    def test_haiku_pattern_picks_haiku_instance_not_priority_1_opus(self) -> None:
+        """THE defect. Priority alone hands `claude-haiku-*` to the opus
+        instance, whose config is then cloned wholesale onto a haiku mount."""
+        providers = _tiered_providers()
+        coordinator = _make_coordinator_with_provider_specs(_TIERED_ANTHROPIC_SPECS)
+
+        result = find_provider_by_type(
+            providers, "anthropic", coordinator, model_pattern="claude-haiku-*"
+        )
+
+        assert result is not None
+        assert result[0] == "haiku", (
+            "A candidate asking for claude-haiku-* must resolve to the instance "
+            "configured FOR haiku, not to whichever instance holds priority 1 "
+            "(opus) -- spawn_utils clones the WHOLE config of the instance "
+            "returned here, so picking opus mounts haiku with xhigh + "
+            "fallback_on_overload"
+        )
+
+    def test_sonnet_pattern_picks_sonnet_instance(self) -> None:
+        providers = _tiered_providers()
+        coordinator = _make_coordinator_with_provider_specs(_TIERED_ANTHROPIC_SPECS)
+
+        result = find_provider_by_type(
+            providers, "anthropic", coordinator, model_pattern="claude-sonnet-*"
+        )
+
+        assert result is not None
+        assert result[0] == "sonnet"
+
+    def test_priority_still_breaks_ties_among_model_matches(self) -> None:
+        """Two instances both serve claude-opus-*; priority decides between
+        them, exactly as before."""
+        providers = _tiered_providers()
+        coordinator = _make_coordinator_with_provider_specs(_TIERED_ANTHROPIC_SPECS)
+
+        result = find_provider_by_type(
+            providers, "anthropic", coordinator, model_pattern="claude-opus-*"
+        )
+
+        assert result is not None
+        assert result[0] == "opus", "priority 1 beats priority 4 among opus matches"
+
+    def test_exact_dated_pattern_matches_alias_instance(self) -> None:
+        """A candidate pinned to a dated snapshot still selects the instance
+        whose default_model is the clean alias of the same model."""
+        providers = _tiered_providers()
+        coordinator = _make_coordinator_with_provider_specs(_TIERED_ANTHROPIC_SPECS)
+
+        result = find_provider_by_type(
+            providers,
+            "anthropic",
+            coordinator,
+            model_pattern="claude-haiku-4-5-20251001",
+        )
+
+        assert result is not None
+        assert result[0] == "haiku"
+
+    def test_unmatched_pattern_falls_back_to_priority(self) -> None:
+        """No instance declares a matching default_model -> unchanged
+        priority-only behaviour, never an empty result."""
+        providers = _tiered_providers()
+        coordinator = _make_coordinator_with_provider_specs(_TIERED_ANTHROPIC_SPECS)
+
+        result = find_provider_by_type(
+            providers, "anthropic", coordinator, model_pattern="claude-fable-*"
+        )
+
+        assert result is not None
+        assert result[0] == "opus", "falls back to the priority-1 default instance"
+
+    def test_omitted_pattern_preserves_priority_only_behaviour(self) -> None:
+        """Backward compatibility: callers that pass no pattern get exactly
+        what they got before this feature existed."""
+        providers = _tiered_providers()
+        coordinator = _make_coordinator_with_provider_specs(_TIERED_ANTHROPIC_SPECS)
+
+        result = find_provider_by_type(providers, "anthropic", coordinator)
+
+        assert result is not None
+        assert result[0] == "opus"
+
+    def test_instances_without_default_model_use_priority(self) -> None:
+        """Specs that declare no default_model express no model intent, so
+        they can only ever be selected by priority (the pre-existing
+        multi-instance fixture shape)."""
+        providers = {
+            "anthropic-sonnet": _make_provider(),
+            "anthropic-opus": _make_provider(),
+            "anthropic-haiku": _make_provider(),
+        }
+        coordinator = _make_coordinator_with_provider_specs(
+            _ANTHROPIC_MULTI_INSTANCE_SPECS
+        )
+
+        result = find_provider_by_type(
+            providers, "anthropic", coordinator, model_pattern="claude-haiku-*"
+        )
+
+        assert result is not None
+        assert result[0] == "anthropic-sonnet"
+
+    def test_exact_key_match_is_unaffected_by_model_pattern(self) -> None:
+        """The single-instance path (a provider keyed by the bare type) never
+        reaches the fallback, so the pattern must not perturb it."""
+        anthropic = _make_provider()
+        providers = {"anthropic": anthropic}
+
+        result = find_provider_by_type(
+            providers, "anthropic", None, model_pattern="claude-haiku-*"
+        )
+
+        assert result == ("anthropic", anthropic)
+
+    @pytest.mark.asyncio
+    async def test_resolve_model_role_fast_returns_haiku_instance_key(self) -> None:
+        """End-to-end through resolve_model_role: the returned `provider` key
+        is what tool-delegate/spawn_utils resolves the child mount against."""
+        providers = _tiered_providers()
+        coordinator = _make_coordinator_with_provider_specs(_TIERED_ANTHROPIC_SPECS)
+        roles = {
+            "fast": {
+                "description": "Fast tasks",
+                "candidates": [{"provider": "anthropic", "model": "claude-haiku-*"}],
+            },
+        }
+
+        result = await resolve_model_role(
+            ["fast"], roles, providers, coordinator=coordinator
+        )
+
+        assert len(result) == 1
+        assert result[0]["provider"] == "haiku"
+        assert result[0]["model"] == "claude-haiku-4-5-20251001"
+
+    @pytest.mark.asyncio
+    async def test_resolve_model_role_reasoning_still_returns_opus(self) -> None:
+        """The opus-tier roles must be untouched by this change."""
+        providers = _tiered_providers()
+        coordinator = _make_coordinator_with_provider_specs(_TIERED_ANTHROPIC_SPECS)
+        roles = {
+            "reasoning": {
+                "description": "Deep reasoning",
+                "candidates": [
+                    {
+                        "provider": "anthropic",
+                        "model": "claude-opus-*",
+                        "config": {"reasoning_effort": "high"},
+                    }
+                ],
+            },
+        }
+
+        result = await resolve_model_role(
+            ["reasoning"], roles, providers, coordinator=coordinator
+        )
+
+        assert len(result) == 1
+        assert result[0]["provider"] == "opus"
+        assert result[0]["model"] == "claude-opus-5"
+        assert result[0]["config"] == {"reasoning_effort": "high"}
