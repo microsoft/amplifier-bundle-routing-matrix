@@ -29,15 +29,26 @@ canonical_effort_key: reasoning_effort
 #                   accepts only medium/high/xhigh) are enforced
 #                   provider-side at mount, not here — this list is the
 #                   provider-wide superset.
-#   gemini:         no provider-side constant exists to cite; this list is the
-#                   set already in use across the shipped matrices. Re-derive
-#                   it from provider-gemini if that provider grows an explicit
-#                   effort vocabulary.
+#   gemini:         EMPTY, deliberately. The previous list here ([low, medium,
+#                   high, xhigh]) was derived from "the set already in use
+#                   across the shipped matrices" rather than from the
+#                   provider -- and the provider turns out to read no effort
+#                   key from mount config at all. `_CONSUMED_CONFIG_KEYS`
+#                   (provider-gemini __init__.py:551-566) is a closed set of
+#                   15 keys containing neither `reasoning_effort` nor
+#                   `effort`, and its only declared ConfigField is `api_key`
+#                   (:832-840). So NO value is valid: the key is inert at
+#                   every level because the read never happens. An empty list
+#                   makes any gemini `reasoning_effort` fail here as a second,
+#                   independent tripwire; the authoritative rejection is the
+#                   loader guard (INERT_CONFIG_RULES in
+#                   modules/hooks-routing/.../matrix_loader.py), which also
+#                   names the replacement setting. See model_performance-565.
 #   github-copilot: provider-github-copilot `REASONING_EFFORT_LEVELS`
 #                   (request_adapter.py) — the provider-wide superset, also
 #                   surfaced to operators as the ConfigField choice list.
 reasoning_effort_values:
   anthropic: [low, medium, high, xhigh, max]
   openai: [none, minimal, low, medium, high, xhigh, max]
-  gemini: [low, medium, high, xhigh]
+  gemini: []  # provider reads no effort key from mount config -- see note above
   github-copilot: [none, low, medium, high, xhigh, max]

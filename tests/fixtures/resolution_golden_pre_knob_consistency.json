@@ -434,9 +434,7 @@
   "gemini.yaml": {
     "__fallback__reasoning_then_general": [
       {
-        "config": {
-          "reasoning_effort": "high"
-        },
+        "config": {},
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
@@ -464,9 +462,7 @@
     ],
     "critique": [
       {
-        "config": {
-          "reasoning_effort": "xhigh"
-        },
+        "config": {},
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
@@ -494,27 +490,21 @@
     ],
     "reasoning": [
       {
-        "config": {
-          "reasoning_effort": "high"
-        },
+        "config": {},
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "research": [
       {
-        "config": {
-          "reasoning_effort": "high"
-        },
+        "config": {},
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "security-audit": [
       {
-        "config": {
-          "reasoning_effort": "high"
-        },
+        "config": {},
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
