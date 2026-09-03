@@ -325,7 +325,13 @@ def validate_matrix_config(
             provider = candidate.get("provider", "")
             model = candidate.get("model", "")
 
-            match = find_provider_by_type(providers, provider, coordinator)
+            # Same instance selection routing will make (see
+            # resolver.find_provider_by_type): validating a candidate's
+            # config against a DIFFERENT instance than the one that will
+            # serve it would judge the wrong provider's config_fields.
+            match = find_provider_by_type(
+                providers, provider, coordinator, model_pattern=model
+            )
             if match is None:
                 # Provider not installed -- we cannot and must not judge it.
                 continue

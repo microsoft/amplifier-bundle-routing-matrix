@@ -126,6 +126,40 @@ that key in `coordinator.providers`. The resolver's `find_provider_by_type`
 does an exact-key match first, so any arbitrary instance id works in the
 `provider:` field.
 
+### Bare types against a multi-instance setup
+
+When a candidate names a **bare module type** (`provider: anthropic`) and no
+provider is keyed by that bare type — the normal shape once every instance has
+an explicit `id:` — `find_provider_by_type` must choose between several
+instances of the same module. It resolves in this order:
+
+1. **Model intent.** An instance whose own `default_model` satisfies the
+   candidate's `model:` pattern wins. An instance configured for a model was
+   configured *with the knobs for that model*.
+2. **Priority.** Among instances that match (or when none declares a matching
+   `default_model`), the lowest `priority` number wins.
+
+This ordering matters because `spawn_utils._apply_single_override` clones the
+**entire config** of the selected instance and overrides only `default_model`.
+Selecting by priority alone therefore mounts the requested model while
+carrying another tier's knobs. Concretely, given
+
+```yaml
+- id: opus     # priority 1,  reasoning_effort: xhigh, fallback_on_overload: true
+- id: haiku    # priority 12, reasoning_effort: high
+```
+
+a `fast` role asking for `provider: anthropic, model: claude-haiku-*` used to
+resolve to **opus**, mounting haiku with `xhigh` and `fallback_on_overload` —
+neither of which haiku honours — and emitting two `[PROVIDER]` warnings, while
+the purpose-built haiku instance went unused. Step 1 picks `haiku`.
+
+The selection is logged at INFO whenever model intent overrides the
+priority-only pick, so the decision is visible without reading the YAML.
+
+If you want to bypass the heuristic entirely, name the instance directly
+(`provider: haiku`) — the exact-key match runs first and always wins.
+
 **API key caveat:** The CLI `amplifier provider add` wizard currently stores
 both instances' api_key values in the same env var (e.g. `$OPENAI_API_KEY`),
 so two instances via the wizard collide in the keyring. Until that's fixed,
