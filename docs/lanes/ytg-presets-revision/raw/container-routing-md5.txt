@@ -1,0 +1,3 @@
+48f5fb2bea1dbd3b487caaa0f7a6752a  /root/.amplifier/cache/amplifier-bundle-routing-matrix-972b0ce7f0cbc2f7/routing/openai.yaml
+b2540bd65f1481a937eb3843c925d650  /root/.amplifier/cache/amplifier-bundle-routing-matrix-972b0ce7f0cbc2f7/routing/anthropic.yaml
+dfdf566bdd446001877fe7f5458d0e0e  /root/.amplifier/cache/amplifier-bundle-routing-matrix-972b0ce7f0cbc2f7/routing/openai-cheap-fast.yaml
