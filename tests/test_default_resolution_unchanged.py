@@ -18,12 +18,21 @@ the fixture regenerated on purpose, never silently.
 Regenerating (only when a routing change is intended and reviewed)::
 
     python3 tests/test_default_resolution_unchanged.py --regenerate
+
+Regeneration REFUSES (exit 2, naming the files) rather than drop a matrix the
+recording already covers -- dropping one would silently exempt it from the
+identity check above. If a matrix is genuinely gone from ``routing/`` and the
+recording should lose it, say so on purpose::
+
+    python3 tests/test_default_resolution_unchanged.py --regenerate --allow-drop
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -68,18 +77,90 @@ FAKE_MODELS: dict[str, list[str]] = {
     "ollama": ["qwen3.6-35b", "llama4-70b"],
 }
 
-# Matrices that ship a `preset:` block on purpose, and so are NOT part of the
-# pre-feature recording. Adding a name here is a deliberate, reviewable act.
+# Two sets, because these are two different facts. They used to be one set
+# doing both jobs, and that conflation silently deleted `openai.yaml`'s entry
+# from the recording every time the documented `--regenerate` path was run
+# (`model_performance-d98`).
 #
-# `openai.yaml` gained a preset on 2026-09-02 (default ON -- a measured win
-# on OpenAI roots, see README "Knob-consistent delegation"). It stays in the
-# byte-identity check below regardless: `_snapshot()` never reads or passes
-# `preset:`/`caller_context` to `resolve_model_role`, so a preset block is
-# structurally inert for this cold-resolution recording -- see
-# `test_preset_bearing_matrix_is_stock_without_a_caller` for the same
-# invariant asserted directly. Listed here only so a future `--regenerate`
-# does not need to re-derive that this file carries one on purpose.
+# (1) Which matrices ship a `preset:` block. A property of the MATRIX.
+#     `openai.yaml` gained one on 2026-09-02 (default ON -- a measured win on
+#     OpenAI roots, see README "Knob-consistent delegation").
 PRESET_BEARING = {"openai-knob-consistent.yaml", "openai.yaml"}
+
+# (2) Which matrices are deliberately absent from the pre-feature recording.
+#     A property of the RECORDING. Adding a name here is a deliberate,
+#     reviewable act -- it exempts that matrix from the byte-identity check.
+#
+#     Shipping a preset does NOT put a matrix here. `_snapshot()` never reads
+#     or passes `preset:`/`caller_context` to `resolve_model_role`, so a preset
+#     block is structurally inert for this cold-resolution recording -- see
+#     `test_preset_bearing_matrix_is_stock_without_a_caller` for the same
+#     invariant asserted directly. `openai.yaml` therefore stays recorded and
+#     stays checked, preset or no preset.
+EXCLUDED_FROM_RECORDING = {"openai-knob-consistent.yaml"}
+
+# Every matrix present in the recording as it stands. A frozen manifest, so a
+# matrix vanishing from the fixture -- by a bad `--regenerate`, a bad merge, a
+# hand edit -- fails a test instead of silently exempting itself from the
+# byte-identity check. Deliberately NOT derived from the fixture (a check that
+# reads its own subject cannot notice the subject shrinking) and deliberately
+# NOT subtracting any exemption set (that subtraction is exactly the blind spot
+# that let d98 through).
+RECORDED_MATRICES = frozenset(
+    {
+        "anthropic.yaml",
+        "balanced.yaml",
+        "copilot.yaml",
+        "economy.yaml",
+        "gemini.yaml",
+        "ollama.yaml",
+        "openai.yaml",
+        "quality.yaml",
+    }
+)
+
+
+class GoldenWouldLoseAMatrix(RuntimeError):
+    """Raised when regeneration would drop an already-recorded matrix."""
+
+    def __init__(self, dropped: list[str]) -> None:
+        self.dropped = dropped
+        super().__init__(
+            "refusing to regenerate: this would DELETE these already-recorded "
+            f"matrices from {GOLDEN_PATH.name}: {dropped}. A matrix that is "
+            "recorded is covered by the byte-identity check; dropping it "
+            "silently exempts it. If a matrix is genuinely gone from "
+            "routing/, re-run with --allow-drop to say so on purpose."
+        )
+
+
+def _regeneration_payload(
+    snapshot: dict[str, dict[str, Any]],
+    existing: dict[str, Any],
+    *,
+    allow_drop: bool = False,
+) -> dict[str, dict[str, Any]]:
+    """Build the fixture payload for ``--regenerate``.
+
+    Two rules, in this order:
+
+    1. ``EXCLUDED_FROM_RECORDING`` keeps a matrix OUT of the recording -- but
+       only one that was never recorded. It never evicts an existing entry:
+       an exemption declared today must not retroactively delete a recording
+       made before it.
+    2. If the payload would still lose a matrix the existing recording covers
+       (its YAML is gone from ``routing/``, say), refuse and name the files.
+       ``allow_drop=True`` is the deliberate, reviewable way to say yes.
+    """
+    payload = {
+        name: entry
+        for name, entry in snapshot.items()
+        if name not in EXCLUDED_FROM_RECORDING or name in existing
+    }
+    dropped = sorted(set(existing) - set(payload))
+    if dropped and not allow_drop:
+        raise GoldenWouldLoseAMatrix(dropped)
+    return payload
 
 
 def _fake_providers() -> dict[str, Any]:
@@ -129,13 +210,34 @@ def test_golden_covers_every_pre_existing_matrix() -> None:
     """
     on_disk = {p.name for p in ROUTING_DIR.glob("*.yaml")}
     recorded = set(_load_golden())
-    unaccounted = on_disk - recorded - PRESET_BEARING
+    unaccounted = on_disk - recorded - EXCLUDED_FROM_RECORDING
     assert not unaccounted, (
         "these matrices are neither in the pre-feature recording nor declared "
-        f"preset-bearing: {sorted(unaccounted)}"
+        f"excluded from it: {sorted(unaccounted)}"
     )
     vanished = recorded - on_disk
     assert not vanished, f"recorded matrices no longer on disk: {sorted(vanished)}"
+
+
+def test_every_recorded_matrix_is_still_in_the_fixture() -> None:
+    """A matrix that was recorded must never quietly leave the recording.
+
+    The tripwire `test_golden_covers_every_pre_existing_matrix` cannot catch
+    this: it subtracts the exemption set before looking, so a matrix that is
+    both recorded and exempt can vanish and still look accounted for. This
+    check subtracts nothing and compares against a frozen manifest rather than
+    against the fixture itself.
+    """
+    missing = sorted(RECORDED_MATRICES - set(_load_golden()))
+    assert not missing, (
+        f"these matrices were recorded and are now absent from {GOLDEN_PATH.name}: "
+        f"{missing}. Dropping an entry exempts it from the byte-identity check. "
+        "If the removal is intended, remove it from RECORDED_MATRICES in the "
+        "same reviewed commit and say why in the PR body."
+    )
+    still_on_disk = {p.name for p in ROUTING_DIR.glob("*.yaml")}
+    gone = sorted(RECORDED_MATRICES - still_on_disk)
+    assert not gone, f"recorded matrices no longer in routing/: {gone}"
 
 
 @pytest.mark.parametrize(
@@ -167,13 +269,94 @@ def test_preset_bearing_matrix_is_stock_without_a_caller() -> None:
     assert knob == stock
 
 
+def test_regeneration_refuses_to_drop_a_recorded_matrix() -> None:
+    """The unit-level guard: naming files, not just failing."""
+    snapshot = {"kept.yaml": {"general": None}}
+    existing = {"kept.yaml": {"general": None}, "gone.yaml": {"general": None}}
+    with pytest.raises(GoldenWouldLoseAMatrix) as caught:
+        _regeneration_payload(snapshot, existing)
+    assert caught.value.dropped == ["gone.yaml"]
+    assert "gone.yaml" in str(caught.value)
+    # ...and says yes when the drop is declared on purpose.
+    assert _regeneration_payload(snapshot, existing, allow_drop=True) == snapshot
+
+
+def test_regeneration_keeps_an_excluded_matrix_that_was_already_recorded() -> None:
+    """An exemption declared later must not evict an earlier recording.
+
+    This is d98 in miniature: `openai.yaml` is preset-bearing AND recorded.
+    Whichever set it lands in, regeneration must not delete its entry.
+    """
+    excluded = sorted(EXCLUDED_FROM_RECORDING)[0]
+    snapshot = {excluded: {"general": "x"}, "other.yaml": {"general": "y"}}
+    fresh = _regeneration_payload(snapshot, {})
+    assert excluded not in fresh, "a never-recorded exempt matrix stays out"
+    kept = _regeneration_payload(snapshot, {excluded: {"general": "x"}})
+    assert excluded in kept, "an already-recorded matrix is never evicted"
+
+
+def test_regenerate_entry_point_preserves_every_recorded_matrix(
+    tmp_path: Path,
+) -> None:
+    """Run the DOCUMENTED regeneration command and check nothing vanished.
+
+    The bug this pins (`model_performance-d98`) lived in the ``__main__``
+    branch, which no test ever executed -- so it is executed here, as a
+    subprocess, exactly as the module docstring tells a maintainer to run it.
+    It runs against a COPY of the tree, so a green suite never rewrites the
+    real fixture as a side effect.
+    """
+    sandbox = tmp_path / "repo"
+    ignore = shutil.ignore_patterns("__pycache__", "*.pyc", ".pytest_cache")
+    for sub in ("routing", "modules", "tests"):
+        shutil.copytree(REPO_ROOT / sub, sandbox / sub, ignore=ignore)
+
+    sandboxed_golden = sandbox / GOLDEN_PATH.relative_to(REPO_ROOT)
+    before = json.loads(sandboxed_golden.read_text(encoding="utf-8"))
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(Path("tests") / Path(__file__).name),
+            "--regenerate",
+        ],
+        cwd=sandbox,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    after = json.loads(sandboxed_golden.read_text(encoding="utf-8"))
+
+    lost = sorted(set(before) - set(after))
+    assert not lost, (
+        "`--regenerate` silently deleted already-recorded matrices from the "
+        f"golden fixture: {lost}\nstdout: {proc.stdout}\nstderr: {proc.stderr}"
+    )
+    assert proc.returncode == 0, (
+        f"regeneration exited {proc.returncode}\n"
+        f"stdout: {proc.stdout}\nstderr: {proc.stderr}"
+    )
+    assert set(after) >= RECORDED_MATRICES
+
+
 if __name__ == "__main__":  # pragma: no cover - maintenance entry point
     if "--regenerate" in sys.argv:
-        snapshot = asyncio.run(_snapshot())
-        snapshot = {k: v for k, v in snapshot.items() if k not in PRESET_BEARING}
+        existing = _load_golden() if GOLDEN_PATH.exists() else {}
+        try:
+            payload = _regeneration_payload(
+                asyncio.run(_snapshot()),
+                existing,
+                allow_drop="--allow-drop" in sys.argv,
+            )
+        except GoldenWouldLoseAMatrix as exc:
+            print(f"REFUSED: {exc}", file=sys.stderr)
+            raise SystemExit(2) from None
         GOLDEN_PATH.write_text(
-            json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        print(f"regenerated {GOLDEN_PATH} ({len(snapshot)} matrices)")
+        dropped = sorted(set(existing) - set(payload))
+        if dropped:
+            print(f"WARNING: dropped on purpose (--allow-drop): {dropped}")
+        print(f"regenerated {GOLDEN_PATH} ({len(payload)} matrices)")
     else:
         print(__doc__)
