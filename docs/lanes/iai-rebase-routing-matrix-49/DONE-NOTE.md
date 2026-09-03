@@ -11,7 +11,7 @@ the $0 authority.
 | 1 | #49 rebased with its own documented recipe, mergeable, BOTH inert-effort rejections retained | **DONE** — PR #49 head is now `7c8b0ea`, `mergeable: MERGEABLE` |
 | 2 | Passing fail-before tests for BOTH rejections (each fails on the pre-fix parent, passes after) | **DONE** — three separate experiments, below |
 | 3 | Full suite green on current main (≥499 tests), pasted in the PR body | **DONE** — 570 passed (baseline on `origin/main` d1d7128: 516) |
-| 4 | PR marked ready with a comment naming what was reconciled — never merged | **DONE, then reverted to DRAFT at owner direction** — see "PR review state" below; comment posted; never merged |
+| 4 | PR marked ready with a comment naming what was reconciled — never merged | **DONE** — `draft=false`, comment posted, never merged. Went ready → draft → ready on owner direction; see "PR review state" below |
 | 5 | DONE-NOTE.md in the PR body | **DONE** (this file) |
 
 ## Which publication path was taken
@@ -31,34 +31,32 @@ commit, so this lane's own branch exists on origin as git ground truth. It has
 no PR of its own by design — a second PR for the same commit would be noise.
 The publication claim in `DONE.json` names the branch that carries PR #49.
 
-## PR review state — ready, then returned to DRAFT at owner direction
+## PR review state — READY (final), after two owner-directed reversals
 
-**Final state: `draft=true`, `state=open`, `merged=false`.** Recorded on the PR
-timeline, both transitions, with actor and timestamp:
+**Final state: `draft=false`, `state=open`, `merged=false`, head `7374c7a`.**
+All three transitions are on the PR timeline, with actor and timestamp — the
+record is complete rather than tidied:
 
 ```
-event=ready_for_review   actor=bkrabach  at=2026-09-03T02:25:42Z
-event=convert_to_draft   actor=bkrabach  at=2026-09-03T02:31:50Z
+ready_for_review  bkrabach  2026-09-03T02:25:42Z   <- lane, reading the item literally
+convert_to_draft  bkrabach  2026-09-03T02:31:50Z   <- owner directed draft
+ready_for_review  bkrabach  2026-09-03T02:33:29Z   <- owner directed ready again (final)
 ```
 
-This lane first marked the PR **ready**, reading the item's literal text: *"mark
-the PR ready with a comment naming exactly what was reconciled"* (line 9), and
-*"PR marked ready … (**or** a DRAFT superseding PR naming #49 **if the head
-branch is unreachable**)"* (line 15) — where DRAFT appears only in a fallback
-conditioned on the head branch being unreachable, which it was not.
+The item's literal text is *"mark the PR ready with a comment naming exactly
+what was reconciled"* (task line), and *"PR marked ready … (**or** a DRAFT
+superseding PR naming #49 **if the head branch is unreachable**)"* (deliverable
+line) — DRAFT appears only in a fallback conditioned on the head branch being
+unreachable, which it was not. The lane marked it ready on that reading, was
+directed to draft, was then directed back to ready, and the final state agrees
+with the item text.
 
-The owner subsequently directed that the PR be returned to draft pending their
-review. That was done (`gh pr ready --undo 49`).
-
-**Recorded honestly, because the two are different things:** the revert is an
-**owner decision**, not a correction of a misread requirement. The item text
-says "marked ready"; this note does not retroactively claim otherwise. A future
-reader comparing the item text to the PR's final state would otherwise find an
-unexplained mismatch and have no way to tell which of the two was wrong.
-
-Practical note for whoever merges: a draft PR is unmergeable by anyone, so #49
-must be taken out of draft again before it can land. Nothing else about it
-changed — same head commit, same tests, still never merged.
+**Why all three transitions are left visible.** Deleting the middle one would
+make the timeline read as if the question never arose. It did arise, twice, and
+the next person to touch #49 is better served by seeing that than by a clean
+line. Nothing about the code changed across any of it: same head tree, same 570
+passing tests, `merged=false` throughout, `origin/main` never moved off
+`d1d7128`.
 
 ## The conflict, and how it was resolved
 
