@@ -38,10 +38,60 @@
 # deep-diagnosis (S4) evidence still favors sol at high+ effort over sol at
 # medium. creative/writing/research/vision/image-gen are untouched -- terra
 # is untested on those task shapes.
+#
+# Knob-consistent delegation, DEFAULT ON (2026-09-02): a session pins
+# model/effort for the ROOT only -- sub-agents are routed by this matrix, so
+# the caller's dial used to govern only the root's own work. MEASURED (lane
+# l1-knob-consistent-routing, DONE.json + ai-notes/w2-s3-three-knob-presets/
+# ROUTING-PROPOSAL.md; S3 n=3/arm on OpenAI roots): `gpt-5.6-sol` call share
+# 27.8% -> 0.0%, cost -29.7% (S3 median) / -55.9% (S1), wall -16.2%, quality
+# flat. This is a PROVEN WIN, not an experiment -- see the `preset:` block
+# below (identical to the one `openai-knob-consistent.yaml` shipped as an
+# opt-in arm) and README "Knob-consistent delegation" for the full writeup.
+# Scope: OpenAI-family roots only. Every other shipped matrix (anthropic,
+# balanced, quality, economy, gemini, copilot, ollama) is UNTOUCHED and
+# resolves byte-identically to before -- there is no equivalent evidence yet
+# for other provider families (the "Anthropic guardrail": no measured win,
+# so no default change there). Opt out with `disable_delegation_preset:
+# true` in this hook's mount config to restore legacy (pre-2026-09-02)
+# behaviour on this matrix.
 
 name: openai
-description: "OpenAI-only routing. All roles use OpenAI models exclusively."
-updated: "2026-09-01"
+description: "OpenAI-only routing. All roles use OpenAI models exclusively. Knob-consistent delegation is ON by default (measured win) -- sub-agents inherit the caller's tier/effort ceiling; see preset: below."
+updated: "2026-09-02"
+
+# ---------------------------------------------------------------------------
+# Knob-consistent delegation preset -- DEFAULT ON for this matrix (measured
+# win on OpenAI roots, see header above). Byte-identical to the preset block
+# `openai-knob-consistent.yaml` ships (that file remains as an explicit-name
+# pin for anyone who wants to select it by name; both now behave the same).
+# ---------------------------------------------------------------------------
+preset:
+  # Documentation only; never read by code.
+  axis: [cheap, fast]
+
+  # Cheapest -> most expensive, per provider family. Declared, never inferred
+  # from price: no per-token price for the 5.6 family exists in any guide, so
+  # this encodes the vendor's own ordinal statements (luna lowest cost, terra
+  # mid, sol flagship). A rung may be one glob or a list of globs.
+  #
+  # `gpt-[0-9].[0-9]` sits on the SOL rung on purpose: since the 5.6 rename the
+  # bare alias points at the flagship tier (see header above).
+  tier_ladder:
+    openai:
+      - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
+      - ["gpt-?.?-terra*"]
+      - ["gpt-?.?-sol*", "gpt-[0-9].[0-9]"]
+
+  delegation:
+    # none | effort | tier-and-effort | strict
+    #
+    # `strict` matches the measured arm exactly (l1-knob-consistent-routing
+    # shipped and measured `strict`, not `tier-and-effort` + escalation) --
+    # this default follows the evidence, not a stronger untested claim.
+    inherit: strict
+    report_unhonored: true
+
 
 roles:
   general:

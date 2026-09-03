@@ -70,7 +70,16 @@ FAKE_MODELS: dict[str, list[str]] = {
 
 # Matrices that ship a `preset:` block on purpose, and so are NOT part of the
 # pre-feature recording. Adding a name here is a deliberate, reviewable act.
-PRESET_BEARING = {"openai-knob-consistent.yaml"}
+#
+# `openai.yaml` gained a preset on 2026-09-02 (default ON -- a measured win
+# on OpenAI roots, see README "Knob-consistent delegation"). It stays in the
+# byte-identity check below regardless: `_snapshot()` never reads or passes
+# `preset:`/`caller_context` to `resolve_model_role`, so a preset block is
+# structurally inert for this cold-resolution recording -- see
+# `test_preset_bearing_matrix_is_stock_without_a_caller` for the same
+# invariant asserted directly. Listed here only so a future `--regenerate`
+# does not need to re-derive that this file carries one on purpose.
+PRESET_BEARING = {"openai-knob-consistent.yaml", "openai.yaml"}
 
 
 def _fake_providers() -> dict[str, Any]:

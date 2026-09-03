@@ -152,12 +152,17 @@ class TestDefaultBehaviourUnchanged:
         sink.assert_not_awaited()
 
     def test_every_pre_existing_matrix_has_no_preset_block(self) -> None:
-        """The eight shipped matrices must stay default-off. If a curator adds
-        a preset to one of them, that is a behaviour change to live user
-        settings and this test is where it gets noticed."""
+        """Every shipped matrix EXCEPT `openai.yaml` (default ON, 2026-09-02
+        -- a measured win, see README "Knob-consistent delegation") and
+        `openai-knob-consistent.yaml` (the same block, kept as an
+        explicit-name pin) must stay default-off. If a curator adds a preset
+        to any OTHER matrix, that is a behaviour change to live user settings
+        and this test is where it gets noticed -- in particular,
+        `anthropic.yaml` staying out of this set is the Anthropic guardrail:
+        no measured win there yet, so no default change there."""
         import yaml
 
-        allowed_with_preset = {"openai-knob-consistent.yaml"}
+        allowed_with_preset = {"openai-knob-consistent.yaml", "openai.yaml"}
         offenders = []
         for path in sorted(ROUTING_DIR.glob("*.yaml")):
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -167,6 +172,18 @@ class TestDefaultBehaviourUnchanged:
             "these shipped matrices gained a preset: block and are no longer "
             f"default-off: {offenders}"
         )
+
+    def test_anthropic_matrix_has_no_preset_block(self) -> None:
+        """The Anthropic guardrail, asserted directly and by name: no
+        measured win exists for Anthropic-family roots yet, so
+        `anthropic.yaml` must stay exactly as default-off as every other
+        matrix was before knob-consistent delegation existed at all."""
+        import yaml
+
+        data = yaml.safe_load(
+            (ROUTING_DIR / "anthropic.yaml").read_text(encoding="utf-8")
+        )
+        assert "preset" not in (data or {})
 
 
 # ---------------------------------------------------------------------------
@@ -670,6 +687,119 @@ class TestMountWithPreset:
         prefs = await resolver.resolve("reasoning")
         assert prefs[0].model == "gpt-5.6-terra"
 
+    @pytest.mark.asyncio
+    async def test_disable_delegation_preset_config_restores_legacy(
+        self, tmp_path: Path
+    ) -> None:
+        """`disable_delegation_preset: true` is the explicit opt-out lever:
+        it must make a preset-bearing matrix resolve EXACTLY as it would if
+        the `preset:` block were absent -- the same result
+        `test_session_start_without_preset_is_unchanged` pins for a matrix
+        that never had one."""
+        root = _write_matrix(
+            tmp_path, "t-preset", _MATRIX_YAML_NO_PRESET + "\n" + _PRESET_YAML
+        )
+        agents = {"explorer": {"model_role": "reasoning"}}
+        coordinator = _mount_coordinator(agents)
+        await mount(
+            coordinator,
+            {
+                "default_matrix": "t-preset",
+                "_bundle_root": str(root),
+                "disable_delegation_preset": True,
+            },
+        )
+        await _run_session_start(coordinator)
+        # Legacy result: unclamped, exactly like the no-preset matrix case.
+        assert agents["explorer"]["provider_preferences"] == [
+            {
+                "provider": "openai",
+                "model": "gpt-5.6-sol",
+                "config": {CANONICAL_EFFORT_KEY: "xhigh"},
+            }
+        ]
+        # No clamp event either -- the preset never activated at all.
+        emitted = [
+            call.args
+            for call in coordinator.event_bus.emit.call_args_list
+            if call.args[0] == "routing:intent-clamped"
+        ]
+        assert emitted == []
+
+    @pytest.mark.asyncio
+    async def test_disable_delegation_preset_is_a_noop_without_a_preset(
+        self, tmp_path: Path
+    ) -> None:
+        """The opt-out must never itself change anything for a matrix that
+        already had no preset -- it can only ever remove behaviour, never
+        add any."""
+        root = _write_matrix(tmp_path, "t-plain", _MATRIX_YAML_NO_PRESET)
+        agents = {"explorer": {"model_role": "reasoning"}}
+        coordinator = _mount_coordinator(agents)
+        await mount(
+            coordinator,
+            {
+                "default_matrix": "t-plain",
+                "_bundle_root": str(root),
+                "disable_delegation_preset": True,
+            },
+        )
+        await _run_session_start(coordinator)
+        assert agents["explorer"]["provider_preferences"] == [
+            {
+                "provider": "openai",
+                "model": "gpt-5.6-sol",
+                "config": {CANONICAL_EFFORT_KEY: "xhigh"},
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_shipped_openai_matrix_defaults_to_knob_consistent_at_mount(
+        self,
+    ) -> None:
+        """End to end, through `mount()`, against the REAL shipped
+        `routing/openai.yaml` (not a synthetic fixture): a terra root with no
+        settings.yaml change gets its `reasoning` agent clamped in-tier."""
+        agents = {"explorer": {"model_role": "reasoning"}}
+        coordinator = _mount_coordinator(agents)
+        await mount(
+            coordinator,
+            {"default_matrix": "openai", "_bundle_root": str(REPO_ROOT)},
+        )
+        await _run_session_start(coordinator)
+        assert agents["explorer"]["provider_preferences"][0]["model"] != (
+            "gpt-5.6-sol"
+        )
+        assert (
+            agents["explorer"]["provider_preferences"][0]["config"][
+                CANONICAL_EFFORT_KEY
+            ]
+            == "medium"
+        )
+
+    @pytest.mark.asyncio
+    async def test_shipped_openai_matrix_opt_out_restores_legacy_at_mount(
+        self,
+    ) -> None:
+        """The explicit opt-out, against the REAL shipped matrix: setting
+        `disable_delegation_preset: true` on a terra root restores the
+        pre-2026-09-02 result (the flagship `sol` model) with no matrix edit
+        required."""
+        agents = {"explorer": {"model_role": "reasoning"}}
+        coordinator = _mount_coordinator(agents)
+        await mount(
+            coordinator,
+            {
+                "default_matrix": "openai",
+                "_bundle_root": str(REPO_ROOT),
+                "disable_delegation_preset": True,
+            },
+        )
+        await _run_session_start(coordinator)
+        assert agents["explorer"]["provider_preferences"][0]["model"] == (
+            "gpt-5.6-sol"
+        )
+
 
 # ---------------------------------------------------------------------------
 # The shipped knob-consistent matrix, end to end
@@ -707,16 +837,104 @@ class TestShippedKnobConsistentMatrix:
             )
 
     @pytest.mark.asyncio
-    async def test_stock_openai_matrix_still_sends_reasoning_to_sol(self) -> None:
-        """The control arm, asserted rather than assumed: this is the
-        behaviour the treatment is measured against."""
+    async def test_openai_matrix_cold_resolution_is_unchanged(self) -> None:
+        """`openai.yaml` now ships a `preset:` block by default (2026-09-02,
+        a measured win -- see README "Knob-consistent delegation"), so it is
+        no longer preset-free. What must still hold is the OLD control-arm
+        behaviour: resolved COLD (no caller context -- how every
+        non-delegation consumer resolves, and how `amplifier routing show`
+        resolves), the preset is inert and reasoning still goes to sol."""
         import yaml
 
         data = yaml.safe_load((ROUTING_DIR / "openai.yaml").read_text(encoding="utf-8"))
-        assert parse_preset(data) is None
+        assert parse_preset(data) is not None
         result = await resolve_model_role(["reasoning"], data["roles"], _providers())
         assert result[0]["model"] == "gpt-5.6-sol"
         assert result[0]["config"][CANONICAL_EFFORT_KEY] == "xhigh"
+
+    @pytest.mark.asyncio
+    async def test_openai_root_delegate_resolution_stays_in_tier_by_default(
+        self,
+    ) -> None:
+        """The headline claim, now against `openai.yaml` ITSELF rather than
+        only the opt-in `openai-knob-consistent.yaml` arm: an OpenAI-family
+        root caller gets knob-consistent delegation with NO settings.yaml
+        change and no explicit `routing.matrix: openai-knob-consistent` --
+        the measured win (l1-knob-consistent-routing DONE.json: sol call
+        share 27.8% -> 0.0%, cost -29.7%) is default behaviour now."""
+        import yaml
+
+        data = yaml.safe_load((ROUTING_DIR / "openai.yaml").read_text(encoding="utf-8"))
+        preset = parse_preset(data)
+        assert preset is not None
+        roles = data["roles"]
+        escalations = EscalationState(max_uses=preset.escalate_max_uses)
+        for role in roles:
+            result = await resolve_model_role(
+                [role],
+                roles,
+                _providers(),
+                caller_context=TERRA_CALLER,
+                preset=preset,
+                escalations=escalations,
+            )
+            assert result, f"role {role} resolved to nothing"
+            assert result[0]["model"] != "gpt-5.6-sol", (
+                f"role {role} still resolves to sol under a terra caller "
+                "-- the default-on preset did not clamp it"
+            )
+            assert result[0]["config"].get(CANONICAL_EFFORT_KEY) == "medium", (
+                f"role {role} did not inherit the caller's effort"
+            )
+
+    @pytest.mark.asyncio
+    async def test_anthropic_root_resolution_unchanged_vs_pre_50_matrix(self) -> None:
+        """The Anthropic guardrail, as an explicit resolution-level test (the
+        golden-file test in tests/test_default_resolution_unchanged.py
+        covers this too, but only ever resolves cold / without a caller
+        context). Even handed an Anthropic caller context directly,
+        `anthropic.yaml` has no `preset:` block, so `plan_candidates` takes
+        the `preset is None` identity path and every role resolves EXACTLY
+        as it did before this feature -- and before PR #50 -- existed."""
+        import yaml
+
+        data = yaml.safe_load(
+            (ROUTING_DIR / "anthropic.yaml").read_text(encoding="utf-8")
+        )
+        assert parse_preset(data) is None
+        roles = data["roles"]
+        anthropic_caller = CallerContext(
+            family="anthropic",
+            model="claude-opus-5",
+            effort="medium",
+            provider_key="opus",
+        )
+        anthropic_providers = {
+            "anthropic": _openai_provider()  # any MagicMock with list_models works
+        }
+        anthropic_providers["anthropic"].list_models = AsyncMock(
+            return_value=[
+                "claude-opus-5",
+                "claude-opus-4-8",
+                "claude-sonnet-5",
+                "claude-haiku-4-5",
+            ]
+        )
+        for role in roles:
+            cold = await resolve_model_role([role], roles, anthropic_providers)
+            with_caller = await resolve_model_role(
+                [role],
+                roles,
+                anthropic_providers,
+                caller_context=anthropic_caller,
+                # No preset passed -- mirrors mount()'s own
+                # `preset if agent_caller_context is not None else None` gate
+                # being irrelevant here: parse_preset(data) is None either way.
+            )
+            assert with_caller == cold, (
+                f"role {role}: an Anthropic caller context changed resolution "
+                "on a matrix with no preset: block"
+            )
 
     @pytest.mark.asyncio
     async def test_a_sol_root_is_not_downgraded(self) -> None:
