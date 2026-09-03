@@ -512,6 +512,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # (see _ensure_prefix_placement below).
     _prefix_verified_factory: Any = None
     _prefix_unavailable_logged = False
+    _prefix_unavailable_reason: str | None = None
 
     def _render_banner() -> str:
         """Render the routing-matrix banner, wrapped and source-attributed.
@@ -582,15 +583,17 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         False when the surface is unavailable and the caller should fall
         back to per-request injection.
         """
-        nonlocal _prefix_factory, _prefix_verified_factory
+        nonlocal _prefix_factory, _prefix_verified_factory, _prefix_unavailable_reason
 
         getter = getattr(coordinator, "get", None) if coordinator else None
         context: Any = getter("context") if callable(getter) else None
         if context is None or not hasattr(context, "set_system_prompt_factory"):
+            _prefix_unavailable_reason = "no_surface"
             return False
 
         current = getattr(context, "_system_prompt_factory", None)
         if current is None:
+            _prefix_unavailable_reason = "no_factory_registered"
             # No factory registered (static-system-message session).
             # Wrapping would DROP the static system prompt (factory takes
             # precedence over stored system messages in context-simple),
@@ -628,7 +631,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # Hook 2: provider:request — inject available roles into context
     # ------------------------------------------------------------------
     async def on_provider_request(event: str, data: dict[str, Any]) -> Any:
-        nonlocal _prefix_unavailable_logged
+        nonlocal _prefix_unavailable_logged, _prefix_unavailable_reason
 
         if not effective_matrix:
             return None
@@ -646,14 +649,26 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             # factory support). Warn once, then fall back to per-request
             # injection so the banner is never silently dropped.
             if not _prefix_unavailable_logged:
-                logger.warning(
-                    "placement='prefix' (the default) but the context "
-                    "module offers no system-prompt factory surface "
-                    "(set_system_prompt_factory). Falling back to "
-                    "per-request injection -- the routing banner will not "
-                    "ride the stable cached prefix. Set placement='inject' "
-                    "to silence this warning."
-                )
+                if _prefix_unavailable_reason == "no_factory_registered":
+                    logger.warning(
+                        "placement='prefix' (the default) but this session has "
+                        "no system-prompt factory registered (static system "
+                        "prompt, or no bundle instruction/context at all); "
+                        "refusing to replace it. Falling back to per-request "
+                        "injection -- the routing banner will not ride the "
+                        "stable cached prefix. This is expected for a session "
+                        "with no dynamic system prompt; set placement='inject' "
+                        "to silence."
+                    )
+                else:
+                    logger.warning(
+                        "placement='prefix' (the default) but the context "
+                        "module offers no system-prompt factory surface "
+                        "(set_system_prompt_factory). Falling back to "
+                        "per-request injection -- the routing banner will not "
+                        "ride the stable cached prefix. Set placement='inject' "
+                        "to silence this warning."
+                    )
                 _prefix_unavailable_logged = True
 
         banner = _render_banner()
