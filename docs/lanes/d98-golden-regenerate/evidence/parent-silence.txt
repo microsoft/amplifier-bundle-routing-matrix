@@ -1,0 +1,7 @@
+=== A) At PARENT, with openai.yaml just deleted by --regenerate: does the suite notice? ===
+..........                                                               [100%]
+10 passed in 0.79s
+=== full suite at PARENT with the corrupted fixture ===
+........................................................................ [ 99%]
+...                                                                      [100%]
+579 passed in 2.32s

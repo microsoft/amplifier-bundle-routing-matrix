@@ -1,0 +1,6 @@
+matrices recorded BEFORE: ['anthropic.yaml', 'balanced.yaml', 'copilot.yaml', 'economy.yaml', 'gemini.yaml', 'ollama.yaml', 'openai.yaml', 'quality.yaml']
+regenerated /tmp/tmp.0vxQc7Xjfq/parent/tests/fixtures/resolution_golden_pre_knob_consistency.json (7 matrices)
+matrices recorded AFTER:  ['anthropic.yaml', 'balanced.yaml', 'copilot.yaml', 'economy.yaml', 'gemini.yaml', 'ollama.yaml', 'quality.yaml']
+--- diff stat of the fixture at parent after the documented command ---
+ .../resolution_golden_pre_knob_consistency.json    | 118 ---------------------
+ 1 file changed, 118 deletions(-)

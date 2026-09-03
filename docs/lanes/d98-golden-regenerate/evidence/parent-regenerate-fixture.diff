@@ -1,0 +1,129 @@
+diff --git a/tests/fixtures/resolution_golden_pre_knob_consistency.json b/tests/fixtures/resolution_golden_pre_knob_consistency.json
+index 636260f..b3412d2 100644
+--- a/tests/fixtures/resolution_golden_pre_knob_consistency.json
++++ b/tests/fixtures/resolution_golden_pre_knob_consistency.json
+@@ -552,124 +552,6 @@
+     "vision": [],
+     "writing": []
+   },
+-  "openai.yaml": {
+-    "__fallback__reasoning_then_general": [
+-      {
+-        "config": {
+-          "reasoning_effort": "xhigh"
+-        },
+-        "model": "gpt-5.6-sol",
+-        "provider": "openai"
+-      }
+-    ],
+-    "coding": [
+-      {
+-        "config": {
+-          "reasoning_effort": "high"
+-        },
+-        "model": "gpt-5.6-terra",
+-        "provider": "openai"
+-      }
+-    ],
+-    "creative": [
+-      {
+-        "config": {},
+-        "model": "gpt-5.6-sol",
+-        "provider": "openai"
+-      }
+-    ],
+-    "critical-ops": [
+-      {
+-        "config": {
+-          "reasoning_effort": "high"
+-        },
+-        "model": "gpt-5.6-sol",
+-        "provider": "openai"
+-      }
+-    ],
+-    "critique": [
+-      {
+-        "config": {
+-          "reasoning_effort": "xhigh"
+-        },
+-        "model": "gpt-5.6-terra",
+-        "provider": "openai"
+-      }
+-    ],
+-    "fast": [
+-      {
+-        "config": {},
+-        "model": "gpt-5.6-luna",
+-        "provider": "openai"
+-      }
+-    ],
+-    "general": [
+-      {
+-        "config": {
+-          "reasoning_effort": "high"
+-        },
+-        "model": "gpt-5.6-terra",
+-        "provider": "openai"
+-      }
+-    ],
+-    "image-gen": [
+-      {
+-        "config": {},
+-        "model": "gpt-5.6-sol",
+-        "provider": "openai"
+-      }
+-    ],
+-    "reasoning": [
+-      {
+-        "config": {
+-          "reasoning_effort": "xhigh"
+-        },
+-        "model": "gpt-5.6-sol",
+-        "provider": "openai"
+-      }
+-    ],
+-    "research": [
+-      {
+-        "config": {
+-          "reasoning_effort": "high"
+-        },
+-        "model": "gpt-5.6-sol",
+-        "provider": "openai"
+-      }
+-    ],
+-    "security-audit": [
+-      {
+-        "config": {
+-          "reasoning_effort": "xhigh"
+-        },
+-        "model": "gpt-5.6-terra",
+-        "provider": "openai"
+-      }
+-    ],
+-    "ui-coding": [
+-      {
+-        "config": {
+-          "reasoning_effort": "high"
+-        },
+-        "model": "gpt-5.6-terra",
+-        "provider": "openai"
+-      }
+-    ],
+-    "vision": [
+-      {
+-        "config": {},
+-        "model": "gpt-5.6-terra",
+-        "provider": "openai"
+-      }
+-    ],
+-    "writing": [
+-      {
+-        "config": {},
+-        "model": "gpt-5.6-sol",
+-        "provider": "openai"
+-      }
+-    ]
+-  },
+   "quality.yaml": {
+     "__fallback__reasoning_then_general": [
+       {

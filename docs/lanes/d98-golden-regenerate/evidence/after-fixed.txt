@@ -1,0 +1,17 @@
+=== C) AFTER (fixed tree, THROWAWAY COPY -- the real fixture is untouched) ===
+BEFORE: ['anthropic.yaml', 'balanced.yaml', 'copilot.yaml', 'economy.yaml', 'gemini.yaml', 'ollama.yaml', 'openai.yaml', 'quality.yaml']
+regenerated /tmp/tmp.xa1O0kTsqR/repo/tests/fixtures/resolution_golden_pre_knob_consistency.json (8 matrices)
+exit=0
+AFTER : ['anthropic.yaml', 'balanced.yaml', 'copilot.yaml', 'economy.yaml', 'gemini.yaml', 'ollama.yaml', 'openai.yaml', 'quality.yaml']
+--- byte-identical to the committed fixture? ---
+IDENTICAL (regeneration is now a no-op on an unchanged tree)
+
+=== D) The refusal path: a recorded matrix genuinely leaves routing/ ===
+REFUSED: refusing to regenerate: this would DELETE these already-recorded matrices from resolution_golden_pre_knob_consistency.json: ['economy.yaml']. A matrix that is recorded is covered by the byte-identity check; dropping it silently exempts it. If a matrix is genuinely gone from routing/, re-run with --allow-drop to say so on purpose.
+exit=2
+fixture still has: ['anthropic.yaml', 'balanced.yaml', 'copilot.yaml', 'economy.yaml', 'gemini.yaml', 'ollama.yaml', 'openai.yaml', 'quality.yaml']
+--- and with --allow-drop, on purpose ---
+WARNING: dropped on purpose (--allow-drop): ['economy.yaml']
+regenerated /tmp/tmp.xa1O0kTsqR/repo/tests/fixtures/resolution_golden_pre_knob_consistency.json (7 matrices)
+exit=0
+fixture now has : ['anthropic.yaml', 'balanced.yaml', 'copilot.yaml', 'gemini.yaml', 'ollama.yaml', 'openai.yaml', 'quality.yaml']
