@@ -1,0 +1,49 @@
+$ (at 452560b, role_pin.py reverted, new tests applied)
+$ uv run --extra dev --with amplifier-foundation pytest -q --tb=line tests/test_role_pin_module_vs_instance.py tests/test_role_pin_fidelity.py
+FFFFFFFFF.F............FF...                                             [100%]
+=================================== FAILURES ===================================
+E   assert None is not None
+tests/test_role_pin_module_vs_instance.py:158: assert None is not None
+E   AssertionError: assert {'config_keys_reasserted': [], 'model_after': 'gemini-3.1-flash-image-preview', 'model_before': 'gemini-3.1-flash-image-preview', 'model_not_reasserted_reason': 'model_is_unresolved_pattern', ...} is None
+     +  where {'config_keys_reasserted': [], 'model_after': 'gemini-3.1-flash-image-preview', 'model_before': 'gemini-3.1-flash-image-preview', 'model_not_reasserted_reason': 'model_is_unresolved_pattern', ...} = reassert_own_role_pin(<MagicMock id='246945289552624'>)
+tests/test_role_pin_module_vs_instance.py:186: AssertionError: assert {'config_keys_reasserted': [], 'model_after': 'gemini-3.1-flash-image-preview', 'model_before': 'gemini-3.1-flash-image-preview', 'model_not_reasserted_reason': 'model_is_unresolved_pattern', ...} is None
+E   assert None is not None
+tests/test_role_pin_module_vs_instance.py:204: assert None is not None
+E   TypeError: _match_mounted() takes 2 positional arguments but 4 were given
+tests/test_role_pin_module_vs_instance.py:225: TypeError: _match_mounted() takes 2 positional arguments but 4 were given
+E   TypeError: _match_mounted() takes 2 positional arguments but 4 were given
+tests/test_role_pin_module_vs_instance.py:241: TypeError: _match_mounted() takes 2 positional arguments but 4 were given
+E   TypeError: _match_mounted() takes 2 positional arguments but 4 were given
+tests/test_role_pin_module_vs_instance.py:269: TypeError: _match_mounted() takes 2 positional arguments but 4 were given
+E   KeyError: 'provider_resolution'
+tests/test_role_pin_module_vs_instance.py:289: KeyError: 'provider_resolution'
+E   KeyError: 'provider_resolution'
+tests/test_role_pin_module_vs_instance.py:308: KeyError: 'provider_resolution'
+E   TypeError: _match_mounted() takes 2 positional arguments but 4 were given
+tests/test_role_pin_module_vs_instance.py:330: TypeError: _match_mounted() takes 2 positional arguments but 4 were given
+E   KeyError: 'provider_resolution'
+tests/test_role_pin_module_vs_instance.py:375: KeyError: 'provider_resolution'
+E   AssertionError: assert ['provider-openai', 'provider-provider-openai'] == 'provider-openai'
+     +  where ['provider-openai', 'provider-provider-openai'] = _match_mounted({'provider-openai': <object object at 0xe098722f1db0>, 'provider-provider-openai': <object object at 0xe098722f1f40>}, 'openai')
+tests/test_role_pin_fidelity.py:502: AssertionError: assert ['provider-openai', 'provider-provider-openai'] == 'provider-openai'
+E   AssertionError: assert 'pinned_provider_ambiguous' == 'mount_state_..._declared_pin'
+      
+      - mount_state_disagreed_with_declared_pin
+      + pinned_provider_ambiguous
+------------------------------ Captured log call -------------------------------
+WARNING  amplifier_module_hooks_routing.role_pin:role_pin.py:328 [ROUTING] this session pins 'openai', but 2 mounted providers answer to that name (provider-openai, provider-provider-openai). Refusing to guess which instance was meant -- leaving ordering untouched.
+tests/test_role_pin_fidelity.py:528: AssertionError: assert 'pinned_provider_ambiguous' == 'mount_state_..._declared_pin'
+=========================== short test summary info ============================
+FAILED tests/test_role_pin_module_vs_instance.py::test_gate_measured_host_promotes_opus_and_never_touches_gemini
+FAILED tests/test_role_pin_module_vs_instance.py::test_gate_measured_host_at_spawn_state_is_a_no_op
+FAILED tests/test_role_pin_module_vs_instance.py::test_gate_earlier_preference_never_falls_through_to_a_later_one
+FAILED tests/test_role_pin_module_vs_instance.py::test_module_named_preference_resolves_by_default_model
+FAILED tests/test_role_pin_module_vs_instance.py::test_module_named_preference_falls_back_to_highest_priority
+FAILED tests/test_role_pin_module_vs_instance.py::test_module_name_that_is_also_a_key_keeps_its_literal_reading
+FAILED tests/test_role_pin_module_vs_instance.py::test_exact_instance_id_preference_still_wins
+FAILED tests/test_role_pin_module_vs_instance.py::test_single_instance_module_is_unchanged
+FAILED tests/test_role_pin_module_vs_instance.py::test_instance_named_after_another_module_does_not_match_it
+FAILED tests/test_role_pin_module_vs_instance.py::test_no_mount_plan_leaves_the_pre_existing_spelling_path_intact
+FAILED tests/test_role_pin_fidelity.py::test_match_mounted_resolves_an_ambiguous_spelling_instead_of_refusing
+FAILED tests/test_role_pin_fidelity.py::test_ambiguous_pin_is_resolved_by_model_intent
+12 failed, 16 passed in 0.09s

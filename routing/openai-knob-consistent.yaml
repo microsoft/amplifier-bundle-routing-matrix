@@ -1,70 +1,50 @@
-# Routing Matrix: openai
+# Routing Matrix: openai-knob-consistent
 #
-# OpenAI-only routing. All roles use OpenAI models exclusively.
-# Use when you want to run entirely on your OpenAI API account.
+# The `openai` matrix, byte-identical in its `roles:` block, plus ONE optional
+# top-level `preset:` block that turns on knob-consistent sub-agent routing.
 #
-# Glob strategy: tier suffixes (`gpt-?.?-sol*` flagship, `gpt-?.?-terra*` mid,
-# `gpt-?.?-luna*` cheap, `gpt-?.?-mini*`, `gpt-?.?-nano*`) auto-track minor
-# version bumps without matching the wrong tier. The mid tier uses
-# `gpt-?.?-terra*`, falling back to the base glob `gpt-[0-9].[0-9]` which matches
-# any single-digit major.minor base model (e.g. gpt-5.5) without matching suffix
-# variants (-sol, -terra, -luna, -mini, -pro, -nano) or dated snapshots.
-# IMPORTANT: since the 5.6 rename, the bare `gpt-5.6` alias points at the
-# flagship (sol) tier, so the base glob is a migration fallback for pre-5.6
-# accounts (where the un-suffixed model WAS the mid tier) -- not the primary
-# mid-tier candidate. Mid-tier roles (general, coding, ui-coding,
-# security-audit, critique, vision) try `gpt-?.?-terra*` first, then the base
-# glob. Flagship roles (reasoning, creative, writing, research, critical-ops)
-# try `gpt-?.?-sol*` first, then fall back to the base glob; the cheap `fast`
-# role tries `gpt-?.?-luna*` then `gpt-?.?-mini*`. The resolver's version-aware
-# sort picks the highest available version automatically; an unmatched glob
-# falls through to the next candidate, so accounts mid-migration degrade
-# gracefully.
+# WHAT PROBLEM THIS SOLVES
+# ------------------------
+# A session pins model/effort for the ROOT only. Sub-agents are routed by the
+# matrix, so the caller's dial governs only the root's own work. Measured
+# (00-what-we-know.md section 2c): a terra S1 tree sent 85-96% of its LLM calls
+# to sol; a haiku cell billed $2.225 with 26 of 49 calls on sol; luna costs
+# $1.5 when it delegates to sol vs $0.48-0.78 when it does not.
 #
-# reasoning_effort pin on the workhorse roles (2026-09-01): general, coding,
-# and ui-coding now pin `reasoning_effort: high` on their terra candidates.
-# Evidence: a DTU rebaseline wave (S1 diagnostic + S3 5-turn multi-turn
-# build, n=2 each) found gpt-5.6-terra @ high scored 2/2 on both scenarios,
-# while gpt-5.6-sol @ xhigh could not complete a single run inside a 30-minute
-# cap on either scenario, at ~3-7x the cost. A prior dial-in wave
-# (2026-08-30) corroborated terra-high across S1/S3/S4. Both candidates
-# (terra glob and the base-glob migration fallback) carry the same pin so
-# pre-5.6 accounts inherit the same effort. n=2 per cell; sol's S1
-# non-completions are cap-bounded, not graded-wrong -- see PR description
-# for the full write-up. security-audit and critique were left untouched:
-# they already pin terra @ xhigh (a separate, pre-existing design, not sol),
-# outside this evidence's scope. reasoning and critical-ops were left
-# untouched: they already pin sol (xhigh and high respectively) and the
-# deep-diagnosis (S4) evidence still favors sol at high+ effort over sol at
-# medium. creative/writing/research/vision/image-gen are untouched -- terra
-# is untested on those task shapes.
+# With `inherit: strict`, a session running on gpt-5.6-terra @ medium resolves
+# EVERY role at or below terra, at medium -- including `reasoning`, which the
+# stock matrix sends to `gpt-?.?-sol*` @ xhigh. When intent cannot be honored,
+# a `routing:intent-clamped` event is emitted with {role, requested, granted,
+# reason}. Emitted to the event log, never injected into the conversation.
 #
-# Knob-consistent delegation, DEFAULT ON (2026-09-02): a session pins
-# model/effort for the ROOT only -- sub-agents are routed by this matrix, so
-# the caller's dial used to govern only the root's own work. MEASURED (lane
-# l1-knob-consistent-routing, DONE.json + ai-notes/w2-s3-three-knob-presets/
-# ROUTING-PROPOSAL.md; S3 n=3/arm on OpenAI roots): `gpt-5.6-sol` call share
-# 27.8% -> 0.0%, cost -29.7% (S3 median) / -55.9% (S1), wall -16.2%, quality
-# flat. This is a PROVEN WIN, not an experiment -- see the `preset:` block
-# below (identical to the one `openai-knob-consistent.yaml` shipped as an
-# opt-in arm) and README "Knob-consistent delegation" for the full writeup.
-# Scope: OpenAI-family roots only. Every other shipped matrix (anthropic,
-# balanced, quality, economy, gemini, copilot, ollama) is UNTOUCHED and
-# resolves byte-identically to before -- there is no equivalent evidence yet
-# for other provider families (the "Anthropic guardrail": no measured win,
-# so no default change there). Opt out with `disable_delegation_preset:
-# true` in this hook's mount config to restore legacy (pre-2026-09-02)
-# behaviour on this matrix.
+# WHY IT IS SAFE ON ANTHROPIC
+# ---------------------------
+# A delegate SPAWNS A NEW SESSION with its own request prefix, so setting the
+# child's effort at creation is not a mid-session effort change and cannot
+# invalidate a parent's message blocks (G-EFFORT-CONSTANT). Nothing here
+# re-configures a running session.
+#
+# WHAT THIS FILE DELIBERATELY DOES NOT SET
+# ----------------------------------------
+# No fan-out cap, no delegate timeout, no partial-result policy, no
+# `session_scoped` block, no `context` block. Those knobs are parseable and
+# validated by the loader but are a SEPARATE treatment, per the design source:
+# "Bound the tree; do not vary effort inside it. These must not ship as one
+# treatment." Keeping them out is what makes this arm single-variable.
+#
+# STATUS (2026-09-02): the measurement this file existed to gather PASSED
+# (see l1-knob-consistent-routing DONE.json + ROUTING-PROPOSAL.md) and the
+# same `preset:` block now ships ON BY DEFAULT in `routing/openai.yaml`
+# itself -- this file is kept only as an explicit-name pin (`routing.matrix:
+# openai-knob-consistent`) for anyone who selects a matrix by name; the two
+# now resolve identically. No other shipped matrix carries a preset.
 
-name: openai
-description: "OpenAI-only routing. All roles use OpenAI models exclusively. Knob-consistent delegation is ON by default (measured win) -- sub-agents inherit the caller's tier/effort ceiling; see preset: below."
+name: openai-knob-consistent
+description: "OpenAI-only routing with knob-consistent delegation: sub-agents resolve at or below the caller's tier and effort."
 updated: "2026-09-02"
 
 # ---------------------------------------------------------------------------
-# Knob-consistent delegation preset -- DEFAULT ON for this matrix (measured
-# win on OpenAI roots, see header above). Byte-identical to the preset block
-# `openai-knob-consistent.yaml` ships (that file remains as an explicit-name
-# pin for anyone who wants to select it by name; both now behave the same).
+# OPTIONAL. A matrix without this block resolves exactly as it always has.
 # ---------------------------------------------------------------------------
 preset:
   # Documentation only; never read by code.
@@ -76,7 +56,9 @@ preset:
   # mid, sol flagship). A rung may be one glob or a list of globs.
   #
   # `gpt-[0-9].[0-9]` sits on the SOL rung on purpose: since the 5.6 rename the
-  # bare alias points at the flagship tier (see header above).
+  # bare alias points at the flagship tier (see routing/openai.yaml's header).
+  # Putting it anywhere else would let the migration fallback smuggle a
+  # flagship model past the ceiling.
   tier_ladder:
     openai:
       - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
@@ -86,9 +68,14 @@ preset:
   delegation:
     # none | effort | tier-and-effort | strict
     #
-    # `strict` matches the measured arm exactly (l1-knob-consistent-routing
-    # shipped and measured `strict`, not `tier-and-effort` + escalation) --
-    # this default follows the evidence, not a stronger untested claim.
+    # `strict` is chosen here rather than `tier-and-effort` + an escalation
+    # allowance so this matrix is a single-variable arm: it answers "does
+    # propagating the ceiling collapse the sol share, and what does that cost
+    # in quality?" without a second, differently-motivated knob in the way.
+    # Escalation is implemented and unit-tested; it is simply not exercised by
+    # this file. A curator who wants it writes:
+    #   inherit: tier-and-effort
+    #   escalate: {allow_roles: [reasoning], max_uses: 3, on_exhausted: fall_back}
     inherit: strict
     report_unhonored: true
 

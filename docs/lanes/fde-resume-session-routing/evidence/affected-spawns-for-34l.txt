@@ -1,0 +1,229 @@
+Delegate spawns that occurred on a ROOT session's RESUMED leg.
+These are the spawns whose parent had NOT run layer-B model_role resolution,
+because hooks-routing's handler never fired on that leg (model_performance-fde).
+Handed to model_performance-34l as the exact population to re-read.
+
+TOTAL: 74 (root, delegate) pairs; 82 spawn events; 43 distinct root sessions
+
+- run   : 20260830-dialin/runs/val-dial-oai-ctl-s3-01/all-sessions/-root-s3-work/sessions
+  root  : 038296a9-5457-4bad-8a94-3daa336694de   (first resume 2026-08-30T20:07:40.378781957+00:00)
+  child : 0000000000000000-683696ffb15e4f3e_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-08-30T20:09:29.486117115+00:00)
+- run   : 20260830-dialin/runs/val-dial-oai-ctl-s3-02/all-sessions/-root-s3-work/sessions
+  root  : 100bf453-b90d-4009-a1bf-cdfdc1c0791f   (first resume 2026-08-30T20:09:11.248313761+00:00)
+  child : 0000000000000000-3598b2f69bcf4d35_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-08-30T20:09:23.841465247+00:00)
+- run   : 20260830-dialin/runs/val-dial-oai-high-s3-01/all-sessions/-root-s3-work/sessions
+  root  : b57221d2-2826-4e76-82ff-a9937972dc60   (first resume 2026-08-30T20:03:38.837542502+00:00)
+  child : 0000000000000000-5508434a262d4605_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-08-30T20:03:46.713839428+00:00)
+- run   : 20260830-dialin/runs/val-dial-oai-high-s3-02/all-sessions/-root-s3-work/sessions
+  root  : d62d1598-3b20-46eb-8b5d-7a0dcb7e6174   (first resume 2026-08-30T20:08:40.933100267+00:00)
+  child : 0000000000000000-d7a52dfec1a641d9_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-08-30T20:09:55.769272747+00:00)
+- run   : 20260830-dialin/runs/val-dial-oai-terra-s3-01/all-sessions/-root-s3-work/sessions
+  root  : 51aee97d-1daf-4200-9565-9f037387ba62   (first resume 2026-08-30T20:27:13.051558235+00:00)
+  child : 0000000000000000-0065586b20414916_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-08-30T20:27:21.728986590+00:00)
+- run   : 20260831-s4c/runs/val-s4c-anth-opus48-xhigh-01/all-sessions/-root-val-s4-anth-opus48-xhigh-01/sessions
+  root  : ac8b5370-a635-489f-a8b8-ef7edcd11e55   (first resume 2026-08-31T04:22:25.730807350+00:00)
+  child : 0000000000000000-45369e92e6ef493d_amplifier-tester-setup-digital-twin   (1 spawn(s) after that, first at 2026-08-31T04:28:40.926426974+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-medium-01/all-sessions/-root-val-s4-oai-sol-medium-01/sessions
+  root  : 5c7a1273-c637-4a4f-a621-9292051916ae   (first resume 2026-08-31T04:02:42.284386353+00:00)
+  child : 0000000000000000-1031e9223d3d415e_anchors-amp-dev-git-ops   (6 spawn(s) after that, first at 2026-08-31T04:02:53.277097579+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-medium-02/all-sessions/-root-val-s4-oai-sol-medium-02/sessions
+  root  : 73f1e4b7-30f5-435e-b9c0-b2ff92eea85a   (first resume 2026-08-31T04:02:42.923066997+00:00)
+  child : 0000000000000000-3d9f73008a434298_anchors-amp-dev-git-ops   (3 spawn(s) after that, first at 2026-08-31T04:03:00.919598926+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-medium-02/all-sessions/-root-val-s4-oai-sol-medium-02/sessions
+  root  : 73f1e4b7-30f5-435e-b9c0-b2ff92eea85a   (first resume 2026-08-31T04:02:42.923066997+00:00)
+  child : 0000000000000000-143f42c88ac94ef1_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-08-31T04:04:32.961103858+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-01/all-sessions/-root-val-s4-oai-sol-xhigh-01/sessions
+  root  : 1a75994d-b218-4847-8dc6-416cb51d5059   (first resume 2026-08-31T04:02:41.218387407+00:00)
+  child : 0000000000000000-fe268e9be1b145b7_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:06:53.324199237+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-01/all-sessions/-root-val-s4-oai-sol-xhigh-01/sessions
+  root  : 1a75994d-b218-4847-8dc6-416cb51d5059   (first resume 2026-08-31T04:02:41.218387407+00:00)
+  child : 0000000000000000-d56de4c3cf834b94_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:03:08.509999007+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-01/all-sessions/-root-val-s4-oai-sol-xhigh-01/sessions
+  root  : 1a75994d-b218-4847-8dc6-416cb51d5059   (first resume 2026-08-31T04:02:41.218387407+00:00)
+  child : 0000000000000000-6f1b7a77dbf34b0b_amplifier-tester-setup-digital-twin   (1 spawn(s) after that, first at 2026-08-31T04:05:41.894991895+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-01/all-sessions/-root-val-s4-oai-sol-xhigh-01/sessions
+  root  : 1a75994d-b218-4847-8dc6-416cb51d5059   (first resume 2026-08-31T04:02:41.218387407+00:00)
+  child : 0000000000000000-4a2351f10af64476_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-08-31T04:08:36.597887365+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-01/all-sessions/-root-val-s4-oai-sol-xhigh-01/sessions
+  root  : 1a75994d-b218-4847-8dc6-416cb51d5059   (first resume 2026-08-31T04:02:41.218387407+00:00)
+  child : 0000000000000000-e5dbe2a7599843d4_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:03:50.779874950+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-02/all-sessions/-root-val-s4-oai-sol-xhigh-02/sessions
+  root  : fccd20ac-5037-45e4-b061-9d9a790ef0d2   (first resume 2026-08-31T04:02:41.845648478+00:00)
+  child : 0000000000000000-c99488aa3d9d4b87_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:08:25.342597193+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-02/all-sessions/-root-val-s4-oai-sol-xhigh-02/sessions
+  root  : fccd20ac-5037-45e4-b061-9d9a790ef0d2   (first resume 2026-08-31T04:02:41.845648478+00:00)
+  child : 0000000000000000-3be04f4023a544e9_amplifier-tester-setup-digital-twin   (1 spawn(s) after that, first at 2026-08-31T04:09:08.765296080+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-02/all-sessions/-root-val-s4-oai-sol-xhigh-02/sessions
+  root  : fccd20ac-5037-45e4-b061-9d9a790ef0d2   (first resume 2026-08-31T04:02:41.845648478+00:00)
+  child : 0000000000000000-af9df2e8718942fa_anchors-amp-dev-amplifier-dev-expert   (1 spawn(s) after that, first at 2026-08-31T04:02:58.287031032+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-02/all-sessions/-root-val-s4-oai-sol-xhigh-02/sessions
+  root  : fccd20ac-5037-45e4-b061-9d9a790ef0d2   (first resume 2026-08-31T04:02:41.845648478+00:00)
+  child : 0000000000000000-d7e6737673604eec_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:06:31.952693503+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-02/all-sessions/-root-val-s4-oai-sol-xhigh-02/sessions
+  root  : fccd20ac-5037-45e4-b061-9d9a790ef0d2   (first resume 2026-08-31T04:02:41.845648478+00:00)
+  child : 0000000000000000-199b616b1bde4993_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:10:02.019524199+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-02/all-sessions/-root-val-s4-oai-sol-xhigh-02/sessions
+  root  : fccd20ac-5037-45e4-b061-9d9a790ef0d2   (first resume 2026-08-31T04:02:41.845648478+00:00)
+  child : 0000000000000000-4e9466c620c543cd_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-08-31T04:10:32.763048913+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-sol-xhigh-02/all-sessions/-root-val-s4-oai-sol-xhigh-02/sessions
+  root  : fccd20ac-5037-45e4-b061-9d9a790ef0d2   (first resume 2026-08-31T04:02:41.845648478+00:00)
+  child : 0000000000000000-8dad0ca5741f4c5f_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:09:42.788355044+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-terra-high-01/all-sessions/-root-val-s4-oai-terra-high-01/sessions
+  root  : a620efc9-4e03-4f23-8bb2-969b7a108daa   (first resume 2026-08-31T04:22:16.537725302+00:00)
+  child : 0000000000000000-93af2b1cc4e7422e_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:23:13.825513727+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-terra-high-01/all-sessions/-root-val-s4-oai-terra-high-01/sessions
+  root  : a620efc9-4e03-4f23-8bb2-969b7a108daa   (first resume 2026-08-31T04:22:16.537725302+00:00)
+  child : 0000000000000000-5c7202be08ed4c8e_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:25:45.904067839+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-terra-high-01/all-sessions/-root-val-s4-oai-terra-high-01/sessions
+  root  : a620efc9-4e03-4f23-8bb2-969b7a108daa   (first resume 2026-08-31T04:22:16.537725302+00:00)
+  child : 0000000000000000-fa784250e1f44fb1_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:25:29.249939316+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-terra-high-01/all-sessions/-root-val-s4-oai-terra-high-01/sessions
+  root  : a620efc9-4e03-4f23-8bb2-969b7a108daa   (first resume 2026-08-31T04:22:16.537725302+00:00)
+  child : 0000000000000000-aa9bcf7aabbb476f_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:22:29.071045617+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-terra-high-02/all-sessions/-root-val-s4-oai-terra-high-02/sessions
+  root  : fec8a8c4-e741-43e6-8d3e-3f46db983fb9   (first resume 2026-08-31T04:22:21.468549148+00:00)
+  child : 0000000000000000-efe8a6bcd71446c4_anchors-amp-dev-git-ops   (1 spawn(s) after that, first at 2026-08-31T04:22:44.070155245+00:00)
+- run   : 20260831-s4c/runs/val-s4c-oai-terra-high-02/all-sessions/-root-val-s4-oai-terra-high-02/sessions
+  root  : fec8a8c4-e741-43e6-8d3e-3f46db983fb9   (first resume 2026-08-31T04:22:21.468549148+00:00)
+  child : 0000000000000000-ea2c9a8918b24af7_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-08-31T04:23:29.095024300+00:00)
+- run   : 20260901-cadence/runs/fewer-01/all-sessions/projects/-root-s5-work/sessions
+  root  : f42aa377-bd4c-4b1a-a994-583542b4ee66   (first resume 2026-09-02T03:23:27.043024232+00:00)
+  child : 0000000000000000-a99fd5ce4d674776_anchors-amp-dev-explorer   (1 spawn(s) after that, first at 2026-09-02T03:24:17.414772623+00:00)
+- run   : 20260901-cadence/runs/sp-01/all-sessions/projects/-root-s5-work/sessions
+  root  : f7ce58e8-d004-40f6-adc4-96b1c49a5a4b   (first resume 2026-09-02T02:45:59.550140060+00:00)
+  child : 0000000000000000-18ed83b7be8a4944_foundation-session-analyst   (1 spawn(s) after that, first at 2026-09-02T02:49:53.100608111+00:00)
+- run   : 20260901-compaction-cache/runs/ccK-03/all-sessions/projects/-root-s5-work/sessions
+  root  : 90790ec0-bcc9-4517-be1f-b940b53d9d3f   (first resume 2026-09-01T21:53:57.722479242+00:00)
+  child : 0000000000000000-7422fe2b09c741c8_anchors-amp-dev-explorer   (1 spawn(s) after that, first at 2026-09-01T21:55:57.919881488+00:00)
+- run   : 20260901-compaction-cache/runs/ccK-03/all-sessions/projects/-root-s5-work/sessions
+  root  : 90790ec0-bcc9-4517-be1f-b940b53d9d3f   (first resume 2026-09-01T21:53:57.722479242+00:00)
+  child : 0000000000000000-11064d6e05fc4525_foundation-session-analyst   (1 spawn(s) after that, first at 2026-09-01T22:00:11.197069042+00:00)
+- run   : 20260901-rebaseline/runs/val-rb-oai-sol-high-s3-01/all-sessions/-root-s3-work/sessions
+  root  : 1ca25366-3359-40e2-b4ba-b35b0fa996ad   (first resume 2026-09-01T04:48:54.390732521+00:00)
+  child : 0000000000000000-b3dadc635063429a_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T05:00:37.528542238+00:00)
+- run   : 20260901-rebaseline/runs/val-rb-oai-sol-high-s3-01/all-sessions/-root-s3-work/sessions
+  root  : 1ca25366-3359-40e2-b4ba-b35b0fa996ad   (first resume 2026-09-01T04:48:54.390732521+00:00)
+  child : 0000000000000000-bca4c5f5711c42cf_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T05:07:47.198828769+00:00)
+- run   : 20260901-rebaseline/runs/val-rb-oai-sol-xhigh-s3-01/all-sessions/-root-s3-work/sessions
+  root  : c5737e52-3147-4f3a-bfd7-30ef395de922   (first resume 2026-09-01T03:45:57.900653199+00:00)
+  child : 0000000000000000-5b3d7114bf1d4df0_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T03:48:04.452302222+00:00)
+- run   : 20260901-rebaseline/runs/val-rb-oai-sol-xhigh-s3-02/all-sessions/-root-s3-work/sessions
+  root  : 92bbec72-e937-482a-b4a6-99a4d4e41986   (first resume 2026-09-01T03:51:30.783959970+00:00)
+  child : 0000000000000000-14a7be1491244681_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T03:54:43.263580165+00:00)
+- run   : 20260901-rebaseline/runs/val-rb-oai-terra-high-s3-01/all-sessions/-root-s3-work/sessions
+  root  : 748949b2-796c-4b41-b1ce-c78721b671d1   (first resume 2026-09-01T04:04:30.112468260+00:00)
+  child : 0000000000000000-ce1f1598cd8540bb_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T04:15:18.223147790+00:00)
+- run   : 20260901-rebaseline/runs/val-rb-oai-terra-high-s3-01/all-sessions/-root-s3-work/sessions
+  root  : 748949b2-796c-4b41-b1ce-c78721b671d1   (first resume 2026-09-01T04:04:30.112468260+00:00)
+  child : 0000000000000000-aa2a43b80bd5450b_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T04:06:16.852312715+00:00)
+- run   : 20260901-rebaseline/runs/val-rb-oai-terra-high-s3-02/all-sessions/-root-s3-work/sessions
+  root  : c45f2bcb-5c6c-4fa7-9a0b-2bce68d974f3   (first resume 2026-09-01T04:01:16.625032434+00:00)
+  child : 0000000000000000-2b84b0d281ee4c14_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T04:09:26.468264057+00:00)
+- run   : 20260901-rebaseline/runs/val-rb-oai-terra-high-s3-02/all-sessions/-root-s3-work/sessions
+  root  : c45f2bcb-5c6c-4fa7-9a0b-2bce68d974f3   (first resume 2026-09-01T04:01:16.625032434+00:00)
+  child : 0000000000000000-afff3aea02a743ee_anchors-amp-dev-architect   (1 spawn(s) after that, first at 2026-09-01T04:01:22.306854163+00:00)
+- run   : 20260901-rebaseline/runs/val-rb-oai-terra-high-s3-02/all-sessions/-root-s3-work/sessions
+  root  : c45f2bcb-5c6c-4fa7-9a0b-2bce68d974f3   (first resume 2026-09-01T04:01:16.625032434+00:00)
+  child : 0000000000000000-97ba1fda85344e1d_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T04:10:09.666549311+00:00)
+- run   : 20260901-threeknob/runs/val-tk-c-sonnet5-xhigh-s3-03/all-sessions/projects/-root-s3-work/sessions
+  root  : b02701e9-d3ee-4905-98e1-2e625ec3cabd   (first resume 2026-09-01T14:12:51.367583147+00:00)
+  child : 0000000000000000-5bd64cb9c72b4094_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T14:13:22.881261603+00:00)
+- run   : 20260901-threeknob/runs/val-tk-c-terra-high-s3-04/all-sessions/projects/-root-s3-work/sessions
+  root  : 87d63709-99b2-410c-a66e-852b35c2b9d9   (first resume 2026-09-01T15:09:21.245581198+00:00)
+  child : 0000000000000000-3fdd42db9f3646c4_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T15:15:39.290549858+00:00)
+- run   : 20260901-threeknob/runs/val-tk-c-terra-high-s3-04/all-sessions/projects/-root-s3-work/sessions
+  root  : 87d63709-99b2-410c-a66e-852b35c2b9d9   (first resume 2026-09-01T15:09:21.245581198+00:00)
+  child : 0000000000000000-b82da192337f47ce_anchors-amp-dev-architect   (1 spawn(s) after that, first at 2026-09-01T15:09:33.840433458+00:00)
+- run   : 20260901-threeknob/runs/val-tk-c-terra-high-s3-05/all-sessions/projects/-root-s3-work/sessions
+  root  : 7e067e56-e5fc-4d65-99a8-d4d6ed31a504   (first resume 2026-09-01T15:30:23.292159021+00:00)
+  child : 0000000000000000-ea1e89a08ffe4f68_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T15:34:24.893388929+00:00)
+- run   : 20260901-threeknob/runs/val-tk-c-terra-medium-s3-03/all-sessions/projects/-root-s3-work/sessions
+  root  : 318ac0f8-a8de-48a8-a3f0-405ff683ac26   (first resume 2026-09-01T15:43:28.458646007+00:00)
+  child : 0000000000000000-7fbf0a1d5e0740be_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T15:43:36.048600290+00:00)
+- run   : 20260901-threeknob/runs/val-tk-c-terra-medium-s3-05/all-sessions/projects/-root-s3-work/sessions
+  root  : 74ed57ce-372e-46fc-a97d-f5e3ebb441fc   (first resume 2026-09-01T16:02:08.541928614+00:00)
+  child : 0000000000000000-c760d932c92445b8_anchors-amp-dev-explorer   (1 spawn(s) after that, first at 2026-09-01T16:02:17.846893787+00:00)
+- run   : 20260901-threeknob/runs/val-tk-e-luna-medium-s3-04/all-sessions/projects/-root-s3-work/sessions
+  root  : 6d6107f7-42d0-47f0-b24c-b517083e8973   (first resume 2026-09-01T14:32:13.610254597+00:00)
+  child : 0000000000000000-f37efb783e6b40d2_anchors-amp-dev-architect   (1 spawn(s) after that, first at 2026-09-01T14:32:51.244935752+00:00)
+- run   : 20260901-threeknob/runs/val-tk-e-terra-xhigh-s3-01/all-sessions/projects/-root-s3-work/sessions
+  root  : 88989ede-df28-4d2d-8999-8af5931d30df   (first resume 2026-09-01T14:53:18.346840254+00:00)
+  child : 0000000000000000-9f6648e330da430e_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T14:59:15.685978025+00:00)
+- run   : 20260901-threeknob/runs/val-tk-e-terra-xhigh-s3-01/all-sessions/projects/-root-s3-work/sessions
+  root  : 88989ede-df28-4d2d-8999-8af5931d30df   (first resume 2026-09-01T14:53:18.346840254+00:00)
+  child : 0000000000000000-084854642a004b49_self   (1 spawn(s) after that, first at 2026-09-01T15:06:39.867594309+00:00)
+- run   : 20260901-threeknob/runs/val-tk-e-terra-xhigh-s3-01/all-sessions/projects/-root-s3-work/sessions
+  root  : 88989ede-df28-4d2d-8999-8af5931d30df   (first resume 2026-09-01T14:53:18.346840254+00:00)
+  child : 0000000000000000-f364c82c719943b6_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T14:53:28.043888066+00:00)
+- run   : 20260901-threeknob/runs/val-tk-e-terra-xhigh-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : 3f600b2b-bf0d-4954-aa05-e9d263328a5a   (first resume 2026-09-01T15:11:25.020985947+00:00)
+  child : 0000000000000000-9659ebcf6ee44ef7_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T15:16:55.432847130+00:00)
+- run   : 20260901-threeknob/runs/val-tk-e-terra-xhigh-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : 3f600b2b-bf0d-4954-aa05-e9d263328a5a   (first resume 2026-09-01T15:11:25.020985947+00:00)
+  child : 0000000000000000-2d91e8500d8649c7_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T15:11:35.693250592+00:00)
+- run   : 20260901-threeknob/runs/val-tk-e-terra-xhigh-s3-04/all-sessions/projects/-root-s3-work/sessions
+  root  : 7c98532a-9c84-40bb-8317-fafcacb6723f   (first resume 2026-09-01T15:51:46.516193122+00:00)
+  child : 0000000000000000-73b028cfc39347ea_anchors-amp-dev-architect   (1 spawn(s) after that, first at 2026-09-01T15:52:21.548161512+00:00)
+- run   : 20260901-threeknob/runs/val-tk-e-terra-xhigh-s3-04/all-sessions/projects/-root-s3-work/sessions
+  root  : 7c98532a-9c84-40bb-8317-fafcacb6723f   (first resume 2026-09-01T15:51:46.516193122+00:00)
+  child : 0000000000000000-8c5a20f7e0fa412e_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T15:59:12.312522581+00:00)
+- run   : 20260901-threeknob/runs/val-tk-e-terra-xhigh-s3-05/all-sessions/projects/-root-s3-work/sessions
+  root  : a037d79f-e957-425d-90e5-a372dd5d2af6   (first resume 2026-09-01T16:11:12.845005041+00:00)
+  child : 0000000000000000-41be08ee86a041b6_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T16:13:43.752399949+00:00)
+- run   : 20260901-threeknob/runs/val-tk-p2-luna-medium-s3-01/all-sessions/projects/-root-s3-work/sessions
+  root  : f4caab62-337c-4a2e-b73a-45c6c0a0996e   (first resume 2026-09-01T12:40:43.728938178+00:00)
+  child : 0000000000000000-91b2346b03d9402e_anchors-amp-dev-architect   (1 spawn(s) after that, first at 2026-09-01T12:40:48.282589900+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-high-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : b37024a5-90ca-44aa-b682-cdf9ea517d71   (first resume 2026-09-01T15:26:46.050590900+00:00)
+  child : 0000000000000000-e455ecb607d74711_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T15:26:59.512306971+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-high-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : b37024a5-90ca-44aa-b682-cdf9ea517d71   (first resume 2026-09-01T15:26:46.050590900+00:00)
+  child : 0000000000000000-c5b43634edf448a2_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T15:30:41.706755355+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-high-s3-03/all-sessions/projects/-root-s3-work/sessions
+  root  : e1f4bea9-5783-487a-9ba4-59c191c76ce0   (first resume 2026-09-01T15:41:19.746263740+00:00)
+  child : 0000000000000000-847ac86cc85940a0_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T15:41:41.692086331+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-high-s3-03/all-sessions/projects/-root-s3-work/sessions
+  root  : e1f4bea9-5783-487a-9ba4-59c191c76ce0   (first resume 2026-09-01T15:41:19.746263740+00:00)
+  child : 0000000000000000-22866ead54ac4ca8_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T15:45:19.502372216+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-medium-s3-01/all-sessions/projects/-root-s3-work/sessions
+  root  : b419d710-2c25-48bb-af2d-ded84a17b280   (first resume 2026-09-01T15:39:39.240926200+00:00)
+  child : 0000000000000000-98fbe2e923374e42_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T15:41:00.635212575+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-medium-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : b2dac76c-2399-43bf-b18b-5c8ebcc21fcd   (first resume 2026-09-01T15:57:14.960933678+00:00)
+  child : 0000000000000000-020f896110cc47d0_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T16:06:35.338957091+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-medium-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : b2dac76c-2399-43bf-b18b-5c8ebcc21fcd   (first resume 2026-09-01T15:57:14.960933678+00:00)
+  child : 0000000000000000-d702241c6cd04556_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T15:57:26.206957399+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-medium-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : b2dac76c-2399-43bf-b18b-5c8ebcc21fcd   (first resume 2026-09-01T15:57:14.960933678+00:00)
+  child : 0000000000000000-944e8cfa3a344764_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T16:01:02.071053118+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-medium-s3-03/all-sessions/projects/-root-s3-work/sessions
+  root  : 6d4cd5f7-3965-4cca-90af-d2f7e1bd7f35   (first resume 2026-09-01T16:15:51.763266968+00:00)
+  child : 0000000000000000-c93ce55a7031422c_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T16:16:06.790834792+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-xhigh-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : 1f19b7ad-8e07-40a7-87a2-9c1513e95552   (first resume 2026-09-01T16:29:39.123679752+00:00)
+  child : 0000000000000000-c8315805f9f34fa8_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-01T16:35:33.568812315+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-xhigh-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : 1f19b7ad-8e07-40a7-87a2-9c1513e95552   (first resume 2026-09-01T16:29:39.123679752+00:00)
+  child : 0000000000000000-5720860d017c4225_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-01T16:29:55.379668362+00:00)
+- run   : 20260901-threeknob/runs/val-tk-sol-xhigh-s3-03/all-sessions/projects/-root-s3-work/sessions
+  root  : 8839b22c-e8bf-4ae0-91b7-fe92a8d109d5   (first resume 2026-09-01T16:57:44.213383497+00:00)
+  child : 0000000000000000-f7205d92122047bc_anchors-amp-dev-builder   (2 spawn(s) after that, first at 2026-09-01T17:00:58.605622546+00:00)
+- run   : 20260902-161-presets/runs/quality-fast-expensive-s3-01/all-sessions/projects/-root-s3-work/sessions
+  root  : 6a45d87a-e85e-49b8-8e50-491497a51dc3   (first resume 2026-09-02T21:39:48.943264936+00:00)
+  child : 0000000000000000-516c937f9793443e_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-02T21:39:59.113025677+00:00)
+- run   : 20260902-161-presets/runs/quality-fast-expensive-s3-03/all-sessions/projects/-root-s3-work/sessions
+  root  : b544a1d8-9367-481c-84b3-b4a9de888eb8   (first resume 2026-09-02T22:30:20.575806070+00:00)
+  child : 0000000000000000-686810d7b5fd488d_anchors-amp-dev-builder   (1 spawn(s) after that, first at 2026-09-02T22:32:46.986791295+00:00)
+- run   : 20260902-161-presets/runs/quality-fast-expensive-s3-03/all-sessions/projects/-root-s3-work/sessions
+  root  : b544a1d8-9367-481c-84b3-b4a9de888eb8   (first resume 2026-09-02T22:30:20.575806070+00:00)
+  child : 0000000000000000-022b04d00df54082_app-cli-cli-expert   (1 spawn(s) after that, first at 2026-09-02T22:30:33.394504869+00:00)
+- run   : 20260902-161-presets/runs/quality-slow-reasonable-s3-01/all-sessions/projects/-root-s3-work/sessions
+  root  : 49f715cc-66a9-4764-aef7-2e8de495c2c0   (first resume 2026-09-02T21:37:48.280523619+00:00)
+  child : 0000000000000000-a047d12ecfac4c3d_anchors-amp-dev-architect   (1 spawn(s) after that, first at 2026-09-02T21:37:53.128990760+00:00)
+- run   : 20260902-161-presets/runs/quality-slow-reasonable-s3-02/all-sessions/projects/-root-s3-work/sessions
+  root  : 3f56ba54-6d27-4b14-8c4f-c6835f1ed4ef   (first resume 2026-09-02T21:43:54.535625771+00:00)
+  child : 0000000000000000-fe4ee4a5105a459c_anchors-amp-dev-architect   (1 spawn(s) after that, first at 2026-09-02T21:44:00.653962102+00:00)
+- run   : 20260902-ytg-presets-revision/runs/ctl-s3-01/all-sessions/projects/-root-s3-work/sessions
+  root  : 7e891993-7046-4f3b-bf65-9015d228ab35   (first resume 2026-09-03T03:43:39.429768911+00:00)
+  child : 0000000000000000-23217c6dc3b34b34_anchors-amp-dev-architect   (1 spawn(s) after that, first at 2026-09-03T03:43:46.939991994+00:00)

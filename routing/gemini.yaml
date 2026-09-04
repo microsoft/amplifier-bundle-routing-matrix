@@ -46,24 +46,18 @@ roles:
     candidates:
       - provider: gemini
         model: gemini-*-pro-preview
-        config:
-          reasoning_effort: high
 
   reasoning:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: gemini
         model: gemini-*-pro-preview
-        config:
-          reasoning_effort: high
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
       - provider: gemini
         model: gemini-*-pro-preview
-        config:
-          reasoning_effort: xhigh
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
@@ -82,8 +76,6 @@ roles:
     candidates:
       - provider: gemini
         model: gemini-*-pro-preview
-        config:
-          reasoning_effort: high
 
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"

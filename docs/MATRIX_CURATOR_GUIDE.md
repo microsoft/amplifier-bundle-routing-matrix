@@ -126,6 +126,40 @@ that key in `coordinator.providers`. The resolver's `find_provider_by_type`
 does an exact-key match first, so any arbitrary instance id works in the
 `provider:` field.
 
+### Bare types against a multi-instance setup
+
+When a candidate names a **bare module type** (`provider: anthropic`) and no
+provider is keyed by that bare type — the normal shape once every instance has
+an explicit `id:` — `find_provider_by_type` must choose between several
+instances of the same module. It resolves in this order:
+
+1. **Model intent.** An instance whose own `default_model` satisfies the
+   candidate's `model:` pattern wins. An instance configured for a model was
+   configured *with the knobs for that model*.
+2. **Priority.** Among instances that match (or when none declares a matching
+   `default_model`), the lowest `priority` number wins.
+
+This ordering matters because `spawn_utils._apply_single_override` clones the
+**entire config** of the selected instance and overrides only `default_model`.
+Selecting by priority alone therefore mounts the requested model while
+carrying another tier's knobs. Concretely, given
+
+```yaml
+- id: opus     # priority 1,  reasoning_effort: xhigh, fallback_on_overload: true
+- id: haiku    # priority 12, reasoning_effort: high
+```
+
+a `fast` role asking for `provider: anthropic, model: claude-haiku-*` used to
+resolve to **opus**, mounting haiku with `xhigh` and `fallback_on_overload` —
+neither of which haiku honours — and emitting two `[PROVIDER]` warnings, while
+the purpose-built haiku instance went unused. Step 1 picks `haiku`.
+
+The selection is logged at INFO whenever model intent overrides the
+priority-only pick, so the decision is visible without reading the YAML.
+
+If you want to bypass the heuristic entirely, name the instance directly
+(`provider: haiku`) — the exact-key match runs first and always wins.
+
 **API key caveat:** The CLI `amplifier provider add` wizard currently stores
 both instances' api_key values in the same env var (e.g. `$OPENAI_API_KEY`),
 so two instances via the wizard collide in the keyring. Until that's fixed,
@@ -194,6 +228,54 @@ Common values:
 
 Only include `config` when a candidate genuinely needs different parameters from the provider default. Most candidates don't need it.
 
+> **A key only works if the target actually reads it.** Validation of the
+> `config` map is closed on VALUES but open on KEYS — a key the provider does
+> not declare passes silently and is then read by nobody. The loader now
+> rejects known-inert combinations up front (`INERT_CONFIG_RULES` in
+> `modules/hooks-routing/amplifier_module_hooks_routing/matrix_loader.py`),
+> logging an ERROR that names the key, the candidate and the replacement, and
+> removing the key from the effective matrix so nothing downstream reports it
+> as applied.
+>
+> **Two rules are enforced today, and they key differently:**
+>
+> | rule | keys on | why |
+> |---|---|---|
+> | `reasoning_effort` / `effort` on any **`gemini`** candidate | the PROVIDER | provider-gemini never reads an effort key from mount config, so *every* model it serves is affected |
+> | `reasoning_effort` / `effort` on any **`claude-haiku-*`** model | the MODEL | provider-anthropic *does* read the key, but Haiku collapses every level above `low` into one identical request |
+>
+> **Gemini.** provider-gemini consumes a closed set of 15 mount-config keys
+> and no effort key is among them, so the setting is inert at *every* value.
+> To control Gemini's thinking depth from a matrix, use the one mount-config
+> key gemini does merge into the request:
+>
+> ```yaml
+> - provider: gemini
+>   model: gemini-3.7-flash        # pin an exact 3.x id — see caution below
+>   config:
+>     extra_request_params:
+>       thinking_config:
+>         thinking_level: high     # minimal | low | medium | high
+> ```
+>
+> Caution: gemini-2.x models reject `thinking_level` with a 400 and accept
+> only the legacy `thinking_budget`, so a class glob like
+> `gemini-*-pro-preview` that can resolve to a 2.x id must be pinned first.
+>
+> **Haiku.** Measured on the wire (20260901-threeknob capture root): across
+> 1,438 `claude-haiku-4-5` requests the effort parameter was absent and
+> `thinking.budget_tokens` was pinned at 32000 regardless of the effort the
+> matrix asked for, making an `high` cell and a `medium` cell byte-identical.
+> Use the dial Haiku actually reads, with the exact value the effort level
+> already resolved to (`low` → 4096, everything above → 32000):
+>
+> ```yaml
+> - provider: anthropic
+>   model: claude-haiku-4-5
+>   config:
+>     thinking_budget_tokens: 32000
+> ```
+
 > **Key spelling and valid values are enforced by tests.** `reasoning_effort`
 > is the single canonical spelling — legacy spellings like `effort` are inert
 > on some providers and must not appear in matrix files. Valid values differ
@@ -202,6 +284,19 @@ Only include `config` when a candidate genuinely needs different parameters from
 > [`tests/matrix_validation_rules.yaml`](../tests/matrix_validation_rules.yaml),
 > each annotated with the provider constant it was read from. Read them
 > there, and extend them there when providers add keys or values.
+
+> **A legal value is not the same as an honoured one.** Value validation is
+> *closed on values and open on keys*: it can only catch a value the provider
+> declares as invalid. It cannot catch a legal value on a model that will not
+> act on it. `reasoning_effort` on a `claude-haiku-*` candidate is the
+> measured case — Haiku collapses every level above `low` into one identical
+> request, so `anth-haiku-high` and `anth-haiku-medium` were byte-identical
+> configurations for a whole evaluation wave (n=1,438 requests, effort ABSENT
+> on the wire, `thinking.budget_tokens` pinned at 32000). The loader now
+> **rejects** those keys at mount: it logs a named ERROR and **removes the key
+> from the effective matrix**, so nothing downstream can report an effort as
+> applied that the model ignored. To move Haiku's reasoning dial, set
+> `thinking_budget_tokens` directly.
 
 ---
 

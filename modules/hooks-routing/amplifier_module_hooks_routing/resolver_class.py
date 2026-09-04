@@ -19,6 +19,16 @@ Contract (duck-typed, no Protocol class by design):
         # them presented. Omit when the strategy cannot enumerate its roles.
         known_roles: tuple[str, ...]
 
+        # Optional diagnostics. WHICH FILE this strategy is actually running,
+        # where it came from ("user" | "bundle"), and every same-named file it
+        # shadowed. A consumer surfacing routing state (e.g. `amplifier
+        # routing list`, or a spawn-time telemetry payload) should read these
+        # rather than re-deriving precedence, and must treat absent/None as
+        # "this strategy does not report a source" -- not as "no shadowing".
+        matrix_path: str | None
+        matrix_source: str | None
+        shadowed_paths: tuple[str, ...]
+
 Returning an empty list means "role known but no installed provider matches";
 returning a list with one or more ``ProviderPreference`` is the success path.
 The resolver honours fallback order encoded by the active strategy (matrix
@@ -61,6 +71,17 @@ class MatrixModelRoleResolver:
             Needed to resolve a matrix candidate's bare ``provider:`` type
             (e.g. ``"anthropic"``) when 2+ named instances of that module
             exist but none is keyed by the bare type itself.
+        preset: Optional parsed ``preset:`` block (knob-consistent routing).
+            ``None`` -- the default, and what every matrix without a
+            ``preset:`` block yields -- means this resolver behaves exactly as
+            it did before the feature existed.
+        on_clamp: Optional async callable receiving each ``ClampRecord``.
+        matrix_origin: Optional :class:`~.matrix_loader.MatrixSource` recording
+            which file the matrix was loaded from and what that file shadowed.
+            Published as the ``matrix_path`` / ``matrix_source`` /
+            ``shadowed_paths`` attributes below. ``None`` leaves all three
+            empty, so a caller that does not supply it behaves exactly as
+            before.
     """
 
     def __init__(
@@ -69,11 +90,60 @@ class MatrixModelRoleResolver:
         providers: dict[str, Any],
         matrix_name: str,
         coordinator: Any = None,
+        preset: Any = None,
+        on_clamp: Any = None,
+        escalations: Any = None,
+        matrix_origin: Any = None,
     ) -> None:
         self._matrix_roles = matrix_roles
         self._providers = providers
         self.name = matrix_name
+        # --- Effective source (shadowing observability) ---------------------
+        # `self.name` is the matrix's DECLARED name, which says nothing about
+        # WHICH FILE it came from -- and a user file in ~/.amplifier/routing/
+        # silently outranks the bundle's own same-named matrix. Two prior
+        # investigations read the shipped file, reasoned about a matrix that
+        # was not in effect, and reached confidently wrong mechanisms. These
+        # three attributes are the answer to "which file is actually running?",
+        # published on the capability object every consumer already holds, so
+        # nothing downstream has to re-derive precedence to find out.
+        #
+        # Diagnostics only: nothing here feeds resolution.
+        self.matrix_path: str | None = (
+            str(matrix_origin.path)
+            if matrix_origin is not None and matrix_origin.path is not None
+            else None
+        )
+        self.matrix_source: str | None = (
+            matrix_origin.source if matrix_origin is not None else None
+        )
+        self.shadowed_paths: tuple[str, ...] = (
+            tuple(str(p) for p, _ in matrix_origin.shadowed)
+            if matrix_origin is not None
+            else ()
+        )
         self._coordinator = coordinator
+        self._preset = preset
+        self._on_clamp = on_clamp
+        # Per-session escalation budget. `max_uses` is per session, so the SAME
+        # counter object is shared with the session-start resolution path in
+        # ``__init__.py`` -- two counters would silently double the budget.
+        # Constructed here only when the caller did not supply one.
+        self._escalations: Any = escalations
+        if (
+            self._escalations is None
+            and preset is not None
+            and getattr(preset, "active", False)
+        ):
+            from .knob_consistency import EscalationState
+
+            self._escalations = EscalationState(
+                max_uses=getattr(preset, "escalate_max_uses", 0)
+            )
+        # Diagnostics: every clamp decision this resolver made, newest last.
+        # Read by tests and by anything that wants to surface routing intent
+        # without parsing the event log.
+        self.clamp_records: list[Any] = []
         # Optional part of the model_role_resolver contract. Snapshot in matrix
         # declaration order -- the same order hooks-routing injects into session
         # context -- so consumers that surface these to a model agree with it.
@@ -94,13 +164,26 @@ class MatrixModelRoleResolver:
         # a different model for that call.
         self._preresolved_models: dict[str, list[str]] = {}
 
-    async def resolve(self, model_role: str | list[str]) -> list[ProviderPreference]:
+    async def resolve(
+        self,
+        model_role: str | list[str],
+        caller_context: Any = None,
+    ) -> list[ProviderPreference]:
         """Resolve a model role (or ordered fallback list) to provider preferences.
 
         Args:
             model_role: Either a single role name (``"reasoning"``) or an
                 ordered fallback list (``["reasoning", "general"]``). The first
                 role with at least one installed-provider candidate wins.
+            caller_context: Optional explicit caller triple, for a consumer
+                that knows it (a future tool-delegate could pass it directly).
+                **Optional by design:** when omitted, and only when a preset
+                is active, it is derived from this resolver's own coordinator
+                -- the resolver is mounted in the *caller's* session, so the
+                caller's resolved provider/model/effort is already recorded
+                there. That is why knob-consistent routing needs no change in
+                ``amplifier-foundation``. Every existing call site
+                (``await resolver.resolve(role)``) keeps working unchanged.
 
         Returns:
             ``list[ProviderPreference]`` — one entry per resolved candidate.
@@ -120,12 +203,25 @@ class MatrixModelRoleResolver:
         from .resolver import resolve_model_role
 
         roles = [model_role] if isinstance(model_role, str) else list(model_role)
+
+        knob_active = self._preset is not None and getattr(
+            self._preset, "active", False
+        )
+        if knob_active and caller_context is None:
+            from .knob_consistency import derive_caller_context
+
+            caller_context = derive_caller_context(self._coordinator, self._preset)
+
         resolved = await resolve_model_role(
             roles,
             self._matrix_roles,
             self._providers,
             preresolved_models=self._preresolved_models,
             coordinator=self._coordinator,
+            caller_context=caller_context if knob_active else None,
+            preset=self._preset if knob_active else None,
+            escalations=self._escalations if knob_active else None,
+            on_clamp=self._record_clamp if knob_active else None,
         )
         return [
             ProviderPreference(
@@ -135,3 +231,14 @@ class MatrixModelRoleResolver:
             )
             for r in resolved
         ]
+
+    async def _record_clamp(self, record: Any) -> None:
+        """Keep the record locally, then forward it to the mount-time sink.
+
+        Local retention is what makes the decision inspectable without an
+        event log; the sink is what puts it on the event bus. Neither is
+        allowed to raise into the resolution path.
+        """
+        self.clamp_records.append(record)
+        if self._on_clamp is not None:
+            await self._on_clamp(record)

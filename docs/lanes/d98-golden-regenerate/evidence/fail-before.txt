@@ -1,0 +1,31 @@
+=== B) FAIL-BEFORE: new test, parent regeneration branch ===
+        before = json.loads(sandboxed_golden.read_text(encoding="utf-8"))
+    
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(Path("tests") / Path(__file__).name),
+                "--regenerate",
+            ],
+            cwd=sandbox,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        after = json.loads(sandboxed_golden.read_text(encoding="utf-8"))
+    
+        lost = sorted(set(before) - set(after))
+>       assert not lost, (
+            "`--regenerate` silently deleted already-recorded matrices from the "
+            f"golden fixture: {lost}\nstdout: {proc.stdout}\nstderr: {proc.stderr}"
+        )
+E       AssertionError: `--regenerate` silently deleted already-recorded matrices from the golden fixture: ['openai.yaml']
+E         stdout: regenerated /tmp/pytest-of-bkrabach/pytest-2783/test_regenerate_entry_point_pr0/repo/tests/fixtures/resolution_golden_pre_knob_consistency.json (7 matrices)
+E         
+E         stderr: 
+E       assert not ['openai.yaml']
+
+tests/test_default_resolution_unchanged.py:331: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_default_resolution_unchanged.py::test_regenerate_entry_point_preserves_every_recorded_matrix
+1 failed, 3 passed, 11 deselected in 0.30s

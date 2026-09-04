@@ -40,7 +40,12 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     """Mount the routing matrix hook.
 
     Loads the default matrix, composes with user overrides, registers
-    ``session:start`` and ``provider:request`` hooks.
+    ``session:start``, ``session:resume`` and ``provider:request`` hooks.
+
+    ``session:start`` and ``session:resume`` share one handler, because the
+    kernel emits one XOR the other per process depending on whether the session
+    was resumed (``amplifier_core/session.py:151``). See the handler for why
+    "share one handler" is not the same as "may run twice".
     """
     config = config or {}
 
@@ -51,7 +56,21 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             f"Valid values: {', '.join(VALID_PLACEMENTS)}."
         )
 
-    from .matrix_loader import compose_matrix, load_matrix, validate_matrix_config
+    # model_performance-74w: restore this session's own model_role pin at the
+    # session's lifecycle event when the live mount ordering has drifted from it
+    # (a RESUME re-imposes settings priority over a child's promotion --
+    # upstream defect model_performance-rc0). No-op unless there is a real
+    # disagreement; see role_pin.reassert_own_role_pin. Escape hatch for an
+    # operator who wants the pre-fix behaviour back.
+    reassert_role_pin: bool = config.get("reassert_role_pin", True)
+
+    from .matrix_loader import (
+        compose_matrix,
+        load_matrix,
+        resolve_matrix_source,
+        strip_inert_config,
+        validate_matrix_config,
+    )
 
     # --- Locate the routing directory ---
     # Accept an explicit override for testing; otherwise use __file__ traversal
@@ -85,19 +104,51 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # Search custom dirs first (priority), then fall back to the bundle's own
     # routing/ dir so shipped matrices (balanced, anthropic, etc.) still work.
     default_matrix_name = config.get("default_matrix", "balanced")
-    search_dirs = [*custom_routing_dirs, routing_dir]
-    matrix_path = next(
-        (
-            candidate
-            for search_dir in search_dirs
-            if (candidate := search_dir / f"{default_matrix_name}.yaml").exists()
-        ),
-        None,
+    # PRECEDENCE IS UNCHANGED by this call: `resolve_matrix_source` implements
+    # the same "first existing <name>.yaml in [*custom_routing_dirs,
+    # routing_dir] wins" rule this line has always had. What it adds is the
+    # REST of the picture -- which file won, whether it is a user file or the
+    # shipped one, and every same-named file it suppressed -- so the outcome
+    # can be reported instead of silently applied.
+    matrix_origin = resolve_matrix_source(
+        default_matrix_name, custom_routing_dirs, routing_dir
     )
+    matrix_path = matrix_origin.path
 
     base_matrix: dict[str, Any] = {}
     if matrix_path is not None:
         base_matrix = load_matrix(matrix_path)
+        # Unconditional, at INFO: before this, the winning path appeared ONLY
+        # inside the not-found warning below -- i.e. the file that actually
+        # decided this session's routing was named only when loading FAILED.
+        # Forensics on a successful load had to guess, and did guess wrong.
+        logger.info(
+            "[ROUTING] matrix %r loaded from %s (source=%s)",
+            default_matrix_name,
+            matrix_path,
+            matrix_origin.source,
+        )
+        if matrix_origin.is_shadowed:
+            # WARNING, not INFO: a shipped matrix being dead is not a status
+            # detail. Every bundle-side change to the shadowed file -- including
+            # anything a bundle update delivers -- is inert on this host, and
+            # nothing else anywhere says so. Report; do NOT change precedence:
+            # the user file winning may be exactly what its author intended.
+            logger.warning(
+                "[ROUTING] matrix %r is SHADOWED — %s (source=%s) WINS and is "
+                "the only file in effect; same-named matrix file(s) IGNORED: "
+                "%s. Edits to the ignored file(s), including anything shipped "
+                "in a bundle update, have NO effect on this session. To use a "
+                "shadowed file instead, remove or rename %s.",
+                default_matrix_name,
+                matrix_path,
+                matrix_origin.source,
+                ", ".join(
+                    f"{path} (source={origin})"
+                    for path, origin in matrix_origin.shadowed
+                ),
+                matrix_path,
+            )
     else:
         logger.warning(
             "Matrix file not found: %s — routing disabled",
@@ -132,6 +183,91 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         if capability_overrides:
             effective_matrix = compose_matrix(effective_matrix, capability_overrides)
 
+    # --- Knob-consistent routing: parse the optional `preset:` block ---
+    # A matrix with no `preset:` key yields None here, and None is the
+    # default-off signal every downstream branch checks. Every shipped matrix
+    # in routing/ except `openai.yaml` (default ON, measured win -- see
+    # README "Knob-consistent delegation") and `openai-knob-consistent.yaml`
+    # (the same block, kept as an explicit-name pin) has no `preset:` key, so
+    # this is None for all of them.
+    from .knob_consistency import EscalationState, parse_preset, validate_preset
+
+    preset = parse_preset(base_matrix)
+
+    # Explicit opt-out: restores legacy (pre-knob-consistent) behaviour for
+    # ANY matrix, including one that ships a `preset:` block by default
+    # (`openai.yaml`). Treated identically to the matrix having no `preset:`
+    # key at all -- no validation runs, no escalation budget is created, and
+    # every downstream branch takes its `preset is None` path.
+    disable_delegation_preset = bool(config.get("disable_delegation_preset", False))
+    if disable_delegation_preset and preset is not None:
+        logger.info(
+            "[ROUTING] disable_delegation_preset=true: ignoring preset: "
+            "block in matrix %s -- resolving as if it were absent (legacy "
+            "behaviour restored).",
+            matrix_path,
+        )
+        preset = None
+
+    if preset is not None:
+        preset_errors = validate_preset(base_matrix)
+        if preset_errors:
+            raise ValueError(
+                f"Invalid preset: block in matrix {matrix_path}:\n  "
+                + "\n  ".join(preset_errors)
+            )
+    escalations = (
+        EscalationState(max_uses=preset.escalate_max_uses)
+        if preset is not None and preset.active
+        else None
+    )
+
+    # --- Reject config keys the target will never act on ---
+    # A DIFFERENT class from the value validation below, which structurally
+    # cannot catch EITHER shape of it. One table, two enforced rules:
+    #
+    #   * gemini (PROVIDER-keyed): `reasoning_effort` on a gemini candidate is
+    #     an UNDECLARED key, so validate_matrix_config takes its explicit
+    #     "undeclared key -- the open-key rule. Pass silently" branch
+    #     (matrix_loader.py). The key rides into the effective matrix, is
+    #     merged into the child provider's mount config, and is read by nobody
+    #     -- gemini consumes a closed set of 15 mount-config keys and no effort
+    #     key is among them. The VALUE is irrelevant: every level is equally
+    #     inert, because the read never happens.
+    #
+    #   * claude-haiku-* (MODEL-keyed): `reasoning_effort: high` on a haiku
+    #     candidate is a DECLARED key with a LEGAL value on an INSTALLED
+    #     provider, so it passes -- and is then collapsed to nothing when the
+    #     request is built, because Haiku resolves every effort above 'low' to
+    #     the same thinking budget. Measured consequence: anth-haiku-high
+    #     (n=702) and anth-haiku-medium (n=736) were byte-identical
+    #     configurations for a whole evaluation wave.
+    #
+    # Name it, then REMOVE it, so nothing downstream can carry a setting the
+    # target ignored and report it as applied.
+    #
+    # ERROR, not WARNING: the value-validation block below warns about a
+    # mistyped value, which is a typo. This is a config that cannot work as
+    # written on ANY value.
+    #
+    # Strip-and-continue rather than raise: a bad matrix must not take a
+    # session down, and the offending key is dead data either way -- removing
+    # it changes no wire behaviour, it only stops the lie.
+    if effective_matrix:
+        effective_matrix, inert_errors = strip_inert_config(
+            {"roles": effective_matrix}
+        )
+        effective_matrix = effective_matrix.get("roles", {})
+        if inert_errors:
+            logger.error("[ROUTING] Inert config in matrix %s:", matrix_path)
+            for err in inert_errors:
+                logger.error("[ROUTING]   %s", err)
+            logger.error(
+                "[ROUTING]   Key REMOVED from the effective matrix. "
+                "Fix with: amplifier routing edit %s",
+                default_matrix_name,
+            )
+
     # --- Validate composed matrix config values ---
     # Catches provider-declared `choice` fields (e.g. reasoning_effort) set to
     # invalid values that the provider would otherwise silently warn about and
@@ -142,6 +278,19 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             {"roles": effective_matrix}, _validation_providers, coordinator
         )
         if config_errors:
+            # "Fail loud on an unknown effort value" (ROUTING-PROPOSAL.md
+            # section 2.2). Today this validation only warns, because it has
+            # always run against every legacy matrix and cannot start
+            # rejecting them. A matrix that opts into `preset:` is new by
+            # definition, so it can be held to the stricter bar without
+            # breaking anyone -- and a preset whose effort values are inert is
+            # a preset that silently does not do what it says.
+            if preset is not None:
+                raise ValueError(
+                    f"Invalid config in preset-bearing matrix {matrix_path} "
+                    f"(these values are IGNORED by the provider):\n  "
+                    + "\n  ".join(config_errors)
+                )
             logger.warning("[ROUTING] Invalid config in matrix %s:", matrix_path)
             for err in config_errors:
                 logger.warning("[ROUTING]   %s", err)
@@ -150,6 +299,27 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                 "Fix with: amplifier routing edit %s",
                 default_matrix_name,
             )
+
+    # --- Clamp reporting: emit, never inject ---
+    # W2-S4 anti-pattern #6: injected telemetry becomes class-B context at
+    # best and prefix mutation at worst. The record goes to the event log.
+    async def _emit_clamp(record: Any) -> None:
+        logger.info(
+            "[ROUTING] intent-clamped role=%s mode=%s honored=%s "
+            "requested=%s granted=%s reason=%s",
+            record.role,
+            record.mode,
+            record.honored,
+            record.requested_model,
+            record.granted_model,
+            record.reason,
+        )
+        hooks_bus = coordinator.get("hooks") if hasattr(coordinator, "get") else None
+        # Duck-typed on purpose: a coordinator-like object without an event
+        # bus must degrade to log-only, never raise into resolution. Routing
+        # a delegate is the job; reporting on it is not allowed to break it.
+        if hooks_bus is not None and hasattr(hooks_bus, "emit"):
+            await hooks_bus.emit("routing:intent-clamped", record.to_dict())
 
     # --- Register the model_role_resolver capability ---
     # Consumers: tool-delegate, hooks-session-naming, tool-recipes, tool-skills.
@@ -166,13 +336,112 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             providers=_resolver_providers,
             matrix_name=base_matrix.get("name", default_matrix_name),
             coordinator=coordinator,
+            preset=preset,
+            on_clamp=_emit_clamp,
+            escalations=escalations,
+            matrix_origin=matrix_origin,
         )
         coordinator.register_capability("model_role_resolver", _resolver)
 
     # ------------------------------------------------------------------
-    # Hook 1: session:start — resolve model_role for all agents
+    # Hook 1: session:start / session:resume — resolve model_role for all agents
     # ------------------------------------------------------------------
+    # model_performance-fde. The kernel picks ONE lifecycle event per process,
+    # mutually exclusively (amplifier_core/session.py:151):
+    #
+    #     event_base = SESSION_RESUME if self._is_resumed else SESSION_START
+    #
+    # Registering on "session:start" alone therefore skipped this entire handler
+    # on a RESUMED ROOT session -- every interactive `amplifier` resume and every
+    # multi-turn eval driver. Measured across the committed capture corpus: 212
+    # root sessions resumed over 1238 lifecycle legs, of which only 212 fired
+    # session:start; 1026 legs (82.9%) ran with layer-B resolution, the 74w
+    # role-pin reassert and the routing:matrix-loaded telemetry all skipped.
+    #
+    # Registering on both events is NECESSARY BUT NOT SUFFICIENT, and the naive
+    # form is a regression: a resumed DELEGATE child receives BOTH events on the
+    # same bus, ~5ms apart. amplifier_app_cli/session_spawner.py:1763-1774 emits
+    # its own observability "session:resume" on the child coordinator's hooks
+    # bus, and the reconstructed child session (is_resumed=False) then emits the
+    # kernel "session:start". Measured in the corpus: fork -> resume -> START on
+    # every delegate resume leg. Two guards keep that from double-running:
+    #
+    #   1. _lifecycle_handled -- a hard latch. The body runs at most once per
+    #      mount() no matter how many lifecycle emitters exist, now or later.
+    #      This is what makes "no double resolution, no duplicate
+    #      routing:matrix-loaded emit" a property of this module rather than a
+    #      bet on another package's emit count.
+    #   2. The spawner-emit discriminator below, so a delegate leg still runs at
+    #      session:start exactly as it did before -- byte-identical, same
+    #      ordering, not merely "once".
+    _lifecycle_handled = False
+
     async def on_session_start(event: str, data: dict[str, Any]) -> Any:
+        nonlocal _lifecycle_handled
+
+        from amplifier_core.models import HookResult
+
+        # session_spawner's observability emit, NOT the kernel lifecycle event.
+        # Discriminated on `turn_count`, which only the spawner's payload
+        # carries: measured over the whole committed corpus, 102/102 delegate
+        # resume payloads have it and 1029/1029 kernel root-resume payloads do
+        # not -- 100% separation, n=1131. A kernel session:start is guaranteed to
+        # follow on this leg (the child is reconstructed with is_resumed=False),
+        # so defer to it and leave the latch UNTOUCHED.
+        if (
+            event == "session:resume"
+            and isinstance(data, dict)
+            and "turn_count" in data
+        ):
+            return HookResult(action="continue")
+
+        if _lifecycle_handled:
+            return HookResult(action="continue")
+        _lifecycle_handled = True
+
+        # Effective-source telemetry, emitted ONCE per session on the same
+        # event surface this module already uses for clamp records (never
+        # injected -- W2-S4 anti-pattern #6). Emitted here rather than at
+        # mount() because listeners are not registered yet at mount time, so a
+        # mount-time emit would land in an empty room.
+        #
+        # This is what makes the shadowed-file class of forensic error
+        # impossible to repeat: the file that decided routing is now IN the
+        # event log, alongside what it shadowed, instead of having to be
+        # inferred from a raw wire capture after the fact.
+        if matrix_path is not None:
+            try:
+                _hooks_bus = (
+                    coordinator.get("hooks") if hasattr(coordinator, "get") else None
+                )
+                if _hooks_bus is not None and hasattr(_hooks_bus, "emit"):
+                    await _hooks_bus.emit(
+                        "routing:matrix-loaded", matrix_origin.to_dict()
+                    )
+            except Exception:  # pragma: no cover - reporting must never break routing
+                logger.warning("routing matrix-source reporting failed", exc_info=True)
+
+        # Restore this session's OWN role pin before anything else reads the
+        # provider ordering. Runs on whichever lifecycle event this process
+        # actually fires -- session:start for a new session or a resumed
+        # DELEGATE child, session:resume for a resumed ROOT session. Before
+        # model_performance-fde only the first two were covered, so on a root
+        # resume -- the leg where the promotion has been lost -- this never ran
+        # at all.
+        # Emits rather than staying silent: a corrected pin is exactly the
+        # signal the 74w capture had no way to surface.
+        if reassert_role_pin:
+            from .role_pin import reassert_own_role_pin
+
+            pin_record = reassert_own_role_pin(coordinator)
+            if pin_record is not None:
+                # Same emit shape as _emit_clamp above: resolve the bus from the
+                # coordinator and duck-type it, so a session without a hooks bus
+                # still gets the correction, just unreported.
+                pin_bus = coordinator.get("hooks") if hasattr(coordinator, "get") else None
+                if pin_bus is not None and hasattr(pin_bus, "emit"):
+                    await pin_bus.emit("routing:role-pin-reasserted", pin_record)
+
         providers = coordinator.get("providers") or {}
         agents = (
             coordinator.config.get("agents", {})
@@ -202,11 +471,40 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             (routing_cap or {}).get("preresolved_models", {})
         )
 
+        # Knob-consistent routing, level 3. Derived ONCE per session:start from
+        # this session's own provider mount config -- the caller's resolved
+        # (family, model, effort) is already recorded there by whoever spawned
+        # or configured this session. See knob_consistency.derive_caller_context.
+        caller_context = None
+        if preset is not None and preset.active:
+            from .knob_consistency import derive_caller_context
+
+            caller_context = derive_caller_context(coordinator, preset)
+            if caller_context is None:
+                logger.warning(
+                    "[ROUTING] preset %r requests inherit=%s but this session's "
+                    "own model could not be determined from its provider mount "
+                    "config -- inheritance is INACTIVE for this session "
+                    "(matrix candidates used as-is).",
+                    base_matrix.get("name", default_matrix_name),
+                    preset.inherit,
+                )
+
         async def _resolve_one(agent_cfg: dict[str, Any]) -> None:
             """Resolve model_role for a single agent and patch agent_cfg in-place."""
             model_role = agent_cfg.get("model_role")
             if not model_role:
                 return
+            # Precedence: an agent whose frontmatter carries an explicit
+            # `provider_preferences` pin is at level 2, ABOVE inherited caller
+            # intent at level 3. Inheritance is a default, never a ceiling on
+            # explicit intent -- so an author who deliberately asked for a
+            # specialist model still gets one. (This does not change the
+            # pre-existing behaviour of overwriting that key from model_role:
+            # only the clamp is skipped, and only when a preset is active.)
+            agent_caller_context = (
+                None if "provider_preferences" in agent_cfg else caller_context
+            )
             # Normalise to list
             if isinstance(model_role, str):
                 model_role = [model_role]
@@ -215,6 +513,29 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                 effective_matrix,
                 providers,
                 preresolved_models=preresolved_models,
+                # model_performance-cly: WITHOUT this, layer B (an agent's OWN
+                # frontmatter `model_role`) was silently inert on every
+                # multi-instance provider install. find_provider_by_type()
+                # matches a matrix candidate's bare `provider:` type (e.g.
+                # "anthropic") against the mounted providers dict first; when
+                # every instance is mounted under its own explicit `id:`
+                # ("opus", "sonnet", "haiku", ...) and none is keyed by the
+                # bare type, that direct match fails and the ONLY remaining
+                # strategy is the coordinator-backed fallback, which reads
+                # coordinator.config["providers"] to map instance ids back to
+                # module types. Omitting `coordinator` here disabled that
+                # fallback, so every candidate was skipped, resolve_model_role
+                # returned [], and no provider_preferences was ever written --
+                # leaving session_spawner.py:568-575's documented read with
+                # nothing to find and routing every such agent by session
+                # default instead. Layer A (the model_role_resolver
+                # capability) always passed it (resolver_class.py:220); this
+                # is the parity fix, not a new capability.
+                coordinator=coordinator,
+                caller_context=agent_caller_context,
+                preset=preset if agent_caller_context is not None else None,
+                escalations=escalations,
+                on_clamp=_emit_clamp,
             )
             if resolved:
                 # Preserve the per-candidate `config` block (e.g. reasoning_effort)
@@ -256,8 +577,6 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                 {**existing_routing, "preresolved_models": preresolved_models},
             )
 
-        from amplifier_core.models import HookResult
-
         return HookResult(action="continue")
 
     # ------------------------------------------------------------------
@@ -271,6 +590,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # (see _ensure_prefix_placement below).
     _prefix_verified_factory: Any = None
     _prefix_unavailable_logged = False
+    _prefix_unavailable_reason: str | None = None
 
     def _render_banner() -> str:
         """Render the routing-matrix banner, wrapped and source-attributed.
@@ -341,15 +661,17 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         False when the surface is unavailable and the caller should fall
         back to per-request injection.
         """
-        nonlocal _prefix_factory, _prefix_verified_factory
+        nonlocal _prefix_factory, _prefix_verified_factory, _prefix_unavailable_reason
 
         getter = getattr(coordinator, "get", None) if coordinator else None
         context: Any = getter("context") if callable(getter) else None
         if context is None or not hasattr(context, "set_system_prompt_factory"):
+            _prefix_unavailable_reason = "no_surface"
             return False
 
         current = getattr(context, "_system_prompt_factory", None)
         if current is None:
+            _prefix_unavailable_reason = "no_factory_registered"
             # No factory registered (static-system-message session).
             # Wrapping would DROP the static system prompt (factory takes
             # precedence over stored system messages in context-simple),
@@ -387,7 +709,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # Hook 2: provider:request — inject available roles into context
     # ------------------------------------------------------------------
     async def on_provider_request(event: str, data: dict[str, Any]) -> Any:
-        nonlocal _prefix_unavailable_logged
+        nonlocal _prefix_unavailable_logged, _prefix_unavailable_reason
 
         if not effective_matrix:
             return None
@@ -405,14 +727,26 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             # factory support). Warn once, then fall back to per-request
             # injection so the banner is never silently dropped.
             if not _prefix_unavailable_logged:
-                logger.warning(
-                    "placement='prefix' (the default) but the context "
-                    "module offers no system-prompt factory surface "
-                    "(set_system_prompt_factory). Falling back to "
-                    "per-request injection -- the routing banner will not "
-                    "ride the stable cached prefix. Set placement='inject' "
-                    "to silence this warning."
-                )
+                if _prefix_unavailable_reason == "no_factory_registered":
+                    logger.warning(
+                        "placement='prefix' (the default) but this session has "
+                        "no system-prompt factory registered (static system "
+                        "prompt, or no bundle instruction/context at all); "
+                        "refusing to replace it. Falling back to per-request "
+                        "injection -- the routing banner will not ride the "
+                        "stable cached prefix. This is expected for a session "
+                        "with no dynamic system prompt; set placement='inject' "
+                        "to silence."
+                    )
+                else:
+                    logger.warning(
+                        "placement='prefix' (the default) but the context "
+                        "module offers no system-prompt factory surface "
+                        "(set_system_prompt_factory). Falling back to "
+                        "per-request injection -- the routing banner will not "
+                        "ride the stable cached prefix. Set placement='inject' "
+                        "to silence this warning."
+                    )
                 _prefix_unavailable_logged = True
 
         banner = _render_banner()
@@ -441,6 +775,21 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             on_session_start,
             priority=5,
             name="routing-resolve",
+        )
+        # model_performance-fde: the kernel emits session:resume INSTEAD of
+        # session:start when a session is resumed (amplifier_core/session.py:151),
+        # so without this a resumed ROOT session skipped layer-B model_role
+        # resolution, the role-pin reassert and the routing:matrix-loaded
+        # telemetry entirely. Same handler object on purpose -- the two legs must
+        # not be able to drift apart. Double-running is prevented inside the
+        # handler (latch + spawner-emit discriminator), not by assuming the
+        # events are mutually exclusive: on a resumed delegate child they are
+        # measurably NOT.
+        hooks.register(
+            "session:resume",
+            on_session_start,
+            priority=5,
+            name="routing-resolve-resume",
         )
         hooks.register(
             "provider:request",

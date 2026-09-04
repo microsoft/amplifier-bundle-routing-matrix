@@ -1,0 +1,38 @@
+Verbatim lifecycle ordering from two committed captures (no new spend).
+
+== ROOT session, driven over 5 executions as separate resuming processes ==
+   treatment-validation/20260903-h7n-knobanth/runs/h7n-armA-s3-01/
+     all-sessions/projects/-root-s3-work/sessions/8e7ff193-2e16-4f8e-a1d5-d37bf9bfb7c1/events.jsonl
+   2026-09-03T10:38:40.655017037+00:00  session:start      payload_keys=['parent_id']
+   2026-09-03T10:38:40.700748686+00:00  session:config     payload_keys=['parent_id', 'raw']
+   2026-09-03T10:42:01.132611356+00:00  session:end        payload_keys=['parent_id']
+   2026-09-03T10:42:14.085082188+00:00  session:resume     payload_keys=['parent_id']
+   2026-09-03T10:42:14.087550292+00:00  session:config     payload_keys=['parent_id', 'raw']
+   2026-09-03T10:43:50.242260370+00:00  session:end        payload_keys=['parent_id']
+   2026-09-03T10:44:16.652972379+00:00  session:resume     payload_keys=['parent_id']
+   2026-09-03T10:44:16.655159877+00:00  session:config     payload_keys=['parent_id', 'raw']
+   2026-09-03T10:45:16.477672485+00:00  session:end        payload_keys=['parent_id']
+   2026-09-03T10:45:18.709686095+00:00  session:resume     payload_keys=['parent_id']
+   2026-09-03T10:45:18.711683737+00:00  session:config     payload_keys=['parent_id', 'raw']
+   2026-09-03T10:47:54.879630008+00:00  session:end        payload_keys=['parent_id']
+   2026-09-03T10:48:21.508310715+00:00  session:resume     payload_keys=['parent_id']
+   2026-09-03T10:48:21.509671623+00:00  session:config     payload_keys=['parent_id', 'raw']
+   2026-09-03T10:48:54.509408213+00:00  session:end        payload_keys=['parent_id']
+
+== DELEGATE child, resumed twice ==
+   treatment-validation/20260830-dialin/runs/val-dial-oai-budget-s1-02/
+     all-sessions/-root-val-dial-oai-budget-s1-02/sessions/0000000000000000-dc081e8b5a0b43c3_anchors-amp-dev-git-ops/events.jsonl
+   2026-08-30T19:29:38.500959693+00:00  session:fork       payload_keys=['metadata', 'parent', 'parent_id', 'raw']
+   2026-08-30T19:29:38.524943409+00:00  session:start      payload_keys=['parent_id']
+   2026-08-30T19:29:38.548334646+00:00  session:config     payload_keys=['parent_id', 'raw']
+   2026-08-30T19:30:15.905916124+00:00  session:end        payload_keys=['parent_id']
+   2026-08-30T19:37:08.144527488+00:00  session:fork       payload_keys=['metadata', 'parent', 'parent_id', 'raw']
+   2026-08-30T19:37:08.181638050+00:00  session:resume     payload_keys=['agent_name', 'parent_id', 'turn_count']
+   2026-08-30T19:37:08.186709907+00:00  session:start      payload_keys=['parent_id']
+   2026-08-30T19:37:08.210813212+00:00  session:config     payload_keys=['parent_id', 'raw']
+   2026-08-30T19:39:15.296567717+00:00  session:end        payload_keys=['parent_id']
+   2026-08-30T19:39:26.328403695+00:00  session:fork       payload_keys=['metadata', 'parent', 'parent_id', 'raw']
+   2026-08-30T19:39:26.351252266+00:00  session:resume     payload_keys=['agent_name', 'parent_id', 'turn_count']
+   2026-08-30T19:39:26.393597065+00:00  session:start      payload_keys=['parent_id']
+   2026-08-30T19:39:26.417734943+00:00  session:config     payload_keys=['parent_id', 'raw']
+   2026-08-30T19:39:48.116154220+00:00  session:end        payload_keys=['parent_id']
