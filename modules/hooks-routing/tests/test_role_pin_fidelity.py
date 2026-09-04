@@ -479,26 +479,38 @@ def test_exact_key_wins_over_a_variant_match() -> None:
     assert _priority_winner(providers) == "provider-openai"
 
 
-def test_match_mounted_refuses_an_ambiguous_spelling_rather_than_guessing() -> None:
-    """Defensive branch, asserted directly because real key shapes rarely reach it.
+def test_match_mounted_resolves_an_ambiguous_spelling_instead_of_refusing() -> None:
+    """SUPERSEDED by recipes-0ac: this used to assert refusal, and refusal is the bug.
 
-    Upstream's own helpers disagree on this case -- ``_find_provider_index``
-    takes the first match, ``_build_provider_lookup``'s dict build leaves the
-    last -- so picking a side would be inventing a rule this layer has no
-    standing to set. Returning the candidate list makes the caller refuse.
+    Until recipes-0ac this returned the candidate LIST, on the reasoning that
+    upstream's own two helpers disagreed on which instance wins
+    (``_find_provider_index`` takes the first, ``_build_provider_lookup``'s
+    dict build leaves the last), so picking a side would have been inventing a
+    rule. Upstream has since picked one -- ``spawn_utils._find_provider_instance``
+    resolves to the instance whose ``default_model`` matches, else the
+    highest-priority one -- so this layer now applies THAT rule rather than
+    abandoning the preference and falling through to a later, worse one.
+
+    With bare ``object()`` values there is no model and no priority to read, so
+    only the deterministic tail of the rule is left: lowest priority number
+    (both default to 100), then key name.
     """
     keys = {"provider-openai": object(), "provider-provider-openai": object()}
 
     assert _match_mounted(keys, "provider-openai") == "provider-openai"  # exact
     assert _match_mounted(keys, "vertex") is None  # no match
-    assert _match_mounted(keys, "openai") == [  # variant, two candidates
-        "provider-openai",
-        "provider-provider-openai",
-    ]
+    assert _match_mounted(keys, "openai") == "provider-openai"  # resolved, not a list
 
 
-def test_ambiguous_pin_leaves_ordering_untouched() -> None:
-    """The caller's half of the same rule: refuse, report, change nothing."""
+def test_ambiguous_pin_is_resolved_by_model_intent() -> None:
+    """The caller's half of the same rule: resolve, report, promote.
+
+    The preference names a model, and exactly one of the two instances
+    answering to ``openai`` is configured for it -- so that instance is what
+    the preference means, and it is promoted. Pre-recipes-0ac this returned
+    ``pinned_provider_ambiguous`` and changed nothing, leaving selection on
+    ``anthropic``.
+    """
     providers = {
         "provider-openai": FakeProvider("provider-openai", 5, "gpt-5.6-sol"),
         "provider-provider-openai": FakeProvider(
@@ -506,7 +518,6 @@ def test_ambiguous_pin_leaves_ordering_untouched() -> None:
         ),
         "anthropic": FakeProvider("anthropic", 0, "claude-sonnet-5"),
     }
-    before = _priorities(providers)
     coordinator = _coordinator(
         providers, [{"provider": "openai", "model": "gpt-5.6-luna"}]
     )
@@ -514,9 +525,17 @@ def test_ambiguous_pin_leaves_ordering_untouched() -> None:
     record = reassert_own_role_pin(coordinator)
 
     assert record is not None
-    assert record["reason"] == "pinned_provider_ambiguous"
-    assert record["candidates"] == ["provider-openai", "provider-provider-openai"]
-    assert _priorities(providers) == before
+    assert record["reason"] == "mount_state_disagreed_with_declared_pin"
+    assert record["pinned_provider"] == "provider-provider-openai"
+    assert record["pinned_provider_declared"] == "openai"
+    assert record["provider_resolution"] == "name_variant_default_model"
+    assert record["resolution_candidates"] == [
+        "provider-openai",
+        "provider-provider-openai",
+    ]
+    assert _priority_winner(providers) == "provider-provider-openai"
+    # The demotion half of _apply_single_override still applies to the loser.
+    assert _priorities(providers)["anthropic"] == 1
 
 
 # ---------------------------------------------------------------------------
