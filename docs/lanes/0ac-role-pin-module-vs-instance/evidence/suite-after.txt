@@ -1,0 +1,8 @@
+$ uv run --extra dev --with amplifier-foundation pytest -q   # modules/hooks-routing
+........................................................................ [ 87%]
+......................................................................   [100%]
+574 passed in 1.07s
+
+$ uv run --with pytest --with pytest-asyncio --with pyyaml --with amplifier-foundation --with ./modules/hooks-routing pytest -q tests   # repo-root suite
+.......................................                                  [100%]
+39 passed in 1.30s

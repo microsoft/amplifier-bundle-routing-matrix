@@ -86,6 +86,40 @@ All six are mirrored below. Two known residuals, named rather than hidden:
    though request routing (``kwargs.get("model", self.default_model)``,
    ``__init__.py:2940``) is correct.
 
+MODULE names vs INSTANCE ids (recipes-0ac)
+------------------------------------------
+A preference's ``provider`` is a MODULE name -- the routing matrix writes
+``anthropic`` / ``openai`` / ``gemini`` and the spawner copies that string
+verbatim into ``provider_preferences``. A host mounts INSTANCES, each keyed by
+its own ``id:``. On a 14-provider host those two vocabularies collide, and
+matching a preference against mounted KEYS by spelling picks the wrong one.
+
+Measured 2026-09-02, session ``...a0a049acf77d43c7``: a ``reasoning``-role
+child was spawned with ``opus`` at priority 0 (``session:fork``), and this file
+then moved ``gemini`` to 0 and demoted ``opus`` to 1 (``session:config``). The
+chain was ``[{anthropic, claude-opus-*}, {openai, ...}, {gemini,
+gemini-3-pro-*}]`` and the host mounted ``opus``/``sonnet``/``fable`` (module
+``provider-anthropic``), ``gemini`` (module ``provider-gemini``),
+``sol``/``terra`` (module ``provider-openai-*``):
+
+* ``anthropic`` matched no KEY by spelling -- three instances of that module
+  were mounted but none was *named* it -- so the first, correct preference was
+  skipped entirely;
+* ``gemini`` matched a key by spelling and won, on the third preference;
+* its ``model`` was an unresolved glob, so the pin left that instance's own
+  ``default_model`` in place: ``gemini-3.1-flash-image-preview``.
+
+A reasoning agent ran on a 65K-token image model and 400'd.
+
+The rule now, identical in all three layers that ask this question -- here,
+``resolver.find_provider_by_type`` (the matrix layer) and
+``amplifier_foundation.spawn_utils._find_provider_instance`` (the spawn layer,
+sibling PR): a preference naming a MODULE resolves to the instance of that
+module whose ``default_model`` matches the preference's ``model`` glob, else to
+the highest-priority instance (lowest priority number). It is never skipped as
+"ambiguous", and it is answered BEFORE any spelling match, so an instance
+merely *named* like another module cannot satisfy that module's preference.
+
 Default safety
 --------------
 This is a no-op unless the session's own declared pin *disagrees* with its live
@@ -99,6 +133,13 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+
+from .resolver import (
+    _get_provider_specs,
+    _instance_serves_model,
+    _module_type_of,
+    _spec_for_instance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -243,25 +284,178 @@ def _name_variants(name: str) -> set[str]:
     return {name, short, f"provider-{short}"}
 
 
-def _match_mounted(providers: dict[str, Any], wanted: str) -> str | list[str] | None:
-    """The mounted key a preference names.
+def _module_of(specs: list[dict[str, Any]], key: str) -> str | None:
+    """The bare module type backing mounted instance *key*, per the mount plan.
 
-    Returns the key on an unambiguous match, a ``list`` of candidate keys when
-    several mounted instances answer to the same spelling, or ``None`` when
-    nothing matches. Ambiguity is returned rather than resolved: upstream's own
-    two helpers disagree on which instance wins that case
-    (``_find_provider_index`` takes the first, ``_build_provider_lookup``'s dict
-    build leaves the last), so guessing here would be inventing a rule.
+    ``None`` when the mount plan does not describe that instance -- which is
+    every coordinator-like object that exposes no ``config["providers"]``, and
+    is why every spelling-only path below still exists.
     """
-    if wanted in providers:
-        return wanted
+    return _module_type_of(_spec_for_instance(specs, key))
+
+
+def _serves_model(
+    spec: dict[str, Any] | None, provider: Any, model: str | None
+) -> bool:
+    """Whether this instance was configured FOR *model*.
+
+    Same comparison :mod:`resolver` uses for the matrix's own bare-type
+    fallback (glob via ``fnmatch``, case-insensitive; exact names tolerate a
+    dated snapshot suffix), asked of the mount plan first and of the LIVE
+    provider second. The live read matters here and not in the resolver: this
+    module runs against objects that are already mounted, and a session whose
+    mount plan is not reachable still has a real ``default_model`` on every
+    provider object.
+    """
+    if not model:
+        return False
+    if _instance_serves_model(spec, model):
+        return True
+    live = _read_field(provider, "default_model")
+    if not isinstance(live, str) or not live:
+        return False
+    return _instance_serves_model({"config": {"default_model": live}}, model)
+
+
+def _instance_priority(spec: dict[str, Any] | None, provider: Any) -> int:
+    """Declared priority for tie-breaking, mount plan first, live object second.
+
+    The mount plan is preferred deliberately: the live priorities are exactly
+    the thing this module exists to repair, so ranking instances by them would
+    rank them by the drift.
+    """
+    config = spec.get("config") if isinstance(spec, dict) else None
+    if isinstance(config, dict) and "priority" in config:
+        try:
+            return int(config["priority"])
+        except (TypeError, ValueError):
+            pass
+    return _priority_of(provider)
+
+
+def _pick_instance(
+    providers: dict[str, Any],
+    candidates: list[str],
+    model: str | None,
+    specs: list[dict[str, Any]],
+) -> tuple[str, str]:
+    """Choose ONE instance from several that answer to the same preference.
+
+    THE rule, and it is deliberately the same rule in three places -- here, in
+    ``resolver.find_provider_by_type`` (this module's matrix layer) and in
+    ``amplifier_foundation.spawn_utils._find_provider_instance`` (the spawn
+    layer, sibling PR): prefer the instance whose own ``default_model``
+    satisfies the preference's ``model``, because that instance was configured
+    *for that model*; only when none does, fall back to the highest-priority
+    instance (lowest priority number). Ties break on the key name so the answer
+    is deterministic rather than dict-order dependent.
+
+    Returns ``(key, how)`` where ``how`` is ``"single"``, ``"default_model"``
+    or ``"priority"`` -- carried into the emitted record so the choice is
+    observable to whoever reads the event.
+    """
+    if len(candidates) == 1:
+        return candidates[0], "single"
+
+    ranked = [
+        (_instance_priority(_spec_for_instance(specs, key), providers[key]), key)
+        for key in candidates
+    ]
+    model_matched = [
+        (priority, key)
+        for priority, key in ranked
+        if _serves_model(_spec_for_instance(specs, key), providers[key], model)
+    ]
+    pool = model_matched or ranked
+    pool.sort()
+    return pool[0][1], "default_model" if model_matched else "priority"
+
+
+def _match_mounted_detail(
+    providers: dict[str, Any],
+    wanted: str,
+    model: str | None = None,
+    coordinator: Any = None,
+) -> tuple[str, str, list[str]] | None:
+    """The mounted key a preference names, as ``(key, how, candidates)``.
+
+    Three passes, in this order, and the ORDER is the fix (recipes-0ac):
+
+    1. **``wanted`` names a MODULE.** Every mounted instance whose mount plan
+       ``module`` is that module is a candidate, and :func:`_pick_instance`
+       resolves among them. This runs FIRST, which is what makes a literal key
+       match module-checked: an instance merely *named* ``gemini`` cannot
+       satisfy ``provider: gemini`` while a real ``provider-gemini`` instance
+       is mounted, because the module pass has already answered.
+    2. **``wanted`` is a key.** Instance-id mode -- the preference names one
+       mounted instance exactly, and no mounted instance claims ``wanted`` as
+       its module, so there is no module claim left to contradict. Pass 1
+       defers to this reading in one case: when ``wanted`` is BOTH a module and
+       a key of that same module, and no instance of it serves the pinned
+       model, naming a key exactly is the most specific intent on offer and it
+       outranks a priority tie-break. Model intent still outranks both.
+    3. **``wanted`` is a spelling variant of one or more keys** (the
+       ``provider-`` prefix dance). Resolved by the same rule as pass 1 rather
+       than refused.
+
+    Returns ``None`` only when nothing answers at all.
+
+    Residual, named rather than hidden: pass 2 cannot verify a module claim for
+    a name no mounted instance implements. If an instance is keyed ``gemini``,
+    its module is ``provider-anthropic``, and NO gemini module is mounted, this
+    still matches it -- there is no registry here that could say ``"gemini"``
+    is a module name in the abstract, and refusing would break the ordinary
+    instance-id pin. The measured failure needs a real instance of the named
+    module to exist, and pass 1 owns that case.
+    """
+    specs = _get_provider_specs(coordinator)
     variants = _name_variants(wanted)
-    matches = [key for key in providers if variants & _name_variants(key)]
+
+    # Pass 1 -- module-named preference. The matrix emits MODULE names
+    # (anthropic/openai/gemini) and the spawner copies them verbatim into
+    # provider_preferences, so this is the COMMON shape, not the exotic one.
+    module_candidates = sorted(
+        key
+        for key in providers
+        if (module := _module_of(specs, key)) is not None
+        and variants & _name_variants(module)
+    )
+    if module_candidates:
+        key, how = _pick_instance(providers, module_candidates, model, specs)
+        if how == "priority" and wanted in module_candidates:
+            # `wanted` is a module AND a key of that module, and nothing is
+            # configured for the pinned model. An exact key is a stronger
+            # statement of intent than "lowest priority number wins", so the
+            # literal reading stands -- unchanged from before recipes-0ac.
+            return wanted, "instance_id", module_candidates
+        return key, f"module_{how}", module_candidates
+
+    # Pass 2 -- instance-id mode.
+    if wanted in providers:
+        return wanted, "instance_id", [wanted]
+
+    # Pass 3 -- spelling variants.
+    matches = sorted(key for key in providers if variants & _name_variants(key))
     if not matches:
         return None
-    if len(matches) == 1:
-        return matches[0]
-    return matches
+    key, how = _pick_instance(providers, matches, model, specs)
+    return key, f"name_variant_{how}", matches
+
+
+def _match_mounted(
+    providers: dict[str, Any],
+    wanted: str,
+    model: str | None = None,
+    coordinator: Any = None,
+) -> str | None:
+    """The mounted key a preference names, or ``None``.
+
+    Thin wrapper over :func:`_match_mounted_detail` for callers that only need
+    the key. Never returns a list any more: a preference that several instances
+    answer to is RESOLVED (see :func:`_pick_instance`), not skipped.
+    """
+    detail = _match_mounted_detail(providers, wanted, model, coordinator)
+    return None if detail is None else detail[0]
 
 
 def _declared_pins(coordinator: Any) -> list[dict[str, Any]]:
@@ -306,8 +500,12 @@ def _declared_pins(coordinator: Any) -> list[dict[str, Any]]:
 
 
 def _select_preference(
-    providers: dict[str, Any], pins: list[dict[str, Any]]
-) -> tuple[dict[str, Any] | None, str | None, dict[str, Any] | None]:
+    providers: dict[str, Any],
+    pins: list[dict[str, Any]],
+    coordinator: Any = None,
+) -> tuple[
+    dict[str, Any] | None, str | None, dict[str, Any] | None, dict[str, Any] | None
+]:
     """Pick the first preference whose provider is mounted.
 
     Mirrors ``apply_provider_preferences`` (spawn_utils.py:713-718), which walks
@@ -315,35 +513,39 @@ def _select_preference(
     plan. Taking entry 0 unconditionally -- the pre-j8v behaviour -- turned a
     legitimate fallback ordering into a loud no-op.
 
-    Returns ``(pin, mounted_key, failure_record)``; exactly one of ``pin`` and
-    ``failure_record`` is non-None.
+    A preference is now resolved (recipes-0ac) rather than abandoned when
+    several mounted instances answer to it, so an EARLIER preference can no
+    longer lose to a later, worse one just because the module it names is
+    installed more than once.
+
+    ``model`` is passed to the matcher because it is half of the resolution
+    rule: the instance whose ``default_model`` matches is the instance the
+    preference means.
+
+    Returns ``(pin, mounted_key, resolution, failure_record)``; exactly one of
+    ``pin`` and ``failure_record`` is non-None.
     """
-    ambiguous: list[str] = []
     for pin in pins:
-        match = _match_mounted(providers, pin["provider"])
-        if isinstance(match, str):
-            return pin, match, None
-        if isinstance(match, list):
-            ambiguous = match
-            logger.warning(
-                "[ROUTING] this session pins %r, but %d mounted providers "
-                "answer to that name (%s). Refusing to guess which instance "
-                "was meant -- leaving ordering untouched.",
-                pin["provider"],
-                len(match),
-                ", ".join(sorted(match)),
-            )
-            return (
-                None,
-                None,
-                {
-                    "reasserted": False,
-                    "reason": "pinned_provider_ambiguous",
-                    "pinned_provider": pin["provider"],
-                    "candidates": sorted(ambiguous),
-                    "mounted": sorted(providers),
-                },
-            )
+        detail = _match_mounted_detail(
+            providers, pin["provider"], pin["model"], coordinator
+        )
+        if detail is not None:
+            key, how, candidates = detail
+            if len(candidates) > 1:
+                logger.info(
+                    "[ROUTING] this session pins %r, which %d mounted "
+                    "instances answer to (%s); resolved to %r by %s. The "
+                    "matrix names MODULES, hosts mount INSTANCES -- see "
+                    "recipes-0ac.",
+                    pin["provider"],
+                    len(candidates),
+                    ", ".join(candidates),
+                    key,
+                    "default_model match"
+                    if how.endswith("default_model")
+                    else "priority",
+                )
+            return pin, key, {"how": how, "candidates": candidates}, None
 
     tried = [pin["provider"] for pin in pins]
     # Never invent a promotion for a provider this session cannot reach.
@@ -357,6 +559,7 @@ def _select_preference(
         ", ".join(sorted(providers)) or "(none)",
     )
     return (
+        None,
         None,
         None,
         {
@@ -386,7 +589,7 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
     if not isinstance(providers, dict) or not providers:
         return None
 
-    pin, target, failure = _select_preference(providers, pins)
+    pin, target, resolution, failure = _select_preference(providers, pins, coordinator)
     if pin is None or target is None:
         return failure
 
@@ -525,6 +728,14 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
     if len(pins) > 1:
         record["preference_index"] = pins.index(pin)
         record["tried_providers"] = [p["provider"] for p in pins]
+    if resolution is not None:
+        # WHICH spelling rule answered, and what else answered to it. A pin
+        # naming a module on a multi-instance host is a routing decision no
+        # reader of the preference list alone can reconstruct (recipes-0ac).
+        record["pinned_provider_declared"] = pin["provider"]
+        record["provider_resolution"] = resolution["how"]
+        if len(resolution["candidates"]) > 1:
+            record["resolution_candidates"] = resolution["candidates"]
     if model_skip_reason is not None:
         record["model_not_reasserted_reason"] = model_skip_reason
         record["pinned_model"] = pinned_model
