@@ -337,14 +337,14 @@ def test_regenerate_entry_point_preserves_every_recorded_matrix(
     )
     after = json.loads(sandboxed_golden.read_text(encoding="utf-8"))
 
+    assert proc.returncode == 0, (
+        f"regeneration exited {proc.returncode}\n"
+        f"stdout: {proc.stdout}\nstderr: {proc.stderr}"
+    )
     lost = sorted(set(before) - set(after))
     assert not lost, (
         "`--regenerate` silently deleted already-recorded matrices from the "
         f"golden fixture: {lost}\nstdout: {proc.stdout}\nstderr: {proc.stderr}"
-    )
-    assert proc.returncode == 0, (
-        f"regeneration exited {proc.returncode}\n"
-        f"stdout: {proc.stdout}\nstderr: {proc.stderr}"
     )
     assert set(after) >= RECORDED_MATRICES
 
