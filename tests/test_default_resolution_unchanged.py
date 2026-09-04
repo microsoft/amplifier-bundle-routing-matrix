@@ -72,8 +72,18 @@ FAKE_MODELS: dict[str, list[str]] = {
         "gpt-5.6",
         "gpt-5.5",
     ],
-    "gemini": ["gemini-3-pro-preview", "gemini-3-flash-preview"],
-    "github-copilot": ["claude-sonnet-4.6", "claude-opus-4.6", "gpt-5.5"],
+    "gemini": [
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview",
+        "nano-banana-pro-preview",
+    ],
+    "github-copilot": [
+        "claude-sonnet-4.6",
+        "claude-opus-4.6",
+        "claude-opus-4.8",
+        "claude-haiku-4.5",
+        "gpt-5.5",
+    ],
     "ollama": ["qwen3.6-35b", "llama4-70b"],
 }
 
