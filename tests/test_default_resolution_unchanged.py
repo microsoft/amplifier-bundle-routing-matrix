@@ -34,6 +34,7 @@ import json
 import shutil
 import subprocess
 import sys
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -72,8 +73,18 @@ FAKE_MODELS: dict[str, list[str]] = {
         "gpt-5.6",
         "gpt-5.5",
     ],
-    "gemini": ["gemini-3-pro-preview", "gemini-3-flash-preview"],
-    "github-copilot": ["claude-sonnet-4.6", "claude-opus-4.6", "gpt-5.5"],
+    "gemini": [
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview",
+        "nano-banana-pro-preview",
+    ],
+    "github-copilot": [
+        "claude-sonnet-4.6",
+        "claude-opus-4.6",
+        "claude-opus-4.8",
+        "claude-haiku-4.5",
+        "gpt-5.5",
+    ],
     "ollama": ["qwen3.6-35b", "llama4-70b"],
 }
 
@@ -240,13 +251,18 @@ def test_every_recorded_matrix_is_still_in_the_fixture() -> None:
     assert not gone, f"recorded matrices no longer in routing/: {gone}"
 
 
+@lru_cache(maxsize=1)
+def _snapshot_once() -> dict[str, dict[str, Any]]:
+    return asyncio.run(_snapshot())
+
+
 @pytest.mark.parametrize(
     "matrix_name", sorted(_load_golden()), ids=lambda n: n.replace(".yaml", "")
 )
 def test_resolution_is_byte_identical_to_pre_feature(matrix_name: str) -> None:
     """Every role of every pre-existing matrix resolves exactly as it did."""
     golden = _load_golden()[matrix_name]
-    current = asyncio.run(_snapshot())[matrix_name]
+    current = _snapshot_once()[matrix_name]
     assert current == golden, (
         f"{matrix_name}: default-path resolution CHANGED.\n"
         f"  expected (pre-feature): {json.dumps(golden, sort_keys=True)}\n"
@@ -262,7 +278,7 @@ def test_preset_bearing_matrix_is_stock_without_a_caller() -> None:
     non-delegation consumer resolves -- the knob-consistent matrix returns the
     stock openai answers.
     """
-    snapshot = asyncio.run(_snapshot())
+    snapshot = _snapshot_once()
     knob = snapshot.get("openai-knob-consistent.yaml")
     stock = snapshot.get("openai.yaml")
     assert knob is not None and stock is not None
@@ -327,14 +343,14 @@ def test_regenerate_entry_point_preserves_every_recorded_matrix(
     )
     after = json.loads(sandboxed_golden.read_text(encoding="utf-8"))
 
+    assert proc.returncode == 0, (
+        f"regeneration exited {proc.returncode}\n"
+        f"stdout: {proc.stdout}\nstderr: {proc.stderr}"
+    )
     lost = sorted(set(before) - set(after))
     assert not lost, (
         "`--regenerate` silently deleted already-recorded matrices from the "
         f"golden fixture: {lost}\nstdout: {proc.stdout}\nstderr: {proc.stderr}"
-    )
-    assert proc.returncode == 0, (
-        f"regeneration exited {proc.returncode}\n"
-        f"stdout: {proc.stdout}\nstderr: {proc.stderr}"
     )
     assert set(after) >= RECORDED_MATRICES
 

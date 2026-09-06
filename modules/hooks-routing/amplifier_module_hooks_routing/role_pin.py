@@ -657,7 +657,8 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
                 _set_priority(provider, _TARGET_PRIORITY + 1)
 
     if model_drifted:
-        assert pinned_model is not None  # narrowed by model_drifted
+        if pinned_model is None:
+            raise RuntimeError("model drift detected without a pinned model")
         if not _write_field(providers[target], "default_model", pinned_model):
             model_drifted = False
             model_skip_reason = "no_writable_model_surface"

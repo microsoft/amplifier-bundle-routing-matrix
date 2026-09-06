@@ -6,7 +6,7 @@ The routing hook tries candidates top-to-bottom and uses the first that matches 
 
 ## Matrices
 
-Eight curated matrices ship with this bundle, plus one explicit-name alias
+Ten curated matrices ship with this bundle, including one explicit-name alias
 ([knob-consistent delegation](#knob-consistent-delegation)):
 
 | Matrix | When to use |
@@ -16,6 +16,7 @@ Eight curated matrices ship with this bundle, plus one explicit-name alias
 | **economy** | Cost-optimized. Prefers free tiers, smaller models, and local providers like Ollama. |
 | **anthropic** | Anthropic Claude models exclusively. No knob-consistent delegation -- no measured win for this family yet (the "Anthropic guardrail"). |
 | **openai** | OpenAI models exclusively. **Ships knob-consistent delegation ON by default** (2026-09-02, a measured win -- see below). |
+| **openai-chatgpt** | ChatGPT subscription provider models exclusively; no native image generation. |
 | **gemini** | Google Gemini models exclusively. |
 | **copilot** | GitHub Copilot-optimized. Balances multiplier costs, avoids the 30x fast-variant trap. |
 | **ollama** | Ollama across two instances: `ollama` (local) + `ollama-cloud` (Ollama Cloud). Routes heavy roles to `gpt-oss:120b` on cloud; local fallbacks. Requires both provider instances configured — see [provider README](https://github.com/microsoft/amplifier-module-provider-ollama#mixed-local--cloud-multi-instance). |

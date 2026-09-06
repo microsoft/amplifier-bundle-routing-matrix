@@ -101,6 +101,7 @@ def _coordinator(
     coordinator.get = MagicMock(side_effect=_get)
     coordinator.config = {"agents": agents, "providers": provider_specs}
     coordinator.get_capability = MagicMock(return_value=None)
+    coordinator.register_capability = MagicMock()
     coordinator.hooks = MagicMock()
     coordinator.hooks.register = MagicMock()
     coordinator.event_bus = hooks_bus
