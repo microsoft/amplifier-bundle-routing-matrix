@@ -1,0 +1,46 @@
+# Abort-probe environment for the routing-matrix mount-time fan-out.
+# Stock amplifier CLI (stock truststore 0.10.4) + foundation + recipes --
+# the composition whose session-mount list_models fan-out drives ~20 threads
+# into truststore's unlocked wrap_bio.
+name: routing-fanout-abort-probe
+description: >
+  Reproduce the truststore wrap_bio abort (exit 134/139) with stock
+  hooks-routing, then verify the bounded fan-out + list_models coalescing
+  eliminates it with stock truststore.
+
+base:
+  image: ubuntu:24.04
+
+passthrough:
+  allow_external: true
+  services:
+    - name: anthropic
+      key_env: ANTHROPIC_API_KEY
+
+provision:
+  setup_cmds:
+    - apt-get update && apt-get install -y git curl ca-certificates jq python3 python3-pip
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - git config --global user.name "routing-probe" && git config --global user.email "routing-probe@dtu.local"
+    - uv tool install git+https://github.com/microsoft/amplifier
+    - amplifier bundle add git+https://github.com/microsoft/amplifier-foundation@main --app
+    - amplifier bundle add git+https://github.com/microsoft/amplifier-bundle-recipes@main --app
+    - |
+      mkdir -p /root/.amplifier
+      cat > /root/.amplifier/settings.yaml << 'EOF'
+      config:
+        providers:
+          - module: provider-anthropic
+            source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
+            config:
+              api_key: ${ANTHROPIC_API_KEY}
+      EOF
+    - amplifier --version
+    - mkdir -p /root/work
+    - git clone --branch fix/bounded-role-resolution-fanout --depth 1 https://github.com/microsoft/amplifier-bundle-routing-matrix /root/routing-matrix-patched
+
+readiness:
+  - name: amplifier-version
+    command: "amplifier --version"
+  - name: anthropic-key-present
+    command: "test -n \"$ANTHROPIC_API_KEY\""

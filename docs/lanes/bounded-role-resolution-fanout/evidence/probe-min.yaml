@@ -1,0 +1,15 @@
+schema_version: 2
+dependencies:
+  - source: "git+https://github.com/microsoft/amplifier-foundation@v2.1.2"
+    kind: bundle
+    required_agents: ["foundation:zen-architect"]
+name: "probe-min"
+description: "One agent step, one-token answer."
+version: "1.0.0"
+context:
+  marker: "probe"
+steps:
+  - id: "ping"
+    agent: "foundation:zen-architect"
+    prompt: "Reply with exactly one word: OK (marker {{marker}})"
+    output: "pong"

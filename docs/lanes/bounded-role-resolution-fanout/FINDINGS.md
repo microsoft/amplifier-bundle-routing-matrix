@@ -74,8 +74,45 @@ the semaphore — distinct providers cannot be coalesced):
 | `max_concurrent_role_resolutions: 1` | 1 |
 | `max_concurrent_role_resolutions: 8` | ≤ 8, > 4 |
 
+## Verified in product (A-B-A′, one disposable container)
+
+The report's own probe (`probe-min.yaml`, one agent step, one token, run
+through `amplifier tool invoke recipes ... -b recipes` with
+`PYTHONFAULTHANDLER=1`), aborts counted by exit code 134/139. Only the three
+`hooks-routing` module files changed between arms; **`truststore` 0.10.4 was
+stock and untouched throughout** (its `_api.py` still carries exactly one
+`with self._ctx_lock`, the one in `wrap_socket`).
+
+| arm | hooks-routing | attempts | aborts |
+|---|---|---|---|
+| A | stock (`main`) | 10 concurrent + 6 sequential = 16 | **4** |
+| B | this branch | 20 concurrent + 6 sequential = 26 | **0** |
+| A′ | reverted to stock | 10 concurrent + 6 sequential = 16 | **7** |
+
+Stock combined: **11 aborts in 32**. Patched: **0 in 26**. The failure returns
+immediately on revert.
+
+Every stock abort carried the documented signature: 21–36 threads inside
+`truststore/_openssl.py:38 _configure_context`, **100% via `wrap_bio`, 0% via
+`wrap_socket`**; 65 threads alive at the abort in the captured dump. Both
+outcomes appeared (`double free or corruption (fasttop)` → exit 134, and
+`Segmentation fault` → exit 139), confirming they are the same bug.
+
+Environment: Ubuntu 24.04.4 aarch64, kernel 6.17.0-1029-nvidia, Python 3.12,
+**OpenSSL 3.0.13**, `truststore` 0.10.4, amplifier CLI 2026.09.06-9fd6ad5
+(core 1.6.1) — i.e. the report's environment.
+
+That the patched code is what actually ran (rather than merely what sat on
+disk) is pinned by bytecode: `__pycache__` was removed before arm B and
+regenerated during it, and the resulting `.pyc` files contain the new
+`max_concurrent_role_resolutions` and `inflight_model_lists` symbols.
+
 ## Evidence
 
+- `evidence/probe-abort-aba.txt` — the full A-B-A′ probe output, environment
+  banner, per-run exit codes and faulthandler signatures.
+- `evidence/profile.yaml`, `evidence/run-probe.sh`, `evidence/summarize.sh`,
+  `evidence/probe-min.yaml` — the probe harness, so the run is repeatable.
 - `evidence/fail-before.txt` — the new tests against stock `HEAD~1` code:
   13 failed, headline `41-agent mount issued 41 list_models() calls; expected 1`
   and `peak in-flight list_models() was 20, expected <= 4`.
@@ -91,7 +128,8 @@ produced concurrency in the first place.
 
 - The missing lock in `truststore.SSLContext.wrap_bio`. That is the defect;
   this is the trigger.
-- Whether bounding the fan-out **alone** eliminates the abort in practice.
-  Other concurrent HTTP in the process can still race an unlocked `wrap_bio`.
-  This lane reduces the exposure at its largest single source; it does not
-  claim to close the race.
+- Closing the race. 0 aborts in 26 is the measured result at this sample size
+  on this host, not a proof of impossibility: other concurrent HTTP in the
+  process can still reach an unlocked `wrap_bio`. What is established is that
+  removing this fan-out removes the observed failure, and that restoring the
+  fan-out brings it straight back.
