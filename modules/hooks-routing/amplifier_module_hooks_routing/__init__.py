@@ -28,6 +28,29 @@ logger = logging.getLogger(__name__)
 # section 9).
 VALID_PLACEMENTS = ("prefix", "inject")
 
+# Ceiling on how many agents' model_role resolutions may be in flight at once
+# during the session:start fan-out (see on_session_start's gather below).
+#
+# Before this bound existed the gather was as wide as the composed bundle:
+# every agent's _resolve_one at once, each glob candidate issuing its own
+# list_models() HTTPS request. On a 41-agent bundle that is up to 41
+# simultaneous TLS handshakes at mount, and it happens on EVERY session mount
+# -- the CLI's own and every spawned agent's. That burst is what put 20-37
+# threads simultaneously inside truststore 0.10.4's `wrap_bio`, which (unlike
+# its own `wrap_socket`, _api.py:113-119) calls `_configure_context` WITHOUT
+# taking `self._ctx_lock`, so tens of threads ran
+# `ctx.set_default_verify_paths()` on one shared ssl.SSLContext and glibc
+# aborted the process: `double free or corruption`, exit 134 (sometimes
+# SIGSEGV, exit 139), with no Python traceback and no result envelope.
+#
+# The missing lock is the defect and belongs upstream; this bound removes the
+# trigger regardless of which truststore version is installed. 4 is the low
+# end of the range the report recommends (4-8): mount-time role resolution is
+# latency-tolerant (it is bounded by one round trip per PROVIDER, not per
+# agent, once _fetch_model_names' coalescing is in play) and a lower ceiling
+# is the safer default for the failure mode being removed.
+DEFAULT_MAX_CONCURRENT_ROLE_RESOLUTIONS = 4
+
 # The source-attributed marker this module's own banner always opens with
 # (see _render_banner). Used as a CONTENT signal in _ensure_prefix_placement
 # (rr wave 20260831, D1 cache-regression fix) -- see that function's
@@ -54,6 +77,29 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         raise ValueError(
             f"Invalid placement={placement!r}. "
             f"Valid values: {', '.join(VALID_PLACEMENTS)}."
+        )
+
+    # Config-overridable ceiling on the session:start resolution fan-out.
+    # Raise it to trade the safety margin for mount latency on a bundle whose
+    # agents span many distinct providers; setting it >= the agent count
+    # restores the pre-bound (unbounded gather) behaviour exactly.
+    #
+    # Validated loudly, like `placement` above: a typo here silently removes
+    # the protection this exists to provide, and a mount-time config error is
+    # the cheapest possible place to find out.
+    max_concurrent_role_resolutions = config.get(
+        "max_concurrent_role_resolutions", DEFAULT_MAX_CONCURRENT_ROLE_RESOLUTIONS
+    )
+    if (
+        isinstance(max_concurrent_role_resolutions, bool)
+        or not isinstance(max_concurrent_role_resolutions, int)
+        or max_concurrent_role_resolutions < 1
+    ):
+        raise ValueError(
+            "Invalid max_concurrent_role_resolutions="
+            f"{max_concurrent_role_resolutions!r}. "
+            "Must be an integer >= 1 (default "
+            f"{DEFAULT_MAX_CONCURRENT_ROLE_RESOLUTIONS})."
         )
 
     # model_performance-74w: restore this session's own model_role pin at the
@@ -490,6 +536,22 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                     preset.inherit,
                 )
 
+        # --- Fan-out bound + in-flight fetch de-duplication ---------------
+        # Two independent reductions of the same mount-time HTTPS burst, and
+        # they compose: the semaphore caps how many resolutions may be in
+        # flight at once, and the coalescing map collapses whatever IS in
+        # flight for one provider down to a single request. On the measured
+        # 41-agent `-b recipes` bundle whose agents all resolve globs against
+        # one provider, that is 41 concurrent list_models() calls before, and
+        # 1 after.
+        #
+        # Both are created here rather than at mount() so they belong to the
+        # loop that is actually running this handler, and so a second
+        # lifecycle event (see the latch above) could never reuse a
+        # half-drained semaphore.
+        resolution_semaphore = asyncio.Semaphore(max_concurrent_role_resolutions)
+        inflight_model_lists: dict[str, Any] = {}
+
         async def _resolve_one(agent_cfg: dict[str, Any]) -> None:
             """Resolve model_role for a single agent and patch agent_cfg in-place."""
             model_role = agent_cfg.get("model_role")
@@ -508,35 +570,46 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             # Normalise to list
             if isinstance(model_role, str):
                 model_role = [model_role]
-            resolved = await resolve_model_role(
-                model_role,
-                effective_matrix,
-                providers,
-                preresolved_models=preresolved_models,
-                # model_performance-cly: WITHOUT this, layer B (an agent's OWN
-                # frontmatter `model_role`) was silently inert on every
-                # multi-instance provider install. find_provider_by_type()
-                # matches a matrix candidate's bare `provider:` type (e.g.
-                # "anthropic") against the mounted providers dict first; when
-                # every instance is mounted under its own explicit `id:`
-                # ("opus", "sonnet", "haiku", ...) and none is keyed by the
-                # bare type, that direct match fails and the ONLY remaining
-                # strategy is the coordinator-backed fallback, which reads
-                # coordinator.config["providers"] to map instance ids back to
-                # module types. Omitting `coordinator` here disabled that
-                # fallback, so every candidate was skipped, resolve_model_role
-                # returned [], and no provider_preferences was ever written --
-                # leaving session_spawner.py:568-575's documented read with
-                # nothing to find and routing every such agent by session
-                # default instead. Layer A (the model_role_resolver
-                # capability) always passed it (resolver_class.py:220); this
-                # is the parity fix, not a new capability.
-                coordinator=coordinator,
-                caller_context=agent_caller_context,
-                preset=preset if agent_caller_context is not None else None,
-                escalations=escalations,
-                on_clamp=_emit_clamp,
-            )
+            # The semaphore is held across the whole resolution because the
+            # HTTPS call happens inside it (resolver._resolve_glob ->
+            # provider.list_models()); the rest is in-memory matrix walking
+            # that costs nothing to hold.
+            async with resolution_semaphore:
+                resolved = await resolve_model_role(
+                    model_role,
+                    effective_matrix,
+                    providers,
+                    preresolved_models=preresolved_models,
+                    # Closes the window preresolved_models structurally
+                    # cannot: every coroutine in a concurrent burst sees the
+                    # same empty cache and fetches. This makes the burst
+                    # share ONE fetch per provider.
+                    inflight_model_lists=inflight_model_lists,
+                    # model_performance-cly: WITHOUT this, layer B (an agent's
+                    # OWN frontmatter `model_role`) was silently inert on every
+                    # multi-instance provider install. find_provider_by_type()
+                    # matches a matrix candidate's bare `provider:` type (e.g.
+                    # "anthropic") against the mounted providers dict first;
+                    # when every instance is mounted under its own explicit
+                    # `id:` ("opus", "sonnet", "haiku", ...) and none is keyed
+                    # by the bare type, that direct match fails and the ONLY
+                    # remaining strategy is the coordinator-backed fallback,
+                    # which reads coordinator.config["providers"] to map
+                    # instance ids back to module types. Omitting `coordinator`
+                    # here disabled that fallback, so every candidate was
+                    # skipped, resolve_model_role returned [], and no
+                    # provider_preferences was ever written -- leaving
+                    # session_spawner.py:568-575's documented read with nothing
+                    # to find and routing every such agent by session default
+                    # instead. Layer A (the model_role_resolver capability)
+                    # always passed it (resolver_class.py:220); this is the
+                    # parity fix, not a new capability.
+                    coordinator=coordinator,
+                    caller_context=agent_caller_context,
+                    preset=preset if agent_caller_context is not None else None,
+                    escalations=escalations,
+                    on_clamp=_emit_clamp,
+                )
             if resolved:
                 # Preserve the per-candidate `config` block (e.g. reasoning_effort)
                 # declared in the matrix. ProviderPreference.from_dict() reads this
@@ -556,10 +629,16 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                     prefs.append(pref)
                 agent_cfg["provider_preferences"] = prefs
 
-        # Resolve all agents concurrently — wall-time becomes single longest
-        # latency rather than sum of all latencies.  Each coroutine writes only
-        # its own agent_cfg dict, so there is no shared mutable state between
-        # _resolve_one calls, except for preresolved_models which is asyncio-safe:
+        # Resolve all agents concurrently, at most
+        # `max_concurrent_role_resolutions` at a time (default 4) — wall-time
+        # is still bounded by latency rather than the sum of all latencies,
+        # but the mount no longer opens one TLS connection per agent at the
+        # same instant. Every agent is still resolved; only the ARRIVAL RATE
+        # is capped, so results are identical to the unbounded gather.
+        #
+        # Each coroutine writes only its own agent_cfg dict, so there is no
+        # shared mutable state between _resolve_one calls, except for
+        # preresolved_models / inflight_model_lists, which are asyncio-safe:
         # asyncio is cooperative and single-threaded, so dict reads/writes never
         # interleave (a coroutine only yields at explicit await points, and dict
         # mutation is not awaited).

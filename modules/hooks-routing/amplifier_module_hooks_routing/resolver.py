@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import fnmatch
 import logging
 import re
@@ -271,6 +272,7 @@ async def resolve_model_role(
     preset: Any = None,
     escalations: Any = None,
     on_clamp: Any = None,
+    inflight_model_lists: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Resolve model role(s) against routing matrix.
 
@@ -291,6 +293,17 @@ async def resolve_model_role(
             asyncio is cooperative and single-threaded, dict reads and writes
             never interleave — a coroutine only yields at explicit ``await``
             points, and dict mutation is a non-awaited operation.
+
+            **What it cannot do:** it only helps a caller that arrives after
+            some earlier call has *finished*. Every member of a concurrent
+            burst sees the same empty dict, so all of them fetch. That gap is
+            what *inflight_model_lists* closes.
+        inflight_model_lists: Optional mutable dict of ``provider_type ->
+            asyncio.Future``, used to coalesce *simultaneous*
+            ``list_models()`` fetches for one provider into a single HTTPS
+            request.  ``None`` (the default) disables coalescing and preserves
+            the exact pre-existing call pattern.  See
+            :func:`_fetch_model_names`.
         coordinator: Optional coordinator, forwarded to
             :func:`find_provider_by_type` as a fallback source of mount plan
             config when a matrix candidate's ``provider:`` is a bare module
@@ -377,6 +390,7 @@ async def resolve_model_role(
                     provider_instance,
                     provider_key=provider_type,
                     preresolved_models=preresolved_models,
+                    inflight_model_lists=inflight_model_lists,
                 )
                 if resolved_model is None:
                     continue
@@ -406,11 +420,85 @@ async def resolve_model_role(
     return []
 
 
+def _normalise_model_names(available: Any) -> list[str]:
+    """Normalise a provider's ``list_models()`` return value to a list of strings."""
+    return [
+        m if isinstance(m, str) else getattr(m, "id", str(m)) for m in available
+    ]
+
+
+async def _fetch_model_names(
+    provider: Any,
+    provider_key: str,
+    inflight_model_lists: dict[str, Any] | None = None,
+) -> list[str]:
+    """Fetch one provider's model list, coalescing concurrent callers into one call.
+
+    The ``preresolved_models`` cache in :func:`_resolve_glob` only helps a
+    caller that arrives *after* a fetch has completed. It is empty for every
+    member of a concurrent burst, because none of them has returned yet -- so
+    N agents resolving globs against the same provider at the same instant
+    each issued their own identical ``list_models()`` HTTPS request. On a
+    41-agent bundle that is up to 41 simultaneous TLS handshakes at session
+    mount, which is what drove ~20-37 threads at a time into
+    ``truststore``'s unlocked ``wrap_bio`` -> ``set_default_verify_paths()``
+    on one shared ``ssl.SSLContext`` (glibc ``double free or corruption``,
+    exit 134/139).
+
+    This is single-flight de-duplication: the first caller for a given
+    *provider_key* records an ``asyncio.Future`` in *inflight_model_lists*
+    and performs the fetch; every caller that arrives while it is in flight
+    awaits that same future instead of opening its own connection. One HTTPS
+    round trip serves the whole burst.
+
+    Failures are shared too, so a failing provider also costs exactly one
+    request per burst -- but each caller still handles (and logs) the failure
+    itself, so the warning output is unchanged. The slot is released once the
+    fetch settles, so a *later* call may retry a failed fetch exactly as it
+    could before.
+
+    ``inflight_model_lists=None`` (the default) or an empty *provider_key*
+    disables coalescing entirely and issues the call directly -- byte-identical
+    to the pre-coalescing behaviour.
+
+    **Asyncio safety:** the dict is only read/mutated between ``await``
+    points, so concurrently-running coroutines never interleave a
+    check-then-insert; asyncio is cooperative and single-threaded.
+    """
+    if inflight_model_lists is None or not provider_key:
+        return _normalise_model_names(await provider.list_models())
+
+    pending = inflight_model_lists.get(provider_key)
+    if pending is not None:
+        # Someone else is already fetching this provider's list. Ride along.
+        return await pending
+
+    future: asyncio.Future[list[str]] = asyncio.get_running_loop().create_future()
+    inflight_model_lists[provider_key] = future
+    try:
+        model_names = _normalise_model_names(await provider.list_models())
+    except BaseException as exc:
+        future.set_exception(exc)
+        # Mark retrieved so a fetch with no waiters does not trip asyncio's
+        # "Future exception was never retrieved" reporter. Waiters that are
+        # already parked on this future still receive the exception.
+        future.exception()
+        raise
+    finally:
+        # Release the slot either way -- see docstring on retry semantics.
+        # No ``await`` runs between here and ``set_result`` below, so a
+        # sibling coroutine cannot observe the gap.
+        inflight_model_lists.pop(provider_key, None)
+    future.set_result(model_names)
+    return model_names
+
+
 async def _resolve_glob(
     pattern: str,
     provider: Any,
     provider_key: str = "",
     preresolved_models: dict[str, list[str]] | None = None,
+    inflight_model_lists: dict[str, Any] | None = None,
 ) -> str | None:
     """Resolve a glob model pattern against a provider's model list.
 
@@ -427,6 +515,10 @@ async def _resolve_glob(
     directly.  When the list must be fetched, it is written back into
     *preresolved_models* under *provider_key* so future calls are free.
 
+    *inflight_model_lists*, when provided, additionally de-duplicates fetches
+    that are in flight *simultaneously* — the case ``preresolved_models``
+    structurally cannot catch. See :func:`_fetch_model_names`.
+
     Returns the highest-ranked matching model name or ``None`` when no
     candidate matches or the provider's ``list_models()`` raises.
     """
@@ -434,17 +526,14 @@ async def _resolve_glob(
         model_names = preresolved_models[provider_key]
     else:
         try:
-            available = await provider.list_models()
+            model_names = await _fetch_model_names(
+                provider, provider_key, inflight_model_lists
+            )
         except Exception:
             logger.warning(
                 "Failed to list models for glob pattern '%s'", pattern, exc_info=True
             )
             return None
-
-        # Normalise to list of strings
-        model_names = [
-            m if isinstance(m, str) else getattr(m, "id", str(m)) for m in available
-        ]
 
         if preresolved_models is not None and provider_key:
             preresolved_models[provider_key] = model_names
