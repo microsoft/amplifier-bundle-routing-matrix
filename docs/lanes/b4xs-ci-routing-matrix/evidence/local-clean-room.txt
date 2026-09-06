@@ -1,0 +1,42 @@
+Clean-room verification of the four CI job commands, run against a `git archive HEAD`
+export of the repo plus the new files (no reused .venv, no reused caches beyond uv's).
+
+$ uvx ruff@0.15.11 check .
+All checks passed!
+
+$ uv run --no-project --with pyyaml python .github/scripts/check_bundle_structure.py
+bundle.md frontmatter : ok
+behaviors/*.yaml      : 1 file(s)
+routing/*.yaml        : 9 file(s)
+parsed cleanly        : 11 file(s)
+OK -- bundle structure checks passed
+
+$ uv run --no-project --python 3.11 --with pytest --with pytest-asyncio --with pyyaml python -m pytest tests -q --tb=short
+39 passed in 1.90s
+
+$ cd modules/hooks-routing && uv sync --frozen --extra dev
+$ uv run --frozen --extra dev --with git+https://github.com/microsoft/amplifier-foundation python -c "import amplifier_foundation.spawn_utils, amplifier_core.session; print('runtime deps OK')"
+runtime deps OK
+$ uv run --frozen --extra dev --with git+https://github.com/microsoft/amplifier-foundation python -m pytest -q --tb=short
+590 passed in 1.84s
+
+--- The console-script trap, measured on this host (uv 0.12.6) ---
+
+$ uv run --frozen --extra dev --with git+https://github.com/microsoft/amplifier-foundation pytest -q
+574 passed, 14 failed, 2 skipped        <-- console script does NOT see the --with overlay
+
+$ uv run --frozen --extra dev --with git+https://github.com/microsoft/amplifier-foundation python -m pytest -q
+590 passed                              <-- python -m does
+
+--- Ruff version sensitivity, same tree, same command ---
+
+$ uvx ruff@0.15.11 check --isolated .   -> 2 errors (F402, F401)  [both fixed in this PR]
+$ uvx ruff@latest    check --isolated . -> 28 errors              [expanded default rule set]
+
+--- Bundle-structure script proven able to fail (4 seeded defects, sandbox copy) ---
+
+N1 broken YAML appended to behaviors/routing.yaml           -> exit 1
+N2 behaviors/*.yaml glob emptied                            -> exit 1 ("matched NO files")
+N3 includes: -> behaviors/nope.yaml (missing file)          -> exit 1
+N4 frontmatter bundle.version deleted                       -> exit 1
+positive control (unmodified tree)                          -> exit 0

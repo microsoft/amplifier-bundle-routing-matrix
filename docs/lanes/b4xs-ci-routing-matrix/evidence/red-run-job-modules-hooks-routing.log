@@ -1,0 +1,276 @@
+﻿2026-09-06T21:46:48.9529309Z Current runner version: '2.337.0'
+2026-09-06T21:46:48.9553962Z ##[group]Runner Image Provisioner
+2026-09-06T21:46:48.9554893Z Hosted Compute Agent
+2026-09-06T21:46:48.9555539Z Version: 20260828.587
+2026-09-06T21:46:48.9556175Z Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
+2026-09-06T21:46:48.9557001Z Build Date: 2026-08-28T16:44:25Z
+2026-09-06T21:46:48.9557715Z Worker ID: {9df8f4b3-de42-4b79-818b-73ba0481d774}
+2026-09-06T21:46:48.9559076Z Azure Region: canadacentral
+2026-09-06T21:46:48.9559754Z ##[endgroup]
+2026-09-06T21:46:48.9561852Z ##[group]Operating System
+2026-09-06T21:46:48.9562616Z Ubuntu
+2026-09-06T21:46:48.9563145Z 24.04.4
+2026-09-06T21:46:48.9563700Z LTS
+2026-09-06T21:46:48.9564275Z ##[endgroup]
+2026-09-06T21:46:48.9564831Z ##[group]Runner Image
+2026-09-06T21:46:48.9565470Z Image: ubuntu-24.04
+2026-09-06T21:46:48.9566052Z Version: 20260831.293.1
+2026-09-06T21:46:48.9567349Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260831.293/images/ubuntu/Ubuntu2404-Readme.md
+2026-09-06T21:46:48.9569176Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260831.293
+2026-09-06T21:46:48.9570210Z ##[endgroup]
+2026-09-06T21:46:48.9571329Z ##[group]GITHUB_TOKEN Permissions
+2026-09-06T21:46:48.9573294Z Contents: read
+2026-09-06T21:46:48.9573900Z Metadata: read
+2026-09-06T21:46:48.9574523Z ##[endgroup]
+2026-09-06T21:46:48.9576677Z Secret source: Actions
+2026-09-06T21:46:48.9577707Z Prepare workflow directory
+2026-09-06T21:46:48.9921933Z Prepare all required actions
+2026-09-06T21:46:48.9970317Z Getting action download info
+2026-09-06T21:46:49.2705357Z Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-09-06T21:46:49.3780727Z Download action repository 'astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d' (SHA:ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d)
+2026-09-06T21:46:49.8661675Z Complete job name: Tests — modules/hooks-routing
+2026-09-06T21:46:49.9478790Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+2026-09-06T21:46:49.9479917Z with:
+2026-09-06T21:46:49.9480471Z   repository: microsoft/amplifier-bundle-routing-matrix
+2026-09-06T21:46:49.9484338Z   token: ***
+2026-09-06T21:46:49.9484784Z   ssh-strict: true
+2026-09-06T21:46:49.9485227Z   ssh-user: git
+2026-09-06T21:46:49.9485676Z   persist-credentials: true
+2026-09-06T21:46:49.9486169Z   clean: true
+2026-09-06T21:46:49.9486624Z   sparse-checkout-cone-mode: true
+2026-09-06T21:46:49.9487161Z   fetch-depth: 1
+2026-09-06T21:46:49.9487597Z   fetch-tags: false
+2026-09-06T21:46:49.9488048Z   show-progress: true
+2026-09-06T21:46:49.9488718Z   lfs: false
+2026-09-06T21:46:49.9489140Z   submodules: false
+2026-09-06T21:46:49.9489606Z   set-safe-directory: true
+2026-09-06T21:46:49.9490134Z   allow-unsafe-pr-checkout: false
+2026-09-06T21:46:49.9490918Z ##[endgroup]
+2026-09-06T21:46:50.0560126Z Syncing repository: microsoft/amplifier-bundle-routing-matrix
+2026-09-06T21:46:50.0562139Z ##[group]Getting Git version info
+2026-09-06T21:46:50.0563189Z Working directory is '/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix'
+2026-09-06T21:46:50.0564495Z [command]/usr/bin/git version
+2026-09-06T21:46:50.0630618Z git version 2.55.0
+2026-09-06T21:46:50.0651128Z ##[endgroup]
+2026-09-06T21:46:50.0665823Z Temporarily overriding HOME='/home/runner/work/_temp/2a3d2beb-7bf6-476c-9e99-463c7c4ba068' before making global git config changes
+2026-09-06T21:46:50.0668833Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-06T21:46:50.0671679Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix
+2026-09-06T21:46:50.0728856Z Deleting the contents of '/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix'
+2026-09-06T21:46:50.0731762Z ##[group]Determining repository object format
+2026-09-06T21:46:50.0733381Z ##[endgroup]
+2026-09-06T21:46:50.0734357Z ##[group]Initializing the repository
+2026-09-06T21:46:50.0737792Z [command]/usr/bin/git init /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix
+2026-09-06T21:46:50.0846689Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-09-06T21:46:50.0847957Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-09-06T21:46:50.0849597Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-09-06T21:46:50.0850543Z hint: call:
+2026-09-06T21:46:50.0851132Z hint:
+2026-09-06T21:46:50.0851828Z hint: 	git config --global init.defaultBranch <name>
+2026-09-06T21:46:50.0853187Z hint:
+2026-09-06T21:46:50.0854176Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-09-06T21:46:50.0855241Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-09-06T21:46:50.0856086Z hint:
+2026-09-06T21:46:50.0857045Z hint: 	git branch -m <name>
+2026-09-06T21:46:50.0857925Z hint:
+2026-09-06T21:46:50.0859174Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-09-06T21:46:50.0860607Z Initialized empty Git repository in /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/.git/
+2026-09-06T21:46:50.0864000Z [command]/usr/bin/git remote add origin https://github.com/microsoft/amplifier-bundle-routing-matrix
+2026-09-06T21:46:50.0908092Z ##[endgroup]
+2026-09-06T21:46:50.0909767Z ##[group]Disabling automatic garbage collection
+2026-09-06T21:46:50.0911577Z [command]/usr/bin/git config --local gc.auto 0
+2026-09-06T21:46:50.0945306Z ##[endgroup]
+2026-09-06T21:46:50.0946875Z ##[group]Setting up auth
+2026-09-06T21:46:50.0948127Z Removing SSH command configuration
+2026-09-06T21:46:50.0953164Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-06T21:46:50.0989072Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-06T21:46:50.1343375Z Removing HTTP extra header
+2026-09-06T21:46:50.1351315Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-06T21:46:50.1391028Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-06T21:46:50.1604221Z Removing includeIf entries pointing to credentials config files
+2026-09-06T21:46:50.1609351Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-06T21:46:50.1639635Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-06T21:46:50.1862209Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-09-06T21:46:50.1900170Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/.git.path /home/runner/work/_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config
+2026-09-06T21:46:50.1927585Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config
+2026-09-06T21:46:50.1960446Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config
+2026-09-06T21:46:50.1990714Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config
+2026-09-06T21:46:50.2016869Z ##[endgroup]
+2026-09-06T21:46:50.2018902Z ##[group]Fetching the repository
+2026-09-06T21:46:50.2023404Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +e4bcafb62f013a66816bd5e0004538cf3294543f:refs/remotes/pull/64/merge
+2026-09-06T21:46:50.5903911Z From https://github.com/microsoft/amplifier-bundle-routing-matrix
+2026-09-06T21:46:50.5906492Z  * [new ref]         e4bcafb62f013a66816bd5e0004538cf3294543f -> pull/64/merge
+2026-09-06T21:46:50.5912938Z ##[endgroup]
+2026-09-06T21:46:50.5914559Z ##[group]Determining the checkout info
+2026-09-06T21:46:50.5916070Z ##[endgroup]
+2026-09-06T21:46:50.5916982Z [command]/usr/bin/git sparse-checkout disable
+2026-09-06T21:46:50.5959600Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-09-06T21:46:50.5986987Z ##[group]Checking out the ref
+2026-09-06T21:46:50.5989796Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/64/merge
+2026-09-06T21:46:50.6106012Z Note: switching to 'refs/remotes/pull/64/merge'.
+2026-09-06T21:46:50.6107167Z 
+2026-09-06T21:46:50.6107984Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-09-06T21:46:50.6110270Z changes and commit them, and you can discard any commits you make in this
+2026-09-06T21:46:50.6112282Z state without impacting any branches by switching back to a branch.
+2026-09-06T21:46:50.6113412Z 
+2026-09-06T21:46:50.6114460Z If you want to create a new branch to retain commits you create, you may
+2026-09-06T21:46:50.6116391Z do so (now or later) by using -c with the switch command. Example:
+2026-09-06T21:46:50.6117346Z 
+2026-09-06T21:46:50.6117958Z   git switch -c <new-branch-name>
+2026-09-06T21:46:50.6119230Z 
+2026-09-06T21:46:50.6119815Z Or undo this operation with:
+2026-09-06T21:46:50.6120563Z 
+2026-09-06T21:46:50.6121047Z   git switch -
+2026-09-06T21:46:50.6121658Z 
+2026-09-06T21:46:50.6122549Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-09-06T21:46:50.6124075Z 
+2026-09-06T21:46:50.6125854Z HEAD is now at e4bcafb Merge 4f7e123b686eaec70ed8fcd6ed06dea995ac33ba into 8f51709d03d6226d2942c311965ba9b138976fb7
+2026-09-06T21:46:50.6130980Z ##[endgroup]
+2026-09-06T21:46:50.6155570Z [command]/usr/bin/git log -1 --format=%H
+2026-09-06T21:46:50.6178716Z e4bcafb62f013a66816bd5e0004538cf3294543f
+2026-09-06T21:46:50.6708042Z ##[group]Run astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d
+2026-09-06T21:46:50.6709886Z with:
+2026-09-06T21:46:50.6710668Z   enable-cache: true
+2026-09-06T21:46:50.6711607Z   activate-environment: false
+2026-09-06T21:46:50.6712620Z   no-project: false
+2026-09-06T21:46:50.6714438Z   working-directory: /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix
+2026-09-06T21:46:50.6725080Z   github-token: ***
+2026-09-06T21:46:50.6727363Z   cache-dependency-glob: **/*requirements*.txt
+**/*requirements*.in
+**/*constraints*.txt
+**/*constraints*.in
+**/pyproject.toml
+**/uv.lock
+**/*.py.lock
+
+2026-09-06T21:46:50.6730015Z   restore-cache: true
+2026-09-06T21:46:50.6730902Z   save-cache: true
+2026-09-06T21:46:50.6731772Z   prune-cache: false
+2026-09-06T21:46:50.6732651Z   cache-python: false
+2026-09-06T21:46:50.6733583Z   ignore-nothing-to-cache: false
+2026-09-06T21:46:50.6734660Z   ignore-empty-workdir: false
+2026-09-06T21:46:50.6735748Z   download-from-astral-mirror: true
+2026-09-06T21:46:50.6736867Z   add-problem-matchers: true
+2026-09-06T21:46:50.6737835Z   quiet: false
+2026-09-06T21:46:50.6738799Z   resolution-strategy: highest
+2026-09-06T21:46:50.6739783Z ##[endgroup]
+2026-09-06T21:46:50.8568011Z Trying to find version for uv in: /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/uv.toml
+2026-09-06T21:46:50.8570401Z Could not find file: /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/uv.toml
+2026-09-06T21:46:50.8572449Z Trying to find version for uv in: /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/pyproject.toml
+2026-09-06T21:46:50.8574541Z Could not find file: /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/pyproject.toml
+2026-09-06T21:46:50.8576642Z Could not determine uv version from uv.toml or pyproject.toml. Falling back to latest.
+2026-09-06T21:46:50.8579225Z Fetching manifest data from https://raw.githubusercontent.com/astral-sh/versions/main/v1/uv.ndjson ...
+2026-09-06T21:46:50.9030294Z Downloading uv from "https://releases.astral.sh/github/uv/releases/download/0.12.10/uv-x86_64-unknown-linux-gnu.tar.gz" ...
+2026-09-06T21:46:51.0567873Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/9441a162-33d5-413c-999f-308a700b2e0d -f /home/runner/work/_temp/68442d68-5855-4364-b3c6-fcf96fe30077
+2026-09-06T21:46:51.4395764Z Added /home/runner/.local/bin to the path
+2026-09-06T21:46:51.4399940Z Added /opt/hostedtoolcache/uv/0.12.10/x86_64 to the path
+2026-09-06T21:46:51.4401664Z Set UV_PYTHON_INSTALL_DIR to /home/runner/work/_temp/uv-python-dir
+2026-09-06T21:46:51.4402990Z Added /home/runner/work/_temp/uv-python-dir to the path
+2026-09-06T21:46:51.4422211Z Set UV_CACHE_DIR to /home/runner/work/_temp/setup-uv-cache
+2026-09-06T21:46:51.4423164Z Successfully installed uv version 0.12.10
+2026-09-06T21:46:51.5002660Z Searching files using cache dependency glob: /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/**/*requirements*.txt,/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/**/*requirements*.in,/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/**/*constraints*.txt,/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/**/*constraints*.in,/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/**/pyproject.toml,/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/**/uv.lock,/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/**/*.py.lock
+2026-09-06T21:46:51.5282751Z /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/modules/hooks-routing/pyproject.toml
+2026-09-06T21:46:51.5346251Z /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/modules/hooks-routing/uv.lock
+2026-09-06T21:46:51.5393582Z Found 2 files to hash.
+2026-09-06T21:46:51.5457197Z Trying to restore cache from GitHub Actions cache with key: setup-uv-2-x86_64-unknown-linux-gnu-ubuntu-24.04-3.12.3-11184961025c4ff1f977fd4acf8b6994f77b181bcb1ac62be113287058cece56
+2026-09-06T21:46:51.6434706Z No GitHub Actions cache found for key: setup-uv-2-x86_64-unknown-linux-gnu-ubuntu-24.04-3.12.3-11184961025c4ff1f977fd4acf8b6994f77b181bcb1ac62be113287058cece56
+2026-09-06T21:46:51.7620829Z ##[group]Run uv sync --frozen --extra dev
+2026-09-06T21:46:51.7621472Z [36;1muv sync --frozen --extra dev[0m
+2026-09-06T21:46:51.7663708Z shell: /usr/bin/bash -e {0}
+2026-09-06T21:46:51.7664184Z env:
+2026-09-06T21:46:51.7664664Z   UV_PYTHON_INSTALL_DIR: /home/runner/work/_temp/uv-python-dir
+2026-09-06T21:46:51.7665294Z   UV_CACHE_DIR: /home/runner/work/_temp/setup-uv-cache
+2026-09-06T21:46:51.7665832Z ##[endgroup]
+2026-09-06T21:46:51.8229448Z Using CPython 3.12.3 interpreter at: /usr/bin/python3
+2026-09-06T21:46:51.8230558Z Creating virtual environment at: .venv
+2026-09-06T21:46:51.8284205Z    Building amplifier-module-hooks-routing @ file:///home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/modules/hooks-routing
+2026-09-06T21:46:51.8829544Z Downloading pygments (1.2MiB)
+2026-09-06T21:46:51.9373153Z  Downloaded pygments
+2026-09-06T21:46:52.2254177Z       Built amplifier-module-hooks-routing @ file:///home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/modules/hooks-routing
+2026-09-06T21:46:52.2264370Z Prepared 9 packages in 402ms
+2026-09-06T21:46:52.2389078Z Installed 9 packages in 12ms
+2026-09-06T21:46:52.2390547Z  + amplifier-module-hooks-routing==0.1.1 (from file:///home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/modules/hooks-routing)
+2026-09-06T21:46:52.2392331Z  + iniconfig==2.3.0
+2026-09-06T21:46:52.2392976Z  + packaging==26.2
+2026-09-06T21:46:52.2393536Z  + pluggy==1.6.0
+2026-09-06T21:46:52.2394055Z  + pygments==2.20.0
+2026-09-06T21:46:52.2394600Z  + pytest==9.0.3
+2026-09-06T21:46:52.2395134Z  + pytest-asyncio==1.4.0
+2026-09-06T21:46:52.2395701Z  + pyyaml==6.0.3
+2026-09-06T21:46:52.2396304Z  + typing-extensions==4.15.0
+2026-09-06T21:46:52.2528686Z ##[group]Run uv run --frozen --extra dev --with git+https://github.com/microsoft/amplifier-foundation python -c "import amplifier_foundation.spawn_utils, amplifier_core.session; print('runtime deps OK')"
+2026-09-06T21:46:52.2530237Z [36;1muv run --frozen --extra dev --with git+https://github.com/microsoft/amplifier-foundation python -c "import amplifier_foundation.spawn_utils, amplifier_core.session; print('runtime deps OK')"[0m
+2026-09-06T21:46:52.2567741Z shell: /usr/bin/bash -e {0}
+2026-09-06T21:46:52.2568003Z env:
+2026-09-06T21:46:52.2568551Z   UV_PYTHON_INSTALL_DIR: /home/runner/work/_temp/uv-python-dir
+2026-09-06T21:46:52.2569050Z   UV_CACHE_DIR: /home/runner/work/_temp/setup-uv-cache
+2026-09-06T21:46:52.2569354Z ##[endgroup]
+2026-09-06T21:46:52.7421342Z    Updating https://github.com/microsoft/amplifier-foundation (HEAD)
+2026-09-06T21:46:52.7515402Z Downloading pydantic-core (2.0MiB)
+2026-09-06T21:46:52.7736262Z Downloading amplifier-core (8.3MiB)
+2026-09-06T21:46:52.7799717Z  Downloaded pydantic-core
+2026-09-06T21:46:52.9547555Z  Downloaded amplifier-core
+2026-09-06T21:46:53.9293611Z     Updated https://github.com/microsoft/amplifier-foundation (aaa5c47f3436b25b145feff5837582f1be251241)
+2026-09-06T21:46:53.9296824Z    Building amplifier-foundation @ git+https://github.com/microsoft/amplifier-foundation@aaa5c47f3436b25b145feff5837582f1be251241
+2026-09-06T21:46:54.2424022Z       Built amplifier-foundation @ git+https://github.com/microsoft/amplifier-foundation@aaa5c47f3436b25b145feff5837582f1be251241
+2026-09-06T21:46:54.2592663Z Installed 10 packages in 5ms
+2026-09-06T21:46:55.6227817Z runtime deps OK
+2026-09-06T21:46:55.6633348Z ##[group]Run uv run --frozen --extra dev --with git+https://github.com/microsoft/amplifier-foundation python -m pytest -q --tb=short
+2026-09-06T21:46:55.6634349Z [36;1muv run --frozen --extra dev --with git+https://github.com/microsoft/amplifier-foundation python -m pytest -q --tb=short[0m
+2026-09-06T21:46:55.6671432Z shell: /usr/bin/bash -e {0}
+2026-09-06T21:46:55.6671682Z env:
+2026-09-06T21:46:55.6671958Z   UV_PYTHON_INSTALL_DIR: /home/runner/work/_temp/uv-python-dir
+2026-09-06T21:46:55.6672348Z   UV_CACHE_DIR: /home/runner/work/_temp/setup-uv-cache
+2026-09-06T21:46:55.6672649Z ##[endgroup]
+2026-09-06T21:46:57.4259431Z ........................................................................ [ 12%]
+2026-09-06T21:46:57.7358633Z ........................................................................ [ 24%]
+2026-09-06T21:46:58.0984807Z ........................................................................ [ 36%]
+2026-09-06T21:46:58.2373472Z ........................................................................ [ 48%]
+2026-09-06T21:46:58.5939708Z ........................................................................ [ 60%]
+2026-09-06T21:46:59.2383939Z ........................................................................ [ 73%]
+2026-09-06T21:46:59.3564541Z ........................................................................ [ 85%]
+2026-09-06T21:46:59.5794498Z ........................................................................ [ 97%]
+2026-09-06T21:46:59.7087435Z ..............F                                                          [100%]
+2026-09-06T21:46:59.7088512Z =================================== FAILURES ===================================
+2026-09-06T21:46:59.7089146Z _____________________ test_ci_red_proof_module_suite_runs ______________________
+2026-09-06T21:46:59.7089656Z tests/test_zz_ci_red_proof.py:10: in test_ci_red_proof_module_suite_runs
+2026-09-06T21:46:59.7090480Z     assert False, "deliberate failure: proving Tests — modules/hooks-routing runs"
+2026-09-06T21:46:59.7091485Z E   AssertionError: deliberate failure: proving Tests — modules/hooks-routing runs
+2026-09-06T21:46:59.7091928Z E   assert False
+2026-09-06T21:46:59.7092213Z =========================== short test summary info ============================
+2026-09-06T21:46:59.7093199Z FAILED tests/test_zz_ci_red_proof.py::test_ci_red_proof_module_suite_runs - AssertionError: deliberate failure: proving Tests — modules/hooks-routing runs
+2026-09-06T21:46:59.7093903Z assert False
+2026-09-06T21:46:59.7094125Z 1 failed, 590 passed in 3.30s
+2026-09-06T21:46:59.7773733Z ##[error]Process completed with exit code 1.
+2026-09-06T21:46:59.7917926Z Post job cleanup.
+2026-09-06T21:46:59.8785955Z [command]/usr/bin/git version
+2026-09-06T21:46:59.8822792Z git version 2.55.0
+2026-09-06T21:46:59.8858911Z Temporarily overriding HOME='/home/runner/work/_temp/a35b0d75-8df5-490c-b902-39619ffeb48d' before making global git config changes
+2026-09-06T21:46:59.8860382Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-06T21:46:59.8864275Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix
+2026-09-06T21:46:59.8895787Z Removing SSH command configuration
+2026-09-06T21:46:59.8902789Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-06T21:46:59.8938886Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-06T21:46:59.9169213Z Removing HTTP extra header
+2026-09-06T21:46:59.9175513Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-06T21:46:59.9212576Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-06T21:46:59.9429449Z Removing includeIf entries pointing to credentials config files
+2026-09-06T21:46:59.9435673Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-06T21:46:59.9462763Z includeif.gitdir:/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/.git.path
+2026-09-06T21:46:59.9464611Z includeif.gitdir:/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/.git/worktrees/*.path
+2026-09-06T21:46:59.9465968Z includeif.gitdir:/github/workspace/.git.path
+2026-09-06T21:46:59.9466849Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-09-06T21:46:59.9473043Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/.git.path
+2026-09-06T21:46:59.9495540Z /home/runner/work/_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config
+2026-09-06T21:46:59.9506129Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-1ffae39d\-cadf\-48cb\-9453\-10fe0cc6764c\.config
+2026-09-06T21:46:59.9540771Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/.git/worktrees/*.path
+2026-09-06T21:46:59.9564131Z /home/runner/work/_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config
+2026-09-06T21:46:59.9575787Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/amplifier-bundle-routing-matrix/amplifier-bundle-routing-matrix/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-1ffae39d\-cadf\-48cb\-9453\-10fe0cc6764c\.config
+2026-09-06T21:46:59.9609038Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-09-06T21:46:59.9630066Z /github/runner_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config
+2026-09-06T21:46:59.9638700Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-1ffae39d\-cadf\-48cb\-9453\-10fe0cc6764c\.config
+2026-09-06T21:46:59.9670170Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-09-06T21:46:59.9690866Z /github/runner_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config
+2026-09-06T21:46:59.9700027Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-1ffae39d\-cadf\-48cb\-9453\-10fe0cc6764c\.config
+2026-09-06T21:46:59.9732461Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-06T21:46:59.9946741Z Removing credentials config '/home/runner/work/_temp/git-credentials-1ffae39d-cadf-48cb-9453-10fe0cc6764c.config'
+2026-09-06T21:47:00.0085664Z Cleaning up orphan processes

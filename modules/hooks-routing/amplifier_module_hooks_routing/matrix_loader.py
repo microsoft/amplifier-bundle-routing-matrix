@@ -349,26 +349,29 @@ def validate_matrix_config(
                 continue
 
             field_map: dict[str, Any] = {}
-            for field in config_fields:
-                field_id = getattr(field, "id", None)
-                if field_id is None and isinstance(field, dict):
-                    field_id = field.get("id")
+            # NB: named `cfg_field`, not `field` -- `field` is imported from
+            # dataclasses at module scope and a loop variable of that name
+            # shadows it (ruff F402).
+            for cfg_field in config_fields:
+                field_id = getattr(cfg_field, "id", None)
+                if field_id is None and isinstance(cfg_field, dict):
+                    field_id = cfg_field.get("id")
                 if field_id is not None:
-                    field_map[field_id] = field
+                    field_map[field_id] = cfg_field
 
             for key, value in cfg.items():
-                field = field_map.get(key)
-                if field is None:
+                cfg_field = field_map.get(key)
+                if cfg_field is None:
                     # Undeclared key -- the open-key rule. Pass silently.
                     continue
 
-                field_type = getattr(field, "field_type", None)
-                if field_type is None and isinstance(field, dict):
-                    field_type = field.get("field_type")
+                field_type = getattr(cfg_field, "field_type", None)
+                if field_type is None and isinstance(cfg_field, dict):
+                    field_type = cfg_field.get("field_type")
 
-                choices = getattr(field, "choices", None)
-                if choices is None and isinstance(field, dict):
-                    choices = field.get("choices")
+                choices = getattr(cfg_field, "choices", None)
+                if choices is None and isinstance(cfg_field, dict):
+                    choices = cfg_field.get("choices")
 
                 if field_type != "choice" or not choices:
                     continue
