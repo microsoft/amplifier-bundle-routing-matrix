@@ -1,0 +1,15 @@
+# Ruff configuration for amplifier-bundle-routing-matrix.
+#
+# This file exists so `ruff check .` means the SAME thing locally and in CI.
+# Without it, ruff walks up the filesystem looking for a config and can pick up
+# an unrelated parent-directory pyproject.toml -- which is how a local run and a
+# CI run silently disagree about which rules are even enabled.
+#
+# Settings match the sibling bundle repo microsoft/amplifier-bundle-context-intelligence
+# (its [tool.ruff] block), so the two bundles lint alike.
+#
+# Rule selection is ruff's default (E4, E7, E9, F). CI pins the ruff VERSION
+# (see .github/workflows/ci.yml) because "default rules" is a moving target:
+# ruff 0.15.11 reports 0 findings on this tree, while a later ruff reports 28.
+target-version = "py311"
+line-length = 100

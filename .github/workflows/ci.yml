@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Minimal read-only token — no secrets needed or exposed.
+# Safe for Dependabot PRs and external fork contributors.
+#
+# NOTE: nothing in this workflow calls an LLM. The repo's LLM-backed
+# `validate-bundle-repo` recipe is deliberately NOT wired here — it needs API
+# keys and costs money per run. Everything below is free, offline-ish, and
+# finishes in about a minute.
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint — ruff, at a PINNED version.
+  #
+  # The version pin is load-bearing, not fussiness. "ruff's default rules" is a
+  # moving target: measured on this tree, ruff 0.15.11 reports 0 findings while
+  # a later ruff reports 28. An unpinned linter turns an unrelated upstream
+  # release into a red PR nobody changed anything to cause.
+  #
+  # `ruff format --check` is NOT wired here, on purpose. This repo has never
+  # been ruff-formatted: at ruff 0.15.11 defaults, `ruff format` would rewrite
+  # 14 files / ~137 lines. That is a whitespace-normalisation change, and it
+  # does not belong in the PR that introduces CI (it would collide with every
+  # in-flight branch). Naming it here so the next contributor sees a decision
+  # rather than an oversight — wiring it is a follow-up, and the diff is purely
+  # mechanical: `uvx ruff@0.15.11 format .`
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          enable-cache: true
+
+      # Reads ruff.toml at the repo root, so this is byte-for-byte the command
+      # a contributor runs locally.
+      - name: Lint
+        run: uvx ruff@0.15.11 check .
+
+  # ---------------------------------------------------------------------------
+  # Repo-root test suite (tests/) across supported Python versions.
+  #
+  # There is no root pyproject.toml or lockfile — this repo is a BUNDLE, not a
+  # Python package, and only modules/* are installable. So the root suite runs
+  # in an ephemeral uv environment with its three actual dependencies. The
+  # tests reach modules/hooks-routing via a sys.path insert of their own (see
+  # tests/test_default_resolution_unchanged.py), so nothing needs installing.
+  # ---------------------------------------------------------------------------
+  test-root:
+    name: Tests — root (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          enable-cache: true
+
+      - name: Run root tests
+        run: >
+          uv run --no-project --python ${{ matrix.python-version }}
+          --with pytest --with pytest-asyncio --with pyyaml
+          python -m pytest tests -q --tb=short
+
+  # ---------------------------------------------------------------------------
+  # Per-module test suites. Each modules/* package owns its own pyproject.toml
+  # and uv.lock, so each gets its own matrix leg — add a directory name here
+  # when a second module lands.
+  #
+  # TWO non-obvious things, both of which silently weaken this job if dropped:
+  #
+  # 1. `python -m pytest`, NOT `pytest`. On uv 0.12.6 the `pytest` CONSOLE
+  #    SCRIPT does not see packages supplied by `--with`, so
+  #    `uv run --with git+…/amplifier-foundation pytest` runs WITHOUT
+  #    foundation and 14 tests fail with ModuleNotFoundError. `python -m
+  #    pytest` sees the overlay. Measured on this tree: 574 passed / 14 failed
+  #    / 2 skipped vs 590 passed.
+  #
+  # 2. amplifier-foundation must genuinely be importable. It is a runtime dep
+  #    of the routing resolver, resolved by amplifier's module system rather
+  #    than by this module's pyproject.toml, so it is absent from uv.lock on
+  #    purpose. Two tests guard themselves with `pytest.importorskip`, which
+  #    means a botched install SKIPS them silently instead of failing. The
+  #    explicit import step below converts that silent skip into a red run.
+  # ---------------------------------------------------------------------------
+  test-modules:
+    name: Tests — modules/${{ matrix.module }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - hooks-routing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          enable-cache: true
+
+      - name: Install module dependencies
+        working-directory: modules/${{ matrix.module }}
+        # --frozen: use the module's committed lockfile exactly as-is; fail if
+        # it would need updating.
+        run: uv sync --frozen --extra dev
+
+      - name: Assert optional runtime deps import (they gate 16 tests)
+        working-directory: modules/${{ matrix.module }}
+        run: >
+          uv run --frozen --extra dev
+          --with git+https://github.com/microsoft/amplifier-foundation
+          python -c "import amplifier_foundation.spawn_utils, amplifier_core.session; print('runtime deps OK')"
+
+      - name: Run module tests
+        working-directory: modules/${{ matrix.module }}
+        run: >
+          uv run --frozen --extra dev
+          --with git+https://github.com/microsoft/amplifier-foundation
+          python -m pytest -q --tb=short
+
+  # ---------------------------------------------------------------------------
+  # Bundle structure — a cheap YAML parse of bundle.md's frontmatter, every
+  # behaviors/*.yaml and every routing/*.yaml. No network, no keys, ~1 second.
+  #
+  # The script treats an EMPTY glob as a failure: a check that reports "0
+  # problems in 0 files" and exits 0 looks exactly like a working one.
+  # ---------------------------------------------------------------------------
+  bundle-structure:
+    name: Bundle structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        with:
+          enable-cache: true
+
+      - name: Check bundle structure
+        run: uv run --no-project --with pyyaml python .github/scripts/check_bundle_structure.py
