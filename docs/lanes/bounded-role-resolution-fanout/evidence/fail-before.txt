@@ -1,0 +1,39 @@
+$ uv run --extra dev --with git+https://github.com/microsoft/amplifier-foundation pytest -q tests/test_bounded_fanout.py   # STOCK code (HEAD~1), new tests only
+E       AssertionError: peak in-flight list_models() was 20, expected <= 4
+E       assert 20 <= 4
+E        +  where 20 = <tests.test_bounded_fanout.ConcurrencyTracker object at 0xf630156c7c50>.peak
+tests/test_bounded_fanout.py:240: AssertionError
+>       assert strict.peak == 1, f"serial config still ran {strict.peak} at once"
+E       AssertionError: serial config still ran 20 at once
+E       assert 20 == 1
+E        +  where 20 = <tests.test_bounded_fanout.ConcurrencyTracker object at 0xf630156c7890>.peak
+tests/test_bounded_fanout.py:259: AssertionError
+E       Failed: DID NOT RAISE <class 'ValueError'>
+E       Failed: DID NOT RAISE <class 'ValueError'>
+E       Failed: DID NOT RAISE <class 'ValueError'>
+E       Failed: DID NOT RAISE <class 'ValueError'>
+E       Failed: DID NOT RAISE <class 'ValueError'>
+E       Failed: DID NOT RAISE <class 'ValueError'>
+E   TypeError: _resolve_glob() takes from 2 to 4 positional arguments but 5 were given
+E   TypeError: _resolve_glob() takes from 2 to 4 positional arguments but 5 were given
+E       TypeError: _resolve_glob() takes from 2 to 4 positional arguments but 5 were given
+E       TypeError: _resolve_glob() takes from 2 to 4 positional arguments but 5 were given
+>       assert tracker.calls == 1, (
+E       AssertionError: 41-agent mount issued 41 list_models() calls; expected 1
+E       assert 41 == 1
+E        +  where 41 = <tests.test_bounded_fanout.ConcurrencyTracker object at 0xf63015393450>.calls
+tests/test_bounded_fanout.py:480: AssertionError
+FAILED tests/test_bounded_fanout.py::TestResolutionFanOutBound::test_default_bound_caps_in_flight_resolutions
+FAILED tests/test_bounded_fanout.py::TestResolutionFanOutBound::test_bound_is_config_overridable
+FAILED tests/test_bounded_fanout.py::TestResolutionFanOutBound::test_invalid_bound_rejected_at_mount[0]
+FAILED tests/test_bounded_fanout.py::TestResolutionFanOutBound::test_invalid_bound_rejected_at_mount[-1]
+FAILED tests/test_bounded_fanout.py::TestResolutionFanOutBound::test_invalid_bound_rejected_at_mount[four]
+FAILED tests/test_bounded_fanout.py::TestResolutionFanOutBound::test_invalid_bound_rejected_at_mount[4.5]
+FAILED tests/test_bounded_fanout.py::TestResolutionFanOutBound::test_invalid_bound_rejected_at_mount[None]
+FAILED tests/test_bounded_fanout.py::TestResolutionFanOutBound::test_invalid_bound_rejected_at_mount[True]
+FAILED tests/test_bounded_fanout.py::TestConcurrentListModelsDedup::test_concurrent_globs_share_one_fetch
+FAILED tests/test_bounded_fanout.py::TestConcurrentListModelsDedup::test_failure_is_shared_and_reported_per_caller
+FAILED tests/test_bounded_fanout.py::TestConcurrentListModelsDedup::test_failed_fetch_may_be_retried_later
+FAILED tests/test_bounded_fanout.py::TestConcurrentListModelsDedup::test_distinct_providers_are_not_coalesced_together
+FAILED tests/test_bounded_fanout.py::TestMountTimeHttpCallCount::test_41_agents_one_provider_make_one_call
+13 failed, 3 passed in 0.19s

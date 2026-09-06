@@ -1,0 +1,11 @@
+$ uv run --extra dev --with git+https://github.com/microsoft/amplifier-foundation pytest -q   # modules/hooks-routing
+........................................................................ [ 85%]
+........................................................................ [ 97%]
+..............                                                           [100%]
+590 passed in 1.52s
+
+$ uv run --with pytest --with pytest-asyncio --with pyyaml --with git+https://github.com/microsoft/amplifier-foundation --with ./modules/hooks-routing pytest -q tests   # repo-root suite
+      Built amplifier-module-hooks-routing @ file:///home/bkrabach/dev/hw-truststore/lanes/routing-matrix-bounded-fanout/routing-matrix/modules/hooks-routing
+Installed 17 packages in 6ms
+.......................................                                  [100%]
+39 passed in 1.19s
