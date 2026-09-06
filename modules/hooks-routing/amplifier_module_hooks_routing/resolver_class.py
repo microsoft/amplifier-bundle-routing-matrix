@@ -163,6 +163,12 @@ class MatrixModelRoleResolver:
         # any single transient list_models() failure into a silent demotion to
         # a different model for that call.
         self._preresolved_models: dict[str, list[str]] = {}
+        # Companion to the cache above, for the window the cache cannot cover:
+        # two resolve() calls racing on the SAME provider before either has
+        # returned both miss ``_preresolved_models`` and both fetch. This dict
+        # holds the in-flight fetch so the second one rides along instead of
+        # opening a second connection. See resolver._fetch_model_names.
+        self._inflight_model_lists: dict[str, Any] = {}
 
     async def resolve(
         self,
@@ -217,6 +223,7 @@ class MatrixModelRoleResolver:
             self._matrix_roles,
             self._providers,
             preresolved_models=self._preresolved_models,
+            inflight_model_lists=self._inflight_model_lists,
             coordinator=self._coordinator,
             caller_context=caller_context if knob_active else None,
             preset=self._preset if knob_active else None,

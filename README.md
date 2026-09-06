@@ -298,6 +298,32 @@ To make a shipped matrix take effect again, remove or rename the shadowing file 
 
 See [docs/MATRIX_CURATOR_GUIDE.md](docs/MATRIX_CURATOR_GUIDE.md) for detailed authoring guidance.
 
+### Mount-time resolution fan-out
+
+At `session:start` this hook resolves the `model_role` of **every agent in the composed bundle**, and each candidate whose `model:` is a glob needs the provider's model list — an HTTPS `list_models()` call. On a 41-agent bundle that used to be up to 41 simultaneous TLS handshakes, on *every* session mount: the CLI's own, and every spawned agent's.
+
+Two bounds now apply, and they compose:
+
+- **at most `max_concurrent_role_resolutions` resolutions in flight at once** (default `4`)
+- **one `list_models()` call per provider per burst**, not one per agent — concurrent resolutions of the same provider share a single in-flight fetch
+
+Measured on a 41-agent bundle whose agents all resolve globs against one provider: **41 concurrent `list_models()` calls before, 1 after.** Resolution results and warnings are unchanged; only the arrival rate and the count of identical calls.
+
+This is not only traffic reduction. That unbounded burst is the documented trigger for a native abort: it put 20–37 threads at a time inside `truststore` 0.10.4's `wrap_bio`, which calls `_configure_context` **without** taking `self._ctx_lock` (its own `wrap_socket` does), so tens of threads ran `ctx.set_default_verify_paths()` on one shared `ssl.SSLContext` and glibc aborted the process — `double free or corruption`, exit 134 (sometimes SIGSEGV, exit 139), with no Python traceback and no result envelope. The missing lock is the defect and belongs upstream; bounding the fan-out removes the trigger regardless of which `truststore` version is installed.
+
+Raise the ceiling if a bundle's agents span many distinct providers and mount latency matters more than the margin — setting it at or above the agent count restores the previous unbounded behaviour exactly:
+
+```yaml
+hooks:
+  - module: hooks-routing
+    source: git+https://github.com/microsoft/amplifier-bundle-routing-matrix@main#subdirectory=modules/hooks-routing
+    config:
+      default_matrix: balanced
+      max_concurrent_role_resolutions: 8   # default: 4; must be an integer >= 1
+```
+
+An invalid value is rejected at mount with a `ValueError` rather than silently ignored — a typo here would quietly remove the protection.
+
 ## Contributing
 
 > [!NOTE]

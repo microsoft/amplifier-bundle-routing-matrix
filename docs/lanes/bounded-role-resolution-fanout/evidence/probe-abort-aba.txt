@@ -1,0 +1,104 @@
+# In-product abort probe -- A-B-A', one disposable container
+
+Probe: the bug report's own `probe-min.yaml` (one agent step, one token), run
+via `amplifier tool invoke recipes operation=execute ... -b recipes -o json`
+with `PYTHONFAULTHANDLER=1`. Aborts counted by exit code 134 / 139.
+
+Only ONE thing changed between arms: the three `hooks-routing` module files in
+the CLI's bundle cache. truststore was never touched.
+
+| arm | hooks-routing | attempts | aborts |
+|---|---|---|---|
+| A  | stock (`main`)              | 10 concurrent + 6 sequential = 16 | **4** |
+| B  | this branch                 | 20 concurrent + 6 sequential = 26 | **0** |
+| A' | reverted to stock           | 10 concurrent + 6 sequential = 16 | **7** |
+
+Stock combined: 11 aborts in 32. Patched: 0 in 26. The failure returns
+immediately on revert.
+
+Proof the patched code was the code that RAN (not just the code on disk):
+`__pycache__` was deleted before arm B and regenerated during it, and the
+resulting `.pyc` files contain the new `max_concurrent_role_resolutions` and
+`inflight_model_lists` symbols.
+
+=== environment ===
+amplifier, version 2026.09.06-9fd6ad5 (core 1.6.1)
+truststore: 0.10.4 -- STOCK and unmodified in all three arms
+  (_api.py contains exactly 1 `with self._ctx_lock`: the one in wrap_socket.
+   wrap_bio, the path every abort came through, still has none.)
+openssl: OpenSSL 3.0.13 30 Jan 2024
+Linux 6.17.0-1029-nvidia aarch64
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+
+LABEL=stock concurrent_aborts=2/10 sequential_aborts=2/6 total_aborts=4/16
+-- exit codes --
+c-r1c1=0 c-r1c2=0 c-r1c3=0 c-r1c4=0 c-r1c5=134 c-r2c1=0 c-r2c2=0 c-r2c3=134 c-r2c4=0 c-r2c5=0 s-1=0 s-2=0 s-3=134 s-4=0 s-5=134 s-6=0 
+-- fatal signatures --
+c-r1c5.err: _configure_context=35 wrap_bio=35 wrap_socket=0
+c-r2c3.err: _configure_context=36 wrap_bio=36 wrap_socket=0
+s-3.rc.err: _configure_context=36 wrap_bio=36 wrap_socket=0
+s-5.rc.err: _configure_context=34 wrap_bio=34 wrap_socket=0
+      4 double free or corruption (fasttop)
+
+LABEL=patched concurrent_aborts=0/20 sequential_aborts=0/6 total_aborts=0/26
+-- exit codes --
+c-r1c1=0 c-r1c2=0 c-r1c3=0 c-r1c4=0 c-r1c5=0 c-r2c1=0 c-r2c2=0 c-r2c3=0 c-r2c4=0 c-r2c5=0 c-r3c1=0 c-r3c2=0 c-r3c3=0 c-r3c4=0 c-r3c5=0 c-r4c1=0 c-r4c2=0 c-r4c3=0 c-r4c4=0 c-r4c5=0 s-1=0 s-2=0 s-3=0 s-4=0 s-5=0 s-6=0 
+-- fatal signatures --
+
+LABEL=reverted concurrent_aborts=4/10 sequential_aborts=3/6 total_aborts=7/16
+-- exit codes --
+c-r1c1=134 c-r1c2=134 c-r1c3=0 c-r1c4=134 c-r1c5=0 c-r2c1=134 c-r2c2=0 c-r2c3=0 c-r2c4=0 c-r2c5=0 s-1=0 s-2=139 s-3=0 s-4=134 s-5=139 s-6=0 
+-- fatal signatures --
+c-r1c1.err: _configure_context=35 wrap_bio=35 wrap_socket=0
+c-r1c2.err: _configure_context=21 wrap_bio=21 wrap_socket=0
+c-r1c4.err: _configure_context=25 wrap_bio=25 wrap_socket=0
+c-r2c1.err: _configure_context=35 wrap_bio=35 wrap_socket=0
+s-2.rc.err: _configure_context=26 wrap_bio=26 wrap_socket=0
+s-4.rc.err: _configure_context=27 wrap_bio=27 wrap_socket=0
+s-5.rc.err: _configure_context=30 wrap_bio=30 wrap_socket=0
+      2 Fatal Python error: Segmentation fault
+      5 double free or corruption (fasttop)
+
+=== representative faulthandler stack (stock c-r1c5) ===
+Thread 0x0000e28cd8f9f180 (most recent call first):
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_openssl.py", line 38 in _configure_context
+  File "/usr/lib/python3.12/contextlib.py", line 137 in __enter__
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_api.py", line 144 in wrap_bio
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 1100 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x0000e28cd97af180 (most recent call first):
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_openssl.py", line 38 in _configure_context
+  File "/usr/lib/python3.12/contextlib.py", line 137 in __enter__
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_api.py", line 144 in wrap_bio
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 1100 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x0000e28cd9fbf180 (most recent call first):
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_openssl.py", line 38 in _configure_context
+  File "/usr/lib/python3.12/contextlib.py", line 137 in __enter__
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_api.py", line 144 in wrap_bio
+
+=== main-thread stack showing the supplier (stock) ===
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Current thread 0x0000e28d5a7cf180 (most recent call first):
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_openssl.py", line 38 in _configure_context
+  File "/usr/lib/python3.12/contextlib.py", line 137 in __enter__
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_api.py", line 144 in wrap_bio
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 1100 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x0000e28d5afdf180 (most recent call first):
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_openssl.py", line 38 in _configure_context
+  File "/usr/lib/python3.12/contextlib.py", line 137 in __enter__
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/truststore/_api.py", line 144 in wrap_bio
+  File "/root/.local/share/uv/tools/amplifier/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 1100 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x0000e28d5b7ef180 (most recent call first):
+
