@@ -616,15 +616,25 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
         elif _read_field(providers[target], "default_model") != pinned_model:
             model_drifted = True
 
+    # Config keys are compared on the SAME surface `_read_field` uses for
+    # default_model: the live attribute first, the config dict second. The
+    # attribute is what a request actually reads, so a provider whose
+    # attribute already holds the pinned value has not drifted -- whatever
+    # its config dict says, and whether or not it exposes one at all.
+    #
+    # Reading the dict alone was a false positive. provider-openai-chatgpt kept
+    # its mount config under `_config` with no public `config` (every sibling
+    # exposes `config`; it was the one outlier, fixed in that repo on
+    # 2026-09-07), so this loop saw None for every key, declared drift on every
+    # delegate spawn that landed there, and the branch below then reported
+    # `reasoning_effort` "snapshotted differently at mount" -- while the wire
+    # carried exactly the pinned effort. The attribute was right the whole
+    # time; nothing here had read it.
     config_drift: dict[str, Any] = {}
     for pkey, pvalue in pin["config"].items():
         if pkey in protected:
             continue
-        current = None
-        provider_config = getattr(providers[target], "config", None)
-        if isinstance(provider_config, dict):
-            current = provider_config.get(pkey)
-        if current != pvalue:
+        if _read_field(providers[target], pkey) != pvalue:
             config_drift[pkey] = pvalue
 
     if not (priority_drifted or model_drifted or config_drift):
@@ -673,16 +683,24 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
     # reasoning_effort, __init__.py:1046) will not pick this up -- so say so in
     # the record instead of writing an attribute past its own validation.
     inert_config_keys: list[str] = []
+    unrestorable_config_keys: list[str] = []
     if config_drift:
         provider_config = getattr(providers[target], "config", None)
-        if isinstance(provider_config, dict):
-            for ckey, cvalue in config_drift.items():
+        has_config_dict = isinstance(provider_config, dict)
+        for ckey, cvalue in list(config_drift.items()):
+            if has_config_dict:
                 provider_config[ckey] = cvalue
-                if hasattr(providers[target], ckey) and getattr(providers[target], ckey) != cvalue:
+            live = providers[target]
+            if hasattr(live, ckey):
+                # The attribute is the surface that decides. "Inert" is a claim
+                # about THAT surface, so it is made only after reading it.
+                if getattr(live, ckey) != cvalue:
                     inert_config_keys.append(ckey)
-        else:  # pragma: no cover - defensive: no config dict to restore into
-            inert_config_keys = sorted(config_drift)
-            config_drift = {}
+            elif not has_config_dict:
+                # No attribute and no dict: nothing to restore into. Say that,
+                # rather than asserting a snapshot nobody observed.
+                unrestorable_config_keys.append(ckey)
+                del config_drift[ckey]
 
     after = {name: _priority_of(p) for name, p in providers.items()}
     after_model = _read_field(providers[target], "default_model")
@@ -709,6 +727,14 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
             "at mount; a config write cannot change what it sends. Reported, "
             "not silently forced. Root fix is upstream (model_performance-rc0).",
             sorted(inert_config_keys),
+            target,
+        )
+    if unrestorable_config_keys:
+        logger.warning(
+            "[ROUTING] config keys %s are pinned for %r but that provider "
+            "exposes neither a matching attribute nor a `config` dict, so "
+            "there is no surface to restore them on. Not restored; reported.",
+            sorted(unrestorable_config_keys),
             target,
         )
 
@@ -741,4 +767,6 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
         record["pinned_model"] = pinned_model
     if inert_config_keys:
         record["inert_config_keys"] = sorted(inert_config_keys)
+    if unrestorable_config_keys:
+        record["unrestorable_config_keys"] = sorted(unrestorable_config_keys)
     return record
