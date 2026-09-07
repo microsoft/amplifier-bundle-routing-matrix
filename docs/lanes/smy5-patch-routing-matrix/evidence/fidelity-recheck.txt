@@ -1,0 +1,34 @@
+stock chars: 1148   lean chars: 735   saved: 413 (35.98%)
+
+--- inline-code literal (5) ---
+OK 'Active routing matrix: … / Available model roles: …'  ->  verbatim
+OK 'model_role'  ->  verbatim
+OK 'general'  ->  verbatim
+OK 'fast'  ->  verbatim
+OK "load_skill(skill_name='role-definitions')"  ->  verbatim
+
+--- fenced-block atom (9) ---
+OK 'model_role: coding'  ->  verbatim
+OK '# single role'  ->  equivalent -> 'single (`model_role: coding`)'
+OK 'model_role: [ui-coding, coding, general]'  ->  verbatim
+OK '# fallback chain (specific → general)'  ->  equivalent -> 'fallback chain tried left-to-right specific → general'
+OK 'model_role: fast'  ->  verbatim
+OK '# utility agent'  ->  equivalent -> 'utility (`model_role: fast`)'
+OK '"agent": "foundation:explorer"'  ->  equivalent -> 'agent="foundation:explorer"'
+OK '"instruction": "Analyze these UI screenshots..."'  ->  DROPPED-BY-DESIGN -- illustrative filler text for the example's instruction argument; carries no rule, constraint, command or pointer. Lean keeps the argument itself (instruction="…").
+OK '"model_role": "vision"'  ->  equivalent -> 'model_role="vision"'
+
+--- rule sentence (7) ---
+OK 'Use those role names — they are authoritative.'  ->  equivalent -> 'is authoritative'
+OK 'Role sets and descriptions differ per matrix; do not rely on any list written down here.'  ->  equivalent -> 'role sets and descriptions differ per matrix; never rely on a list written down elsewhere'
+OK 'Use `model_role` in agent frontmatter to declare what kind of model your agent needs:'  ->  equivalent -> 'Agent frontmatter `model_role`'
+OK 'Fallback chains are tried left-to-right.'  ->  equivalent -> 'tried left-to-right'
+OK 'Always end with `general` or `fast`.'  ->  equivalent -> 'always end a chain with `general` or `fast`'
+OK 'When delegating to sub-agents, you can override the model role:'  ->  equivalent -> 'Delegators may override per call'
+OK "For detailed role definitions, decision flowchart, model tier grid, and fallback chain guidance, use `load_skill(skill_name='role-definitions')`."  ->  equivalent -> "Role definitions, decision flowchart, model tier grid, fallback guidance: `load_skill(skill_name='role-definitions')`"
+
+=== RESULT ===
+1 atom(s) DROPPED BY DESIGN (declared, not silent):
+  * fenced-block atom: '"instruction": "Analyze these UI screenshots..."' -- DROPPED-BY-DESIGN -- illustrative filler text for the example's instruction argument; carries no rule, constraint, command or pointer. Lean keeps the argument itself (instruction="…").
+
+0 undeclared drops: every rule, constraint, command and pointer in stock survives in lean (verbatim, or via a declared equivalence).

@@ -1,0 +1,9 @@
+### lint: uvx ruff@0.15.11 check .
+All checks passed!
+### bundle structure: .github/scripts/check_bundle_structure.py
+bundle.md frontmatter : ok
+behaviors/*.yaml      : 1 file(s)
+routing/*.yaml        : 8 file(s)
+parsed cleanly        : 10 file(s)
+
+OK -- bundle structure checks passed
