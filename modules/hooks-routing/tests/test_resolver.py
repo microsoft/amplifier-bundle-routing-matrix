@@ -1444,3 +1444,108 @@ class TestModelIntentInstanceSelection:
         assert result[0]["provider"] == "opus"
         assert result[0]["model"] == "claude-opus-5"
         assert result[0]["config"] == {"reasoning_effort": "high"}
+
+
+# ---------------------------------------------------------------------------
+# Provider FAMILY aliases: one matrix `provider:` name, several modules
+# ---------------------------------------------------------------------------
+
+
+class TestProviderFamilyAliases:
+    """`provider: openai` must also match the `openai-chatgpt` module.
+
+    Same gpt-5.x models, different bill (ChatGPT subscription vs API key). It
+    is a separate provider MODULE, so before `PROVIDER_FAMILY_ALIASES` a
+    `provider: openai` candidate matched it neither by name nor via the
+    module-type fallback, and a ChatGPT-only user got zero routing from every
+    shipped matrix (0/13 roles on balanced.yaml, 2026-09-07).
+    """
+
+    def test_alias_table_is_the_single_source(self) -> None:
+        from amplifier_module_hooks_routing.resolver import (
+            PROVIDER_FAMILY_ALIASES,
+            _type_names_for,
+        )
+
+        assert PROVIDER_FAMILY_ALIASES == {"openai": ("openai-chatgpt",)}
+        assert _type_names_for("openai") == ("openai", "openai-chatgpt")
+        # No aliases -> 1-tuple, so every caller loops uniformly.
+        assert _type_names_for("anthropic") == ("anthropic",)
+
+    def test_chatgpt_alone_satisfies_provider_openai_by_key(self) -> None:
+        """Step 1 (direct key match) honours the alias."""
+        chatgpt = MagicMock()
+        result = find_provider_by_type({"openai-chatgpt": chatgpt}, "openai")
+        assert result == ("openai-chatgpt", chatgpt)
+
+    def test_chatgpt_alone_satisfies_provider_openai_with_prefix(self) -> None:
+        """...including the `provider-` prefixed spelling of the alias."""
+        chatgpt = MagicMock()
+        result = find_provider_by_type({"provider-openai-chatgpt": chatgpt}, "openai")
+        assert result == ("provider-openai-chatgpt", chatgpt)
+
+    def test_canonical_backend_beats_alias_regardless_of_mount_order(self) -> None:
+        """With BOTH mounted the API key wins, even if chatgpt was mounted first.
+
+        The old single-pass loop would have returned whichever came first in
+        dict order; the per-name outer loop is what makes this deterministic.
+        """
+        openai = MagicMock()
+        chatgpt = MagicMock()
+        providers = {"openai-chatgpt": chatgpt, "openai": openai}  # alias FIRST
+        assert find_provider_by_type(providers, "openai") == ("openai", openai)
+
+    def test_alias_is_directional(self) -> None:
+        """`provider: openai-chatgpt` must NOT match a plain `openai` mount.
+
+        A curator who names the subscription backend explicitly means it;
+        silently billing the API key instead would be the wrong kind of
+        helpful.
+        """
+        openai = MagicMock()
+        assert find_provider_by_type({"openai": openai}, "openai-chatgpt") is None
+
+    def test_alias_does_not_leak_to_other_families(self) -> None:
+        chatgpt = MagicMock()
+        assert find_provider_by_type({"openai-chatgpt": chatgpt}, "anthropic") is None
+
+    def test_alias_applies_to_module_type_fallback(self) -> None:
+        """Step 2 (mount-plan module type) honours the alias too.
+
+        The realistic multi-instance case: the user's instances carry custom
+        ids (`sol`, `terra`, `chatgpt-main`...) so nothing is keyed by the
+        bare type, and the ONLY openai-family instance is a chatgpt one.
+        """
+        chatgpt = MagicMock()
+        providers = {"chatgpt-main": chatgpt}
+        coordinator = _make_coordinator_with_provider_specs(
+            [
+                {
+                    "module": "provider-openai-chatgpt",
+                    "id": "chatgpt-main",
+                    "config": {"priority": 5},
+                }
+            ]
+        )
+        result = find_provider_by_type(providers, "openai", coordinator)
+        assert result == ("chatgpt-main", chatgpt)
+
+    def test_module_type_fallback_prefers_canonical_over_alias(self) -> None:
+        """Step 2 with both families present as custom-id instances: the
+        openai-module instance wins even when the chatgpt one has the better
+        (lower) priority number -- family preference outranks priority."""
+        terra = MagicMock()
+        chatgpt = MagicMock()
+        providers = {"chatgpt-main": chatgpt, "terra": terra}
+        coordinator = _make_coordinator_with_provider_specs(
+            [
+                {
+                    "module": "provider-openai-chatgpt",
+                    "id": "chatgpt-main",
+                    "config": {"priority": 1},
+                },
+                {"module": "provider-openai", "id": "terra", "config": {"priority": 50}},
+            ]
+        )
+        result = find_provider_by_type(providers, "openai", coordinator)
+        assert result == ("terra", terra)

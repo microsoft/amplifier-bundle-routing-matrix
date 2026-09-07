@@ -12,9 +12,15 @@ Nothing checked that `balanced` could actually serve such a user. On
 **zero** roles resolved out of thirteen -- every role fell through to nothing,
 because no shipped matrix named that provider. It is a separate provider
 MODULE from `openai` (the OAuth/ChatGPT-subscription backend vs the API-key
-backend), so `find_provider_by_type` matches it neither by name nor via the
+backend), so `find_provider_by_type` matched it neither by name nor via the
 module-type fallback. The failure was silent: routing simply set no
 preference and the agent used the session default.
+
+The fix is `PROVIDER_FAMILY_ALIASES` in the resolver: `provider: openai` now
+matches either backend, API key first. So the `openai-chatgpt` case below is
+the load-bearing one -- it passes ONLY because the alias works, since no
+shipped matrix names that provider directly any more (and
+`test_no_matrix_names_the_chatgpt_backend_directly` pins that).
 
 The golden-fixture test in `test_default_resolution_unchanged.py` cannot catch
 this class. It resolves every matrix against a roster where EVERY provider is
@@ -188,6 +194,9 @@ def test_provider_alone_routes_every_role_of_the_default_matrix(
         "raised, so this assertion is the only thing that notices."
     )
 
+    # The resolved candidate reports the MOUNT it matched, which for an
+    # aliased family is the mounted name (`openai-chatgpt`), reached through a
+    # candidate that says `provider: openai`.
     for role, got in resolved.items():
         if role in exempt:
             continue
@@ -201,18 +210,18 @@ def test_provider_alone_routes_every_role_of_the_default_matrix(
 def test_openai_globs_are_suffix_free_and_never_select_a_fast_variant(
     matrix_name: str,
 ) -> None:
-    """The `-fast` trap, asserted across the whole OpenAI family.
+    """The `-fast` trap, asserted on the one glob vocabulary both backends share.
 
     The ChatGPT backend serves `gpt-5.6-terra` AND `gpt-5.6-terra-fast`. A
     trailing `*` matches both, they tie on version, and the resolver's
     tie-break prefers the LONGER name -- so `gpt-?.?-terra*` silently selects
     the `-fast` variant. (Same shape as `gpt-5.6-sol-fast` on GitHub Copilot.)
 
-    Suffix-free, the SAME glob resolves to the same clean id on BOTH backends,
-    which is what lets one glob vocabulary serve the pay-per-use API and the
-    ChatGPT subscription alike. So the rule is asserted for the whole family,
-    not just the backend that exposes the trap -- a `*` creeping back onto an
-    `openai` candidate would be copied onto a chatgpt one soon enough.
+    Since `provider: openai` now reaches the chatgpt backend through the family
+    alias, every openai candidate's glob is resolved against the chatgpt model
+    list in production whenever that is the mounted backend. So the assertion
+    is exactly that: mount ONLY chatgpt, resolve every openai candidate, and
+    require the clean id every time.
 
     CANDIDATE globs only. The preset `tier_ladder` keeps its `*` on purpose:
     it CLASSIFIES an already-chosen model rather than SELECTING one, so it
@@ -224,13 +233,13 @@ def test_openai_globs_are_suffix_free_and_never_select_a_fast_variant(
         (role, c)
         for role, r in roles.items()
         for c in r["candidates"]
-        if c.get("provider") in ("openai", "openai-chatgpt")
+        if c.get("provider") == "openai"
     ]
-    assert named, f"{matrix_name}.yaml names no openai-family candidate"
+    assert named, f"{matrix_name}.yaml names no openai candidate"
 
     for role, candidate in named:
         assert not candidate["model"].endswith("*"), (
-            f"{matrix_name}.yaml role {role!r}: {candidate['provider']} model "
+            f"{matrix_name}.yaml role {role!r}: openai model "
             f"{candidate['model']!r} ends in '*'. On the ChatGPT backend that "
             "resolves to the '-fast' variant. Drop the trailing '*'."
         )
@@ -242,32 +251,27 @@ def test_openai_globs_are_suffix_free_and_never_select_a_fast_variant(
         }
 
     for role, got in asyncio.run(_run()).items():
-        if not got:
-            continue
+        assert got, f"{matrix_name}.yaml role {role!r} did not resolve via the alias"
         assert not got[0]["model"].endswith("-fast"), (
             f"{matrix_name}.yaml role {role!r} resolved to {got[0]['model']!r}"
         )
 
 
-def test_chatgpt_candidates_never_carry_an_inert_reasoning_effort() -> None:
-    """`reasoning_effort` is inert on this provider; the loader rejects it.
-
-    Asserted here as well as in the loader guard, because the failure mode is
-    a knob that looks set and does nothing -- the exact defect the gemini rule
-    was added for. The live knob is `extra_request_params.reasoning.effort`.
-    """
-    offenders: list[str] = []
-    for path in sorted(ROUTING_DIR.glob("*.yaml")):
-        roles = yaml.safe_load(path.read_text(encoding="utf-8"))["roles"]
-        for role, data in roles.items():
-            for candidate in data["candidates"]:
-                if candidate.get("provider") != "openai-chatgpt":
-                    continue
-                config = candidate.get("config") or {}
-                if "reasoning_effort" in config or "effort" in config:
-                    offenders.append(f"{path.name}:{role}")
+def test_no_matrix_names_the_chatgpt_backend_directly() -> None:
+    """DRY guard: the family alias makes a `provider: openai-chatgpt` candidate
+    redundant, and 49 of them were removed on 2026-09-07. One creeping back in
+    would mean a role that has to be edited twice again."""
+    offenders = [
+        f"{path.name}:{role}"
+        for path in sorted(ROUTING_DIR.glob("*.yaml"))
+        for role, data in yaml.safe_load(path.read_text(encoding="utf-8"))[
+            "roles"
+        ].items()
+        for c in data["candidates"]
+        if c.get("provider") == "openai-chatgpt"
+    ]
     assert not offenders, (
-        "these openai-chatgpt candidates set an INERT effort key: "
-        f"{offenders}. Use `extra_request_params: {{reasoning: {{effort: ..., "
-        "summary: detailed}}}` instead."
+        f"these candidates name openai-chatgpt directly: {offenders}. "
+        "`provider: openai` already reaches that backend via "
+        "PROVIDER_FAMILY_ALIASES -- one candidate serves both bills."
     )

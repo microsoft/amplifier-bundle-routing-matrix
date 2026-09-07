@@ -125,6 +125,36 @@ def _instance_serves_model(spec: dict[str, Any] | None, model_pattern: str) -> b
     )
 
 
+# Provider FAMILIES: one matrix `provider:` name that several distinct provider
+# MODULES may satisfy, in preference order.
+#
+# `openai-chatgpt` is the ChatGPT-subscription/OAuth backend for the same
+# gpt-5.x models `openai` (the pay-per-use API key) serves -- same models,
+# different bill. It is a separate module, so without this table a
+# `provider: openai` candidate matched it neither by name nor via the
+# module-type fallback, and a ChatGPT-only user got NO routing from any
+# shipped matrix (measured 2026-09-07: 0/13 roles on balanced.yaml).
+#
+# Preference order is the tuple order: the canonical type is tried first
+# across ALL mounted providers, then each alias. So a user with both backends
+# mounted always bills the API key; a user with only the subscription still
+# routes. Both backends read the same `reasoning_effort` config key, so a
+# single candidate's `config:` block is correct for whichever one matches.
+PROVIDER_FAMILY_ALIASES: dict[str, tuple[str, ...]] = {
+    "openai": ("openai-chatgpt",),
+}
+
+
+def _type_names_for(type_name: str) -> tuple[str, ...]:
+    """The provider type names that satisfy a matrix ``provider:`` value.
+
+    The canonical name first, then its family aliases in preference order.
+    A name with no aliases yields a 1-tuple, so every caller can loop
+    uniformly and the no-alias path is byte-identical to before.
+    """
+    return (type_name, *PROVIDER_FAMILY_ALIASES.get(type_name, ()))
+
+
 def find_provider_by_type(
     providers: dict[str, Any],
     type_name: str,
@@ -161,7 +191,9 @@ def find_provider_by_type(
     Returns:
         ``(module_id, provider_instance)`` or ``None``.
 
-    Matching strategy:
+    Matching strategy (each step is run for the canonical ``type_name``
+    FIRST and then for each of its :data:`PROVIDER_FAMILY_ALIASES`, so the
+    canonical backend always wins when more than one is mounted):
         1. Exact key, "provider-" prefix stripped, or "provider-" prefix
            added — covers the single-instance case and any instance
            explicitly keyed by the bare type.
@@ -182,18 +214,45 @@ def find_provider_by_type(
            (lowest priority number) — mirroring the "default provider"
            convention used elsewhere in the ecosystem.
     """
-    for name, provider in providers.items():
-        if type_name in (
-            name,
-            name.replace("provider-", ""),
-            f"provider-{type_name}",
-        ):
-            return (name, provider)
+    accepted = _type_names_for(type_name)
+
+    # Step 1, one full scan per accepted name so the canonical type beats an
+    # alias regardless of mount order.
+    for wanted in accepted:
+        for name, provider in providers.items():
+            if wanted in (
+                name,
+                name.replace("provider-", ""),
+                f"provider-{wanted}",
+            ):
+                return (name, provider)
 
     provider_specs = _get_provider_specs(coordinator)
     if not provider_specs:
         return None
 
+    # Step 2, likewise: resolve by module type for the canonical name first,
+    # and only fall through to an alias when no canonical instance exists.
+    for wanted in accepted:
+        found = _resolve_by_module_type(providers, provider_specs, wanted, model_pattern)
+        if found is not None:
+            return found
+    return None
+
+
+def _resolve_by_module_type(
+    providers: dict[str, Any],
+    provider_specs: Any,
+    type_name: str,
+    model_pattern: str,
+) -> tuple[str, Any] | None:
+    """Step 2 of :func:`find_provider_by_type` for ONE module type name.
+
+    Extracted verbatim from the body of :func:`find_provider_by_type` so the
+    family-alias loop above can run it once per accepted name. The logic
+    inside is unchanged; see the long comment below for why the tie-break is
+    model-intent-first.
+    """
     candidates: list[tuple[int, str]] = []
     model_matched: list[tuple[int, str]] = []
     for name in providers:

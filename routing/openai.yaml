@@ -3,24 +3,22 @@
 # OpenAI-only routing. All roles use OpenAI models exclusively.
 # Use when you want to run entirely on OpenAI -- EITHER billing path.
 #
-# BOTH OPENAI BACKENDS, ONE MATRIX. Every role carries two candidates for the
-# same model: `provider: openai` (the pay-per-use API-key backend) and
-# `provider: openai-chatgpt` (the ChatGPT-subscription/OAuth backend). They
-# serve the same gpt-5.6 family and resolve to the same model id; the only
-# thing that differs is which account pays. Whichever you have mounted wins,
-# and having both just means the API key is tried first.
+# BOTH OPENAI BACKENDS, ONE CANDIDATE. `provider: openai` matches EITHER the
+# pay-per-use API-key backend (module `openai`) or the ChatGPT-subscription/
+# OAuth backend (module `openai-chatgpt`). Same gpt-5.6 family, same model
+# ids, same `reasoning_effort` key -- the only difference is which account
+# pays. The resolver's `PROVIDER_FAMILY_ALIASES` (resolver.py) tries the API
+# key across all mounts first, then the subscription, so a user with both
+# bills the API and a user with only the subscription still routes.
 #
-# They need SEPARATE candidates because they are separate provider MODULES,
-# not two instances of one: `find_provider_by_type` matches neither by name
-# nor via its module-type fallback, so a lone `provider: openai` candidate
-# leaves a ChatGPT-only user with no routing at all.
-#
-# And their `config:` blocks differ, unavoidably: provider-openai reads
-# `reasoning_effort` from mount config, provider-openai-chatgpt does not (its
-# only effort read is `request.reasoning_effort`, which nothing populates from
-# config). The latter's live knob is `extra_request_params.reasoning.effort`,
-# the exact payload block it builds for itself. The loader enforces this --
-# a `reasoning_effort:` on a chatgpt candidate is rejected, not ignored.
+# HISTORY, so nobody re-adds the duplicates: on 2026-09-07 this file briefly
+# carried a second `provider: openai-chatgpt` candidate per role (49 in all,
+# across four matrices), because (a) the resolver had no family aliasing and
+# (b) provider-openai-chatgpt did not read `reasoning_effort` from mount
+# config, forcing a differently-shaped `extra_request_params` block. Both
+# root causes were fixed the same day -- the alias here, the config->request
+# bridge in the provider (mirroring provider-openai __init__.py:1046) -- and
+# the twins were removed. One candidate, one glob vocabulary, one knob.
 #
 # TIER STATUS (2026-09-07): the flagship `gpt-?.?-sol*` tier is PAUSED pending
 # further evals. No role selects sol. Roles that previously did now use
@@ -138,10 +136,11 @@
 #      itself must be updated in the same change, since it matches the
 #      substring 'haiku' and would otherwise keep rejecting claude-haiku-5.
 #  12. The separate `openai-chatgpt.yaml` matrix was FOLDED INTO openai.yaml
-#      and deleted. The ChatGPT backend is the same models on a different
-#      bill, not a different tier story, so it did not warrant a second file
-#      to keep in sync -- every role in openai.yaml now carries a candidate
-#      for each backend.
+#      and deleted; then the per-role `openai-chatgpt` twin candidates were
+#      removed as well. `provider: openai` now matches both backends via the
+#      resolver's PROVIDER_FAMILY_ALIASES, and both read the same
+#      `reasoning_effort` key since provider-openai-chatgpt gained its
+#      config->request bridge. One candidate per role serves both bills.
 #  13. Every openai-family candidate glob lost its trailing `*`
 #      (`gpt-?.?-terra`, `gpt-?.?-luna`). The ChatGPT backend serves a `-fast`
 #      sibling for every model, and a trailing `*` silently selects it (tie on
@@ -176,15 +175,11 @@ preset:
   # who pins `gpt-5.6-terra-fast` by hand must still land on the terra rung).
   # Narrowing these would silently un-classify every suffixed id.
   #
-  # One ladder per BACKEND, because a ladder is keyed by the matrix
-  # `provider:` string verbatim (knob_consistency.py:420) -- there is no
-  # family aliasing. The rungs are identical: same models, different bill.
+  # Keyed by the matrix `provider:` string. Every candidate in this file says
+  # `openai`, whichever backend module ends up matching it, so one ladder
+  # covers both.
   tier_ladder:
     openai:
-      - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
-      - ["gpt-?.?-terra*"]
-      - ["gpt-?.?-sol*", "gpt-[0-9].[0-9]"]
-    openai-chatgpt:
       - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
       - ["gpt-?.?-terra*"]
       - ["gpt-?.?-sol*", "gpt-[0-9].[0-9]"]
@@ -198,25 +193,6 @@ preset:
     inherit: strict
     report_unhonored: true
 
-  # KNOWN LIMITATION, on the ChatGPT backend only.
-  #
-  # TIER inheritance works on both backends: the ladders above are what the
-  # clamp reads to pick a lower-tier candidate, and they are equivalent.
-  #
-  # EFFORT inheritance does NOT reach `openai-chatgpt`. The clamp writes the
-  # inherited effort to `preset.effort_key_for(family)`
-  # (knob_consistency.py:638-644), which resolves to the canonical
-  # `reasoning_effort` for every family -- and that key is exactly the one
-  # this provider does not read. So a chatgpt candidate keeps the effort its
-  # `extra_request_params` block declares, rather than the caller's.
-  #
-  # This is stated rather than worked around because the two available
-  # workarounds are both worse: `effort_unsupported` matches on MODEL globs,
-  # and both backends serve the same model ids, so silencing chatgpt would
-  # silence the API backend too. The real fix is to let `effort_keys` name a
-  # nested path (e.g. `extra_request_params.reasoning.effort`), which is a
-  # change to knob_consistency, not to this file.
-
 roles:
   general:
     description: "Versatile catch-all, no specialization needed"
@@ -225,19 +201,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: high
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: high
-              summary: detailed
 
   fast:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
@@ -246,19 +209,6 @@ roles:
         model: gpt-?.?-luna
         config:
           reasoning_effort: medium
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-luna
-        config:
-          extra_request_params:
-            reasoning:
-              effort: medium
-              summary: detailed
 
   coding:
     description: "Code generation, implementation, debugging"
@@ -267,19 +217,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: high
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: high
-              summary: detailed
 
   ui-coding:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
@@ -288,19 +225,6 @@ roles:
         model: gpt-?.?-luna
         config:
           reasoning_effort: max
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-luna
-        config:
-          extra_request_params:
-            reasoning:
-              effort: max
-              summary: detailed
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
@@ -309,19 +233,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: xhigh
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: xhigh
-              summary: detailed
 
   reasoning:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
@@ -330,19 +241,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: xhigh
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: xhigh
-              summary: detailed
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
@@ -351,19 +249,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: xhigh
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: xhigh
-              summary: detailed
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
@@ -372,19 +257,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: high
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: high
-              summary: detailed
 
   writing:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
@@ -393,19 +265,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: high
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: high
-              summary: detailed
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
@@ -414,19 +273,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: xhigh
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: xhigh
-              summary: detailed
 
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
@@ -435,19 +281,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: medium
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: medium
-              summary: detailed
 
   image-gen:
     description: "Image generation (limited — gpt-image not available via chat API)"
@@ -456,19 +289,6 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: high
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: high
-              summary: detailed
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
@@ -477,16 +297,3 @@ roles:
         model: gpt-?.?-terra
         config:
           reasoning_effort: xhigh
-        # Same models, same glob as the `openai` candidate above -- this is
-        # the ChatGPT-subscription backend rather than the pay-per-use API,
-        # and it is a separate provider MODULE, so it needs its own
-        # candidate: `provider: openai` does not match it. Effort rides
-        # `extra_request_params` because this provider reads no effort key
-        # from mount config (matrix_loader.INERT_CONFIG_RULES).
-      - provider: openai-chatgpt
-        model: gpt-?.?-terra
-        config:
-          extra_request_params:
-            reasoning:
-              effort: xhigh
-              summary: detailed
