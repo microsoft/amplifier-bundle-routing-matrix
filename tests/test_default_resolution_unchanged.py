@@ -49,6 +49,9 @@ GOLDEN_PATH = (
 
 sys.path.insert(0, str(REPO_ROOT / "modules" / "hooks-routing"))
 
+from amplifier_module_hooks_routing.knob_consistency import (  # noqa: E402
+    parse_preset,
+)
 from amplifier_module_hooks_routing.resolver import (  # noqa: E402
     resolve_model_role,
 )
@@ -85,7 +88,11 @@ FAKE_MODELS: dict[str, list[str]] = {
 # (1) Which matrices ship a `preset:` block. A property of the MATRIX.
 #     `openai.yaml` gained one on 2026-09-02 (default ON -- a measured win on
 #     OpenAI roots, see README "Knob-consistent delegation").
-PRESET_BEARING = {"openai-knob-consistent.yaml", "openai.yaml"}
+#     `openai-knob-consistent.yaml` was DELETED on 2026-09-07: once the preset
+#     became `openai.yaml`'s default on 2026-09-02 the two files carried
+#     byte-identical preset blocks and identical roles, i.e. one matrix under
+#     two names.
+PRESET_BEARING = {"openai.yaml"}
 
 # (2) Which matrices are deliberately absent from the pre-feature recording.
 #     A property of the RECORDING. Adding a name here is a deliberate,
@@ -97,7 +104,7 @@ PRESET_BEARING = {"openai-knob-consistent.yaml", "openai.yaml"}
 #     `test_preset_bearing_matrix_is_stock_without_a_caller` for the same
 #     invariant asserted directly. `openai.yaml` therefore stays recorded and
 #     stays checked, preset or no preset.
-EXCLUDED_FROM_RECORDING = {"openai-knob-consistent.yaml"}
+EXCLUDED_FROM_RECORDING = {"openai.yaml"}
 
 # Every matrix present in the recording as it stands. A frozen manifest, so a
 # matrix vanishing from the fixture -- by a bad `--regenerate`, a bad merge, a
@@ -254,19 +261,64 @@ def test_resolution_is_byte_identical_to_pre_feature(matrix_name: str) -> None:
     )
 
 
-def test_preset_bearing_matrix_is_stock_without_a_caller() -> None:
+@pytest.mark.parametrize("matrix_name", sorted(PRESET_BEARING))
+def test_preset_bearing_matrix_is_stock_without_a_caller(matrix_name: str) -> None:
     """A preset changes nothing until a caller context exists.
 
     The `preset:` block is opt-in twice over: a matrix must carry one, AND the
     resolution must be handed a caller triple. Resolved cold -- the way every
-    non-delegation consumer resolves -- the knob-consistent matrix returns the
-    stock openai answers.
+    non-delegation consumer resolves -- a preset-bearing matrix returns exactly
+    what the same matrix returns with its `preset:` block deleted.
+
+    This used to be asserted by comparing `openai.yaml` against its twin
+    `openai-knob-consistent.yaml`. That twin was deleted on 2026-09-07 (it had
+    become the same matrix under a second name), and comparing a file against
+    its own preset-stripped self is the stronger form anyway: it cannot be
+    defeated by the two files drifting apart, and it keeps working for the next
+    matrix that gains a preset.
     """
-    snapshot = asyncio.run(_snapshot())
-    knob = snapshot.get("openai-knob-consistent.yaml")
-    stock = snapshot.get("openai.yaml")
-    assert knob is not None and stock is not None
-    assert knob == stock
+    path = ROUTING_DIR / matrix_name
+    assert path.exists(), f"PRESET_BEARING names a matrix not in routing/: {path}"
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    assert "preset" in data, (
+        f"{matrix_name} is listed in PRESET_BEARING but ships no `preset:` block. "
+        "Either the block was removed (drop the name from PRESET_BEARING in the "
+        "same reviewed commit) or this test is guarding nothing."
+    )
+
+    roles = data.get("roles") or {}
+    assert roles, f"{matrix_name} has no roles to resolve"
+
+    parsed = parse_preset(data)
+    assert parsed is not None, (
+        f"{matrix_name} ships a `preset:` block that parse_preset() rejected. "
+        "A preset the parser drops is inert for the wrong reason -- this test "
+        "would then pass while guarding nothing."
+    )
+
+    async def _resolve_all(preset: Any) -> dict[str, Any]:
+        # caller_context stays None: that is the whole point. The preset is
+        # handed over in full, and must still change nothing.
+        return {
+            role: await resolve_model_role(
+                [role], roles, _fake_providers(), preset=preset, caller_context=None
+            )
+            for role in roles
+        }
+
+    without = asyncio.run(_resolve_all(None))
+    with_preset = asyncio.run(_resolve_all(parsed))
+    assert with_preset == without, (
+        f"{matrix_name}: handing resolve_model_role a parsed `preset:` changed "
+        "cold resolution, with no caller context. The preset is supposed to be "
+        "opt-in twice over."
+    )
+
+    # ...and those cold answers are the ones the recording holds, so this
+    # invariant and the byte-identity check are covering the same resolution.
+    recorded = _load_golden()[matrix_name]
+    for role, resolved in without.items():
+        assert recorded[role] == resolved
 
 
 def test_regeneration_refuses_to_drop_a_recorded_matrix() -> None:

@@ -11,21 +11,27 @@
     ],
     "coding": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-sonnet-5",
         "provider": "anthropic"
       }
     ],
     "creative": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-opus-5",
         "provider": "anthropic"
       }
     ],
     "critical-ops": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-opus-5",
         "provider": "anthropic"
       }
@@ -41,21 +47,27 @@
     ],
     "fast": [
       {
-        "config": {},
+        "config": {
+          "thinking_budget_tokens": 32000
+        },
         "model": "claude-haiku-4-5",
         "provider": "anthropic"
       }
     ],
     "general": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-sonnet-5",
         "provider": "anthropic"
       }
     ],
     "image-gen": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-opus-5",
         "provider": "anthropic"
       }
@@ -89,21 +101,27 @@
     ],
     "ui-coding": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-sonnet-5",
         "provider": "anthropic"
       }
     ],
     "vision": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-sonnet-5",
         "provider": "anthropic"
       }
     ],
     "writing": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-opus-5",
         "provider": "anthropic"
       }
@@ -113,31 +131,37 @@
     "__fallback__reasoning_then_general": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "coding": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "high"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "creative": [
       {
-        "config": {},
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "high"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "critical-ops": [
       {
-        "config": {},
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "xhigh"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "critique": [
@@ -145,77 +169,91 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "fast": [
       {
-        "config": {},
-        "model": "claude-haiku-4-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-luna",
+        "provider": "openai"
       }
     ],
     "general": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "image-gen": [
       {
         "config": {},
-        "model": "nano-banana-pro-preview",
+        "model": "gemini-3-pro-image",
         "provider": "gemini"
       }
     ],
     "reasoning": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "research": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "security-audit": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "ui-coding": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "max"
+        },
+        "model": "gpt-5.6-luna",
+        "provider": "openai"
       }
     ],
     "vision": [
       {
-        "config": {},
-        "model": "gemini-3-flash-preview",
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "low"
+            }
+          }
+        },
+        "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "writing": [
       {
-        "config": {},
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "high"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ]
   },
@@ -225,28 +263,34 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "claude-opus-4.8",
+        "model": "claude-opus-4.6",
         "provider": "github-copilot"
       }
     ],
     "coding": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-sonnet-4.6",
         "provider": "github-copilot"
       }
     ],
     "creative": [
       {
-        "config": {},
-        "model": "claude-opus-4.8",
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "claude-opus-4.6",
         "provider": "github-copilot"
       }
     ],
     "critical-ops": [
       {
-        "config": {},
-        "model": "claude-opus-4.8",
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "claude-opus-4.6",
         "provider": "github-copilot"
       }
     ],
@@ -261,21 +305,27 @@
     ],
     "fast": [
       {
-        "config": {},
+        "config": {
+          "thinking_budget_tokens": 32000
+        },
         "model": "claude-haiku-4.5",
         "provider": "github-copilot"
       }
     ],
     "general": [
       {
-        "config": {},
+        "config": {
+          "thinking_budget_tokens": 32000
+        },
         "model": "claude-haiku-4.5",
         "provider": "github-copilot"
       }
     ],
     "image-gen": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-sonnet-4.6",
         "provider": "github-copilot"
       }
@@ -285,14 +335,16 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "claude-opus-4.8",
+        "model": "claude-opus-4.6",
         "provider": "github-copilot"
       }
     ],
     "research": [
       {
-        "config": {},
-        "model": "claude-opus-4.8",
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "claude-opus-4.6",
         "provider": "github-copilot"
       }
     ],
@@ -307,22 +359,28 @@
     ],
     "ui-coding": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-sonnet-4.6",
         "provider": "github-copilot"
       }
     ],
     "vision": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "claude-sonnet-4.6",
         "provider": "github-copilot"
       }
     ],
     "writing": [
       {
-        "config": {},
-        "model": "claude-opus-4.8",
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "claude-opus-4.6",
         "provider": "github-copilot"
       }
     ]
@@ -330,30 +388,38 @@
   "economy.yaml": {
     "__fallback__reasoning_then_general": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "coding": [
       {
-        "config": {},
-        "model": "claude-haiku-4-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-luna",
+        "provider": "openai"
       }
     ],
     "creative": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "critical-ops": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "critique": [
@@ -361,43 +427,51 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "fast": [
       {
-        "config": {},
-        "model": "claude-haiku-4-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-luna",
+        "provider": "openai"
       }
     ],
     "general": [
       {
-        "config": {},
-        "model": "claude-haiku-4-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-luna",
+        "provider": "openai"
       }
     ],
     "image-gen": [
       {
         "config": {},
-        "model": "nano-banana-pro-preview",
+        "model": "gemini-3-pro-image",
         "provider": "gemini"
       }
     ],
     "reasoning": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "research": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "security-audit": [
@@ -405,78 +479,114 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "ui-coding": [
       {
-        "config": {},
-        "model": "claude-haiku-4-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "max"
+        },
+        "model": "gpt-5.6-luna",
+        "provider": "openai"
       }
     ],
     "vision": [
       {
-        "config": {},
-        "model": "gemini-3-flash-preview",
-        "provider": "gemini"
+        "config": {
+          "thinking_budget_tokens": 32000
+        },
+        "model": "claude-haiku-4.5",
+        "provider": "github-copilot"
       }
     ],
     "writing": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ]
   },
   "gemini.yaml": {
     "__fallback__reasoning_then_general": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "high"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "coding": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "medium"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "creative": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "medium"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "critical-ops": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "high"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "critique": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "high"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
-    "fast": [
-      {
-        "config": {},
-        "model": "gemini-3-flash-preview",
-        "provider": "gemini"
-      }
-    ],
+    "fast": [],
     "general": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "medium"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
@@ -484,59 +594,85 @@
     "image-gen": [
       {
         "config": {},
-        "model": "nano-banana-pro-preview",
+        "model": "gemini-3-pro-image",
         "provider": "gemini"
       }
     ],
     "reasoning": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "high"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "research": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "high"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "security-audit": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "high"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "ui-coding": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "medium"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
-    "vision": [
-      {
-        "config": {},
-        "model": "gemini-3-flash-preview",
-        "provider": "gemini"
-      }
-    ],
+    "vision": [],
     "writing": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "medium"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ]
   },
   "ollama.yaml": {
-    "__fallback__reasoning_then_general": [],
-    "coding": [],
-    "creative": [],
-    "critical-ops": [],
-    "critique": [],
+    "__fallback__reasoning_then_general": [
+      {
+        "config": {},
+        "model": "qwen3.6-35b",
+        "provider": "ollama"
+      }
+    ],
     "fast": [
       {
         "config": {},
@@ -544,13 +680,13 @@
         "provider": "ollama"
       }
     ],
-    "general": [],
-    "reasoning": [],
-    "research": [],
-    "security-audit": [],
-    "ui-coding": [],
-    "vision": [],
-    "writing": []
+    "general": [
+      {
+        "config": {},
+        "model": "qwen3.6-35b",
+        "provider": "ollama"
+      }
+    ]
   },
   "openai.yaml": {
     "__fallback__reasoning_then_general": [
@@ -558,7 +694,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-sol",
+        "model": "gpt-5.6-terra",
         "provider": "openai"
       }
     ],
@@ -573,17 +709,19 @@
     ],
     "creative": [
       {
-        "config": {},
-        "model": "gpt-5.6-sol",
+        "config": {
+          "reasoning_effort": "high"
+        },
+        "model": "gpt-5.6-terra",
         "provider": "openai"
       }
     ],
     "critical-ops": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-sol",
+        "model": "gpt-5.6-terra",
         "provider": "openai"
       }
     ],
@@ -598,7 +736,9 @@
     ],
     "fast": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "gpt-5.6-luna",
         "provider": "openai"
       }
@@ -614,8 +754,10 @@
     ],
     "image-gen": [
       {
-        "config": {},
-        "model": "gpt-5.6-sol",
+        "config": {
+          "reasoning_effort": "high"
+        },
+        "model": "gpt-5.6-terra",
         "provider": "openai"
       }
     ],
@@ -624,16 +766,16 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-sol",
+        "model": "gpt-5.6-terra",
         "provider": "openai"
       }
     ],
     "research": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-sol",
+        "model": "gpt-5.6-terra",
         "provider": "openai"
       }
     ],
@@ -649,23 +791,27 @@
     "ui-coding": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "max"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-5.6-luna",
         "provider": "openai"
       }
     ],
     "vision": [
       {
-        "config": {},
+        "config": {
+          "reasoning_effort": "medium"
+        },
         "model": "gpt-5.6-terra",
         "provider": "openai"
       }
     ],
     "writing": [
       {
-        "config": {},
-        "model": "gpt-5.6-sol",
+        "config": {
+          "reasoning_effort": "high"
+        },
+        "model": "gpt-5.6-terra",
         "provider": "openai"
       }
     ]
@@ -674,31 +820,37 @@
     "__fallback__reasoning_then_general": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "coding": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "high"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "creative": [
       {
-        "config": {},
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "critical-ops": [
       {
-        "config": {},
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "high"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "critique": [
@@ -706,77 +858,91 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "fast": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "general": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "low"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "image-gen": [
       {
         "config": {},
-        "model": "nano-banana-pro-preview",
+        "model": "gemini-3-pro-image",
         "provider": "gemini"
       }
     ],
     "reasoning": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "research": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "security-audit": [
       {
         "config": {
-          "reasoning_effort": "high"
+          "reasoning_effort": "xhigh"
         },
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ],
     "ui-coding": [
       {
-        "config": {},
-        "model": "claude-sonnet-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "max"
+        },
+        "model": "gpt-5.6-luna",
+        "provider": "openai"
       }
     ],
     "vision": [
       {
-        "config": {},
+        "config": {
+          "extra_request_params": {
+            "thinking_config": {
+              "thinking_level": "low"
+            }
+          }
+        },
         "model": "gemini-3-pro-preview",
         "provider": "gemini"
       }
     ],
     "writing": [
       {
-        "config": {},
-        "model": "claude-opus-5",
-        "provider": "anthropic"
+        "config": {
+          "reasoning_effort": "medium"
+        },
+        "model": "gpt-5.6-terra",
+        "provider": "openai"
       }
     ]
   }

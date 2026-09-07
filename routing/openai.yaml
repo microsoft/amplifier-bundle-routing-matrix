@@ -3,68 +3,119 @@
 # OpenAI-only routing. All roles use OpenAI models exclusively.
 # Use when you want to run entirely on your OpenAI API account.
 #
-# Glob strategy: tier suffixes (`gpt-?.?-sol*` flagship, `gpt-?.?-terra*` mid,
-# `gpt-?.?-luna*` cheap, `gpt-?.?-mini*`, `gpt-?.?-nano*`) auto-track minor
-# version bumps without matching the wrong tier. The mid tier uses
-# `gpt-?.?-terra*`, falling back to the base glob `gpt-[0-9].[0-9]` which matches
-# any single-digit major.minor base model (e.g. gpt-5.5) without matching suffix
-# variants (-sol, -terra, -luna, -mini, -pro, -nano) or dated snapshots.
-# IMPORTANT: since the 5.6 rename, the bare `gpt-5.6` alias points at the
-# flagship (sol) tier, so the base glob is a migration fallback for pre-5.6
-# accounts (where the un-suffixed model WAS the mid tier) -- not the primary
-# mid-tier candidate. Mid-tier roles (general, coding, ui-coding,
-# security-audit, critique, vision) try `gpt-?.?-terra*` first, then the base
-# glob. Flagship roles (reasoning, creative, writing, research, critical-ops)
-# try `gpt-?.?-sol*` first, then fall back to the base glob; the cheap `fast`
-# role tries `gpt-?.?-luna*` then `gpt-?.?-mini*`. The resolver's version-aware
-# sort picks the highest available version automatically; an unmatched glob
-# falls through to the next candidate, so accounts mid-migration degrade
-# gracefully.
+# TIER STATUS (2026-09-07): the flagship `gpt-?.?-sol*` tier is PAUSED pending
+# further evals. No role selects sol. Roles that previously did now use
+# `gpt-?.?-terra*` one effort notch higher, clamped at xhigh.
 #
-# reasoning_effort pin on the workhorse roles (2026-09-01): general, coding,
-# and ui-coding now pin `reasoning_effort: high` on their terra candidates.
-# Evidence: a DTU rebaseline wave (S1 diagnostic + S3 5-turn multi-turn
-# build, n=2 each) found gpt-5.6-terra @ high scored 2/2 on both scenarios,
-# while gpt-5.6-sol @ xhigh could not complete a single run inside a 30-minute
-# cap on either scenario, at ~3-7x the cost. A prior dial-in wave
-# (2026-08-30) corroborated terra-high across S1/S3/S4. Both candidates
-# (terra glob and the base-glob migration fallback) carry the same pin so
-# pre-5.6 accounts inherit the same effort. n=2 per cell; sol's S1
-# non-completions are cap-bounded, not graded-wrong -- see PR description
-# for the full write-up. security-audit and critique were left untouched:
-# they already pin terra @ xhigh (a separate, pre-existing design, not sol),
-# outside this evidence's scope. reasoning and critical-ops were left
-# untouched: they already pin sol (xhigh and high respectively) and the
-# deep-diagnosis (S4) evidence still favors sol at high+ effort over sol at
-# medium. creative/writing/research/vision/image-gen are untouched -- terra
-# is untested on those task shapes.
+# `luna` is used for exactly two roles: `fast` (cheap utility work) and
+# `ui-coding`, the latter at `max` effort -- cheapest tier, maximum thinking.
 #
-# Knob-consistent delegation, DEFAULT ON (2026-09-02): a session pins
-# model/effort for the ROOT only -- sub-agents are routed by this matrix, so
-# the caller's dial used to govern only the root's own work. MEASURED (lane
-# l1-knob-consistent-routing, DONE.json + ai-notes/w2-s3-three-knob-presets/
-# ROUTING-PROPOSAL.md; S3 n=3/arm on OpenAI roots): `gpt-5.6-sol` call share
-# 27.8% -> 0.0%, cost -29.7% (S3 median) / -55.9% (S1), wall -16.2%, quality
-# flat. This is a PROVEN WIN, not an experiment -- see the `preset:` block
-# below (identical to the one `openai-knob-consistent.yaml` shipped as an
-# opt-in arm) and README "Knob-consistent delegation" for the full writeup.
-# Scope: OpenAI-family roots only. Every other shipped matrix (anthropic,
-# balanced, quality, economy, gemini, copilot, ollama) is UNTOUCHED and
-# resolves byte-identically to before -- there is no equivalent evidence yet
-# for other provider families (the "Anthropic guardrail": no measured win,
-# so no default change there). Opt out with `disable_delegation_preset:
-# true` in this hook's mount config to restore legacy (pre-2026-09-02)
-# behaviour on this matrix.
+# TWO GLOBS, NO FALLBACKS. Every candidate in this file is either
+# `gpt-?.?-terra*` or `gpt-?.?-luna*`. The `gpt-[0-9].[0-9]` base-alias twin
+# (a pre-5.6 migration fallback) and the `gpt-?.?-mini*` rung are both gone --
+# gpt-5.6 terra and luna are live on the openai list_models(), so neither
+# fallback bought anything.
+#
+# CONSEQUENCE, STATED PLAINLY: EVERY role here now has exactly ONE candidate,
+# and provider-openai has no static model-list fallback (`list_models()`
+# docstring: "no fallback; caller handles empty lists"). If that call fails,
+# the glob resolves to nothing and the role yields no preference at all -- the
+# agent falls back to the session's default provider rather than erroring. If
+# that degradation is not acceptable, add a pinned exact name (e.g.
+# `gpt-5.6-terra`) as a second candidate: an exact name never calls
+# list_models(), which is the same glob+pin shape copilot.yaml uses.
+#
+# NOTE: `gpt-?.?-sol*` is deliberately RETAINED on the preset tier ladder
+# below even though nothing routes to it. The ladder describes the provider
+# family for knob-consistent tier comparison; removing the rung would
+# misclassify a sol model that a user pins by hand. With the base alias gone
+# from the roles, nothing resolves onto the sol rung any more, so a terra-tier
+# caller can no longer be clamped by a fallback sitting a rung above it.
+#
+# Knob-consistent delegation is ON by default for this matrix (measured win on
+# OpenAI roots: `gpt-5.6-sol` call share 27.8% -> 0.0%, cost -29.7% (S3 median)
+# / -55.9% (S1), wall -16.2%, quality flat). Scope: OpenAI-family roots only --
+# every other shipped matrix is untouched by the preset. Opt out with
+# `disable_delegation_preset: true` in this hook's mount config to restore
+# legacy (pre-2026-09-02) behaviour.
+#
+# NOTE (2026-09-07): `openai-knob-consistent.yaml` has been DELETED. It shipped
+# as an opt-in arm carrying a byte-identical preset block; once the preset
+# became this matrix's default on 2026-09-02 the two files were functionally
+# the same file under two names. Select `openai` instead.
+#
+# --- Review log ---
+# 2026-09-07: Curator refresh, verified against LIVE provider list_models()
+#   output on 2026-09-07 (anthropic, openai, gemini, github-copilot).
+#   1. OpenAI flagship (`gpt-?.?-sol*`) PAUSED pending further evals -- every
+#      sol candidate moved down one tier to `gpt-?.?-terra*` and up one effort
+#      notch, CLAMPED at xhigh (no `max`): bare -> high, low -> medium,
+#      medium -> high, high -> xhigh, xhigh -> xhigh. (`ui-coding` is the one
+#      exception -- see item 8.) See also item 6: the `gpt-[0-9].[0-9]`
+#      migration-fallback twin is gone entirely.
+#   2. Gemini globs re-anchored `gemini-[3-9]*-...`. The old
+#      `gemini-*-flash-preview` resolved to `gemini-omni-flash-preview` (the
+#      Omni lane, not the Flash lane) AND missed gemini-3.5/3.6/3.7/3.8-flash
+#      entirely, because Google dropped the `-preview` suffix. Verified with
+#      the shipped `_version_sort_key`.
+#   3. Gemini thinking is now requested through the knob the provider actually
+#      reads -- `extra_request_params.thinking_config.thinking_level`. A
+#      `reasoning_effort` on a gemini candidate is INERT at every value (see
+#      matrix_loader.INERT_CONFIG_RULES) and is rejected by the loader.
+#      Gemini's ceiling is `high`; there is no xhigh/max. `minimal` is NOT
+#      used -- gemini-3.8-flash errors on it.
+#   4. Image generation retargeted `nano-banana-pro-preview` ->
+#      `gemini-3-pro-image`. The old name is absent from list_models() and
+#      from every first-party Google source; `gemini-3-pro-image` is the GA
+#      flagship image model ("Nano Banana Pro"). No thinking_level: Gemini 3
+#      image models think by default and expose no level knob.
+#   5. GitHub Copilot pins refreshed to the newest models the live API lists
+#      (claude-sonnet-5, claude-opus-5, gpt-5.5). This also fixes an invalid
+#      effort: claude-sonnet-4.6 and claude-opus-4.6 accept only
+#      low/medium/high/max -- an `xhigh` on either was silently wrong. The
+#      repo test passes a provider-wide superset, so it did not catch this.
+#   6. The `gpt-[0-9].[0-9]` twin was DROPPED from every openai candidate.
+#      It existed as a pre-5.6 migration fallback; `gpt-5.6-terra` and
+#      `gpt-5.6-luna` are both confirmed present on the live openai
+#      list_models(), so a fallback to gpt-5.5-or-earlier buys nothing. The
+#      Copilot GPT slots moved the same generation for the same reason
+#      (`gpt-?.?-terra*` + `gpt-5.6-terra`, both live on the Copilot API).
+#   7. NO CANDIDATE IS LEFT WITH A BLANK EFFORT. An unset knob is not a
+#      neutral default to reason about, so every candidate that can carry one
+#      now says what it wants; `medium` where nothing more specific was
+#      established. Three exceptions, all enforced by the loader rather than
+#      chosen here (matrix_loader.INERT_CONFIG_RULES):
+#        * claude-haiku-* on ANY provider -- `reasoning_effort` is REJECTED at
+#          every value (measured: effort absent on the wire, budget pinned at
+#          32000). Its documented replacement is `thinking_budget_tokens`.
+#        * gemini/* -- `reasoning_effort` is REJECTED; `thinking_level` is the
+#          live knob and is set on every gemini candidate except flash-lite,
+#          where Google documents no levels for the text models.
+#        * ollama `model: "*"` -- no effort knob exists.
+#   8. `ui-coding` is `gpt-?.?-luna*` at `max` effort on EVERY matrix that
+#      routes to openai -- cheap tier, maximum thinking.
+#   9. OpenAI is now TERRA-OR-LUNA ONLY. The `gpt-?.?-mini*` and
+#      `gpt-?.?-nano*` rungs were removed alongside the `gpt-[0-9].[0-9]`
+#      twin (item 6): with sol paused, every openai candidate in every matrix
+#      is one of exactly two globs -- `gpt-?.?-terra*` (work) or
+#      `gpt-?.?-luna*` (cheap/fast, and `ui-coding` at max effort). There are
+#      no openai fallback rungs left at all.
+#  10. Haiku carries `thinking_budget_tokens: 32000` instead of a blank. The
+#      loader REJECTS `reasoning_effort` on any model whose name contains
+#      'haiku', under any provider -- it collapses every level above 'low'
+#      into one identical request. 32000 is what `medium` resolves to and what
+#      a blank already produced on the wire, so this is explicit, not a
+#      behaviour change. REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort
+#      support, swap back to `reasoning_effort` -- and note the guard rule
+#      itself must be updated in the same change, since it matches the
+#      substring 'haiku' and would otherwise keep rejecting claude-haiku-5.
 
 name: openai
-description: "OpenAI-only routing. All roles use OpenAI models exclusively. Knob-consistent delegation is ON by default (measured win) -- sub-agents inherit the caller's tier/effort ceiling; see preset: below."
-updated: "2026-09-02"
+description: "OpenAI-only routing. All roles use OpenAI models exclusively. Flagship (sol) tier paused pending evals; knob-consistent delegation ON by default -- sub-agents inherit the caller's tier/effort ceiling."
+updated: "2026-09-07"
 
 # ---------------------------------------------------------------------------
-# Knob-consistent delegation preset -- DEFAULT ON for this matrix (measured
-# win on OpenAI roots, see header above). Byte-identical to the preset block
-# `openai-knob-consistent.yaml` ships (that file remains as an explicit-name
-# pin for anyone who wants to select it by name; both now behave the same).
+# Knob-consistent delegation preset -- DEFAULT ON for this matrix.
 # ---------------------------------------------------------------------------
 preset:
   # Documentation only; never read by code.
@@ -76,7 +127,7 @@ preset:
   # mid, sol flagship). A rung may be one glob or a list of globs.
   #
   # `gpt-[0-9].[0-9]` sits on the SOL rung on purpose: since the 5.6 rename the
-  # bare alias points at the flagship tier (see header above).
+  # bare alias points at the flagship tier.
   tier_ladder:
     openai:
       - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
@@ -92,7 +143,6 @@ preset:
     inherit: strict
     report_unhonored: true
 
-
 roles:
   general:
     description: "Versatile catch-all, no specialization needed"
@@ -101,18 +151,14 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: high
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: high
 
   fast:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: openai
         model: gpt-?.?-luna*
-      - provider: openai
-        model: gpt-?.?-mini*
+        config:
+          reasoning_effort: medium
 
   coding:
     description: "Code generation, implementation, debugging"
@@ -121,22 +167,14 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: high
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: high
 
   ui-coding:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra*
+        model: gpt-?.?-luna*
         config:
-          reasoning_effort: high
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: high
+          reasoning_effort: max
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
@@ -145,20 +183,12 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: xhigh
 
   reasoning:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: openai
-        model: gpt-?.?-sol*
-        config:
-          reasoning_effort: xhigh
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+        model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
 
@@ -169,66 +199,51 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: xhigh
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
       - provider: openai
-        model: gpt-?.?-sol*
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
 
   writing:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: openai
-        model: gpt-?.?-sol*
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: openai
-        model: gpt-?.?-sol*
+        model: gpt-?.?-terra*
         config:
-          reasoning_effort: high
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: high
+          reasoning_effort: xhigh
 
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
       - provider: openai
         model: gpt-?.?-terra*
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: medium
 
   image-gen:
-    # OpenAI image generation (gpt-image-*) is not yet available through the
-    # chat-completions interface used by this provider. Falls back to the best
-    # creative model for image planning, prompt crafting, and SVG generation.
     description: "Image generation (limited — gpt-image not available via chat API)"
     candidates:
       - provider: openai
-        model: gpt-?.?-sol*
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
       - provider: openai
-        model: gpt-?.?-sol*
+        model: gpt-?.?-terra*
         config:
-          reasoning_effort: high
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: high
+          reasoning_effort: xhigh

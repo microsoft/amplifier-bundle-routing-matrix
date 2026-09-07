@@ -4,7 +4,7 @@
 # Use when you want to run entirely on your Anthropic API account.
 #
 # Uses class-scoped globs (claude-opus-*, claude-sonnet-*, claude-haiku-*) so
-# new Claude releases are picked up automatically — the resolver's version-aware
+# new Claude releases are picked up automatically -- the resolver's version-aware
 # sort with date-suffix stripping selects the highest clean version.
 #
 # Required roles: "general" and "fast" must be defined in every matrix.
@@ -25,10 +25,13 @@
 #   review happened and concluded "no edit needed," per
 #   docs/MATRIX_CURATOR_GUIDE.md's refresh process (trigger: major model
 #   release).
+# 2026-09-07: Re-verified against the live Anthropic list_models(). Globs
+#   resolve claude-sonnet-* -> claude-sonnet-5, claude-opus-* -> claude-opus-5,
+#   claude-haiku-* -> claude-haiku-4-5-20251001. No edit needed.
 
 name: anthropic
 description: "Anthropic-only routing. All roles use Claude models exclusively."
-updated: "2026-08-31"
+updated: "2026-09-07"
 
 roles:
   general:
@@ -36,24 +39,41 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+        config:
+          reasoning_effort: medium
 
   fast:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: anthropic
         model: claude-haiku-*
+        # Haiku collapses every effort level above 'low' into ONE request, so
+        # `reasoning_effort` is rejected outright by the loader
+        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
+        # reads, and is exactly what both `medium` and a blank already
+        # produced on the wire -- explicit, not a behaviour change.
+        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
+        # this back to `reasoning_effort`. The guard is keyed on the model
+        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
+        # being rejected until that rule is updated too.
+        config:
+          thinking_budget_tokens: 32000
 
   coding:
     description: "Code generation, implementation, debugging"
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+        config:
+          reasoning_effort: medium
 
   ui-coding:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+        config:
+          reasoning_effort: medium
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
@@ -84,12 +104,16 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-opus-*
+        config:
+          reasoning_effort: medium
 
   writing:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: anthropic
         model: claude-opus-*
+        config:
+          reasoning_effort: medium
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
@@ -104,17 +128,21 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-sonnet-*
+        config:
+          reasoning_effort: medium
 
   image-gen:
-    # Anthropic has no native image generation API. Falls back to the best
-    # creative model for image planning, prompt crafting, and SVG/ASCII art.
     description: "Image generation (limited — no native Anthropic image API)"
     candidates:
       - provider: anthropic
         model: claude-opus-*
+        config:
+          reasoning_effort: medium
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
       - provider: anthropic
         model: claude-opus-*
+        config:
+          reasoning_effort: medium

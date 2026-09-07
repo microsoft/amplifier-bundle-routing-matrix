@@ -259,8 +259,14 @@ Only include `config` when a candidate genuinely needs different parameters from
 > ```
 >
 > Caution: gemini-2.x models reject `thinking_level` with a 400 and accept
-> only the legacy `thinking_budget`, so a class glob like
-> `gemini-*-pro-preview` that can resolve to a 2.x id must be pinned first.
+> only the legacy `thinking_budget`, so a class glob that can resolve to a 2.x
+> id must be pinned first. The shipped matrices solve this with a DIGIT-ANCHORED
+> glob instead of a pin -- `gemini-[3-9]*-pro-preview`, `gemini-[3-9]*-flash` --
+> which stays adaptive while structurally excluding every 2.x id.
+>
+> Ceiling: Gemini has **no `xhigh` and no `max`**. The levels are
+> `minimal | low | medium | high`, and `minimal` is not universal --
+> gemini-3.8-flash errors on it. The shipped matrices use only low/medium/high.
 >
 > **Haiku.** Measured on the wire (20260901-threeknob capture root): across
 > 1,438 `claude-haiku-4-5` requests the effort parameter was absent and
@@ -457,15 +463,31 @@ class boundaries (Opus and Haiku both match `claude-*`) and will silently
 swap a premium role to a budget model when the provider reorders its list.
 Avoid them outside of `model: "*"` for user-managed providers like Ollama.
 
+**Anchor the generation digit on Gemini.** A `gemini-*-...` glob also matches
+the `gemini-omni-*` lane, and because `omni` has no leading digit run the
+version-aware sort ranks it ABOVE the numbered models. Measured 2026-09-07:
+`gemini-*-flash-preview` resolved to `gemini-omni-flash-preview`, not
+`gemini-3-flash-preview` — and separately missed gemini-3.5/3.6/3.7/3.8-flash
+entirely, because Google dropped the `-preview` suffix from the Flash lane.
+`gemini-[3-9]*-flash` fixes both and additionally excludes the 2.x ids that
+reject `thinking_level`.
+
 | Pattern | What it matches | What it excludes |
 |---------|----------------|-----------------|
 | `claude-opus-*` | all Opus versions | Sonnet, Haiku |
 | `claude-sonnet-*` | all Sonnet versions | Opus, Haiku |
 | `claude-haiku-*` | all Haiku versions | Opus, Sonnet |
-| `gemini-*-pro-preview` | Pro-tier previews, any generation | Flash, Flash-Lite, Image, `*-customtools` |
-| `gemini-*-flash-preview` | Flash-tier previews | Flash-Lite, Image, TTS |
-| `gemini-*-flash-lite-preview` | Flash-Lite-tier previews | Flash, TTS |
+| `gemini-[3-9]*-pro-preview` | Pro-tier previews, generation 3+ | Flash, Flash-Lite, Image, `*-customtools`, 2.x, `gemini-omni-*` |
+| `gemini-[3-9]*-flash` | Flash-tier, generation 3+ | Flash-Lite, Image, TTS, 2.x, `gemini-omni-*` |
+| `gemini-[3-9]*-flash-lite` | Flash-Lite-tier, generation 3+ | Flash, TTS, 2.x, `gemini-omni-*` |
 | `gpt-[0-9].[0-9]` | any single-digit major.minor base (e.g. `gpt-5.5`, `gpt-6.0`) | all suffix variants (-sol, -terra, -luna, -mini, -pro, -nano), dated snapshots |
+
+> `gpt-[0-9].[0-9]` is **no longer used by any shipped matrix** (removed
+> 2026-09-07). It existed as a pre-5.6 migration fallback paired under each
+> tier glob; with `gpt-5.6-terra` / `gpt-5.6-luna` live on both the openai and
+> github-copilot providers, falling back to gpt-5.5 bought nothing. The pattern
+> is documented here because it remains correct for a user override that wants
+> the base alias explicitly.
 | `gpt-?.?-sol*` | any dotted-version sol / flagship tier (e.g. `gpt-5.6-sol`) | base, terra, mini, nano, luna, pro |
 | `gpt-?.?-terra*` | any dotted-version terra / mid tier (e.g. `gpt-5.6-terra`) | base, sol, mini, nano, luna, pro |
 | `gpt-?.?-luna*` | any dotted-version luna / cheap-fast tier (e.g. `gpt-5.6-luna`) | base, terra, mini, nano, sol, pro |
@@ -476,13 +498,32 @@ Avoid them outside of `model: "*"` for user-managed providers like Ollama.
 
 1. The provider has no static fallback for `list_models()`. `github-copilot`
    raises `ProviderUnavailableError` if both the SDK and the disk cache are
-   unavailable, so glob resolution fails catastrophically when offline. Keep
-   all `github-copilot` candidates pinned until the provider gains a fallback.
-2. A specialized model does not follow its family's naming pattern and would
-   be filtered out of `list_models()`. Example: `nano-banana-pro-preview` is
-   excluded from gemini's listing (the provider filters to IDs containing
-   "gemini"). Using it as an **exact name** bypasses `list_models()` entirely
-   and passes the string directly to the API.
+   unavailable (still true at provider v2.7.0, `models.py:215`).
+
+   **Preferred shape (since 2026-09-07): a glob + pin PAIR, not a lone pin.**
+   `_resolve_glob` does not propagate that failure — it catches, logs, and
+   returns `None` (`resolver.py:532`), so resolution falls through to the next
+   candidate. Put the class glob first and the newest known pin immediately
+   after: the glob auto-tracks new Copilot releases when the API is reachable,
+   and the pin still resolves when it is not, because an exact name never calls
+   `list_models()` at all. The pin duplicating what the glob resolves to today
+   is the point, not redundancy — it is the offline path. See
+   [`routing/copilot.yaml`](../routing/copilot.yaml).
+
+   ⚠️ Do NOT use `gpt-?.?-sol*` on Copilot: it resolves to `gpt-5.6-sol-fast`,
+   which the API labels *"Internal only"* (two ids tie at 5.6, longer name
+   wins). Use `gpt-[0-9].[0-9]`, or pin the tier explicitly.
+2. A specialized model does not follow its family's naming pattern, so no
+   class glob expresses it. Example: `gemini-3-pro-image` ("Nano Banana Pro"),
+   the flagship image model — it shares no suffix with the text lanes.
+
+   ⚠️ The name to use is `gemini-3-pro-image`, NOT `nano-banana-pro-preview`.
+   The latter shipped in these matrices until 2026-09-07 and appears in no
+   first-party Google source and in no `list_models()` response; it survived
+   only because an exact name bypasses the listing filter and is passed
+   straight to the API. Avoid `*-preview` image ids generally —
+   `gemini-3-pro-image-preview` and `gemini-3.1-flash-image-preview` are both
+   past their announced shutdown date.
 3. The `*-latest` aliases. Exact names like `gemini-pro-latest` are safer than
    globs because they reach the API even when the listing endpoint is
    unreachable.
@@ -500,13 +541,13 @@ Different providers use different naming conventions for the **same underlying m
 | Claude Opus 4.x | `claude-opus-*` (glob) | — | — | `claude-opus-4.8` (pin) |
 | Claude Haiku 4.x | `claude-haiku-*` (glob) | — | — | `claude-haiku-4.5` (pin) |
 | GPT mid-tier (terra) | — | `gpt-?.?-terra*` (glob) | — | pinned, e.g. `gpt-5.6-terra` |
-| GPT base / pre-5.6 migration fallback | — | `gpt-[0-9].[0-9]` (glob) | — | pinned, e.g. `gpt-5.5` |
+| GPT base / pre-5.6 migration fallback | — | `gpt-[0-9].[0-9]` (glob) | — | — |
 | GPT flagship (sol) | — | `gpt-?.?-sol*` (glob) | — | pinned, e.g. `gpt-5.6-sol` |
 | GPT cheap-fast (luna) | — | `gpt-?.?-luna*` (glob) | — | pinned, e.g. `gpt-5.6-luna` |
 | GPT-5.x mini | — | `gpt-?.?-mini*` (glob) | — | pinned, e.g. `gpt-5.4-mini` |
-| Gemini Pro | — | — | `gemini-*-pro-preview` (glob) | — |
-| Gemini Flash | — | — | `gemini-*-flash-preview` (glob) | — |
-| Gemini Image | — | — | `nano-banana-pro-preview` (exact) | — |
+| Gemini Pro | — | — | `gemini-[3-9]*-pro-preview` (glob) | — |
+| Gemini Flash | — | — | `gemini-[3-9]*-flash` (glob) | — |
+| Gemini Image | — | — | `gemini-3-pro-image` (exact) | — |
 
 > **CRITICAL — naming formats:** Anthropic uses **hyphens** (`claude-sonnet-4-6`)
 > while GitHub Copilot uses **dots** (`claude-sonnet-4.6`). Mixing these up causes

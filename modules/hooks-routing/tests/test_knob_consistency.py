@@ -290,18 +290,10 @@ class TestValidatePreset:
         )
         assert any("not on the declared invalidator allow-list" in e for e in errors)
 
-    def test_shipped_knob_consistent_matrix_validates(self) -> None:
-        """The explicit-name pin matrix must pass validation."""
-        import yaml
-        from pathlib import Path
-
-        path = (
-            Path(__file__).resolve().parents[3]
-            / "routing"
-            / "openai-knob-consistent.yaml"
-        )
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-        assert validate_preset(data) == []
+    # `test_shipped_knob_consistent_matrix_validates` validated
+    # `openai-knob-consistent.yaml`. That file was deleted on 2026-09-07 (it
+    # had become `openai.yaml` under a second name), and the test below already
+    # validates the identical preset block on `openai.yaml` itself.
 
     def test_shipped_openai_matrix_preset_validates(self) -> None:
         """`openai.yaml` itself ships the same preset by default (2026-09-02)
