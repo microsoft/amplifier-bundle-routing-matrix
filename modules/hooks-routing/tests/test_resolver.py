@@ -1549,3 +1549,57 @@ class TestProviderFamilyAliases:
         )
         result = find_provider_by_type(providers, "openai", coordinator)
         assert result == ("terra", terra)
+
+    def test_canonical_by_module_type_beats_alias_by_key(self) -> None:
+        """THE production shape that shipped wrong on 2026-09-07.
+
+        Six provider-openai instances keyed by INSTANCE ID (sol, terra, luna,
+        ...) -- so nothing is keyed "openai" -- plus one provider-openai-chatgpt
+        instance keyed by its BARE TYPE. The old per-step ordering matched
+        `openai-chatgpt` by key before it ever tried `openai` by module type,
+        and the explorer ran on the ChatGPT subscription while the API key sat
+        unused at priority 2. Canonical must be exhausted through BOTH
+        avenues before any alias is considered.
+        """
+        instances = {
+            "sol": MagicMock(),
+            "terra": MagicMock(),
+            "luna": MagicMock(),
+            "openai-chatgpt": MagicMock(),  # keyed by bare type -- the trap
+        }
+        coordinator = _make_coordinator_with_provider_specs(
+            [
+                {"module": "provider-openai", "id": "sol", "config": {"priority": 3}},
+                {"module": "provider-openai", "id": "terra", "config": {"priority": 2}},
+                {"module": "provider-openai", "id": "luna", "config": {"priority": 14}},
+                {
+                    "module": "provider-openai-chatgpt",
+                    "id": "openai-chatgpt",
+                    "config": {"priority": 17},
+                },
+            ]
+        )
+        result = find_provider_by_type(instances, "openai", coordinator)
+        assert result is not None
+        assert result[0] == "terra", (
+            f"resolved to {result[0]!r}; the canonical openai instance with the "
+            "best priority must win over an alias that merely happens to be "
+            "keyed by its bare type"
+        )
+
+    def test_alias_still_wins_when_no_canonical_instance_exists_anywhere(self) -> None:
+        """The reorder must not break the case the alias exists for."""
+        instances = {"chatgpt-main": MagicMock()}
+        coordinator = _make_coordinator_with_provider_specs(
+            [
+                {
+                    "module": "provider-openai-chatgpt",
+                    "id": "chatgpt-main",
+                    "config": {"priority": 5},
+                }
+            ]
+        )
+        assert find_provider_by_type(instances, "openai", coordinator) == (
+            "chatgpt-main",
+            instances["chatgpt-main"],
+        )
