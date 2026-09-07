@@ -59,6 +59,63 @@ DEFAULT_MAX_CONCURRENT_ROLE_RESOLUTIONS = 4
 _PREFIX_MARKER = '<system-reminder source="routing-matrix">'
 
 
+# Every custom event this module emits, declared for observability.
+#
+# hooks-logging persists an event to events.jsonl ONLY if it registered a
+# handler for that event name. It builds that list at on_session_ready from
+# three sources: amplifier_core.events.ALL_EVENTS (kernel events), the
+# `observability.events` capability, and `collect_contributions(
+# "observability.events")`. A module that emits its own event names without
+# declaring them on one of those channels emits into a room hooks-logging never
+# entered -- the emit succeeds, nothing is written, and nobody is told.
+#
+# That was this module's state until 2026-09-07. Measured in a DTU: a session
+# whose `delegate:agent_spawned` proved routing had resolved (a full
+# provider_preferences block) had ZERO `routing:*` lines in events.jsonl --
+# while `skills:discovered`, `delegate:agent_spawned` and `mentions:resolved`
+# (all declared by their modules) landed fine. `routing:matrix-loaded` had
+# fired; it just went unrecorded. The forensic value this telemetry exists for
+# ("which matrix FILE decided routing, and what did it shadow?") was nil.
+#
+# Keep this tuple in step with the `.emit(` call sites below;
+# tests/test_observability_events.py refuses a mismatch in either direction.
+OBSERVABILITY_EVENTS: tuple[str, ...] = (
+    "routing:matrix-loaded",
+    "routing:intent-clamped",
+    "routing:role-pin-reasserted",
+)
+
+
+def _declare_observability_events(coordinator: Any) -> None:
+    """Announce this module's events so hooks-logging will persist them.
+
+    Uses the get -> extend -> register aggregation on the
+    `observability.events` capability -- the pattern tool-task and tool-skills
+    use -- because hooks-logging reads that capability on EVERY core version
+    it supports, whereas `register_contributor` is read only on core >= 1.4.1.
+    Ordering is not a concern: hooks-logging registers its handlers in
+    on_session_ready, after every module has mounted (core _session_init.py
+    Phase 6), so a declaration made here is always visible to it.
+
+    Best-effort by design: a coordinator without the capability API (older
+    kernels, bare test doubles) gets routing exactly as before, minus the
+    telemetry -- observability must never break the thing it observes.
+    """
+    if not (
+        hasattr(coordinator, "get_capability")
+        and hasattr(coordinator, "register_capability")
+    ):
+        return
+    try:
+        declared = list(coordinator.get_capability("observability.events") or [])
+        for event in OBSERVABILITY_EVENTS:
+            if event not in declared:
+                declared.append(event)
+        coordinator.register_capability("observability.events", declared)
+    except Exception:  # pragma: no cover - reporting must never break routing
+        logger.debug("Could not declare observability.events", exc_info=True)
+
+
 async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     """Mount the routing matrix hook.
 
@@ -71,6 +128,10 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     "share one handler" is not the same as "may run twice".
     """
     config = config or {}
+
+    # First thing, before any code path that could emit: hooks-logging must
+    # know these names by on_session_ready, and nothing below depends on it.
+    _declare_observability_events(coordinator)
 
     placement = config.get("placement", "prefix")
     if placement not in VALID_PLACEMENTS:
