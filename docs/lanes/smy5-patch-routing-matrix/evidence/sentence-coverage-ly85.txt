@@ -1,0 +1,36 @@
+threshold: 60% of content words must survive
+
+OK cov=0.71  'This session uses the routing matrix system for model selection.'
+        unmatched: ['session', 'system']
+OK cov=0.92  'The live role list for the active matrix is injected into your context every turn (`Acti'
+        unmatched: ['context']
+OK cov=1.00  '… / Available model roles:'
+!! cov=0.50  'Use those role names — they are authoritative.'
+        unmatched: ['names', 'those']
+OK cov=0.83  'Role sets and descriptions differ per matrix; do not rely on any list written down here.'
+        unmatched: ['any', 'here']
+OK cov=0.62  'Use `model_role` in agent frontmatter to declare what kind of model your agent needs:'
+        unmatched: ['declare', 'kind', 'needs']
+OK cov=1.00  'model_role:'
+OK cov=1.00  'coding # single role model_role:'
+OK cov=1.00  '[ui-coding, coding, general] # fallback chain (specific → general) model_role:'
+OK cov=1.00  'fast # utility agent'
+OK cov=0.75  'Fallback chains are tried left-to-right.'
+        unmatched: ['chains']
+OK cov=1.00  'Always end with `general` or `fast`.'
+OK cov=0.60  'When delegating to sub-agents, you can override the model role:'
+        unmatched: ['delegating', 'sub-agents']
+OK cov=1.00  '{ "agent":'
+OK cov=1.00  '"foundation:explorer", "instruction":'
+!! cov=0.25  '"Analyze these UI screenshots...", "model_role":'
+        unmatched: ['analyze', 'screenshots', 'ui']
+OK cov=1.00  '"vision" }'
+OK cov=0.93  'For detailed role definitions, decision flowchart, model tier grid, and fallback chain g'
+        unmatched: ['detailed']
+
+=== RESULT ===
+2 sentence(s) below 60% coverage -- inspect each:
+  cov=0.50  'Use those role names — they are authoritative.'
+        unmatched: ['names', 'those']
+  cov=0.25  '"Analyze these UI screenshots...", "model_role":'
+        unmatched: ['analyze', 'screenshots', 'ui']

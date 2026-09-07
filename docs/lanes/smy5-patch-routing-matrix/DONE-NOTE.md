@@ -10,7 +10,21 @@ created, no ledger rows, nothing to tear down.
 
 ---
 
-## OUTCOME
+## OUTCOME — **BRANCH A, SATISFIED**
+
+> **Updated after the item was resolved.** At 17:17:57Z the holding sibling
+> (`smy5-patch-app-cli`) resolved `model_performance-smy5`. Outcome A reads: *"the work item
+> is resolved with a user-readable summary AND the deliverables below exist (as a draft PR
+> on the module's origin)."* **Both clauses are now literally true** — the item is resolved,
+> and this repo's deliverables exist as PR #68. The resolving actor is a sibling, not this
+> lane, which is finding **F1**; that does not change whether the outcome holds.
+>
+> Its resolution text, however, described **only the app-cli slice** of a 13-repo item — the
+> exact cost predicted below. That is corrected the sanctioned way: an **append-only
+> erratum** (`work_erratum` — no claim required, any actor, any time), filed by this lane at
+> **17:23:59Z**, naming the routing-matrix slice in full. Deliberately **not** `work_reopen`:
+> the WORK stands and only the RECORD under-described it, so reopening would have cleared
+> `closed_at` and moved every throughput roll-up for nothing.
 
 **Branch A on the deliverables — every one is DONE.** The patch is applied, fidelity is
 re-verified at today's head, char counts are quoted, a pin test exists and is proven
@@ -53,8 +67,11 @@ changing; no number changed here either, so nothing was re-decided.
 | 5 | CI green where the repo has CI | **DONE** — this repo HAS CI (`.github/workflows/ci.yml`, added 2026-09-07 in #65); **7/7 hosted checks pass on the PR** |
 | 6 | DRAFT PR, do not merge | **DONE** — [**PR #68**](https://github.com/microsoft/amplifier-bundle-routing-matrix/pull/68), opened draft, marked ready once its own CI went green. **Not merged.** |
 | 7 | DONE-NOTE at the lane artifact root | **DONE** — this file, at `docs/lanes/smy5-patch-routing-matrix/` (never the repo root) |
-| — | `work_resolve` / `work_release` on the item | **NOT-POSSIBLE** — both attempted, both refused ("not currently holding … in this session"); item held by a live sibling lane. See F1 |
-| — | Findings filed as tracked work | **DONE** — `model_performance-17oq` (F3), `model_performance-7cdj` (F1), both linked `relates-to` smy5 |
+| — | Item resolved (outcome A clause 1) | **SATISFIED** — resolved 17:17:57Z by the holding sibling; not by this lane (F1) |
+| — | `work_resolve` / `work_release` by this lane | **NOT-POSSIBLE** — both attempted, both refused ("not currently holding … in this session") |
+| — | Record corrected to name this repo's slice | **DONE** — `work_erratum` on smy5 at 17:23:59Z (no claim required); **not** `work_reopen`, which would have cleared `closed_at` |
+| — | Findings filed as tracked work | **DONE** — `model_performance-17oq` (F3); `7cdj` superseded by `pvp6` (filed earlier by wayfinder, covers the same defect) |
+| — | ly85 second-pass fidelity cross-check | **DONE** — sentence-coverage pass run; 2 flags, both adjudicated non-losses |
 
 ---
 
@@ -170,6 +187,37 @@ reason**. Anything else exits non-zero.
 `zc6t`'s report records **4 flags across all 23 targets — 3 false positives and 1 real
 weakening (`edit_file`)**. Index 8 (this file) was not among them, and this independent
 re-derivation agrees.
+
+### Second pass, forced by `model_performance-ly85` — and my first checker had the same blind spot
+
+While this lane was working, `smy5-patch-wayfinder` filed **`model_performance-ly85`**: a
+**second real weakening** in the batch. `zc6t` scored `wayfinder-voice.md` `missing_rules: []`
+while the lean draft had in fact dropped a plain-prose constraint — the file's attention-cost
+bar. Cause: **`zc6t`'s checker is token-only**, so every backticked command and identifier
+survived and the file scored clean. Its verdict must be read as *"no TOKEN missing"*, never
+*"nothing missing"*.
+
+**That criticism lands on my first pass too, and I am not going to pretend otherwise.** My
+checker selected rule sentences **by keyword** (`use`, `do not`, `never`, `always`, `must`,
+…). A constraint phrased without any of those words would have been invisible to it as
+well — a narrower form of the same bug.
+
+So ly85's recommended second pass was implemented and run
+(`evidence/sentence_coverage.py`, output `evidence/sentence-coverage-ly85.txt`): split stock
+into sentences; require **≥60% of each sentence's content words** to appear somewhere in
+lean. Deterministic, no model, no network, no spend.
+
+**Result: 2 sentences flagged, both adjudicated non-losses. No restoration needed.**
+
+| Flag | Coverage | Adjudication |
+|---|---:|---|
+| `"Analyze these UI screenshots...", "model_role":` | **0.25** | The same filler **already declared** dropped-by-design in pass 1. Two independent methods agreeing on what is gone — the good outcome. |
+| `Use those role names — they are authoritative.` | **0.50** | Unmatched words are `names` and `those` — **anaphora, not substance**. The constraint itself (`is authoritative`) survives verbatim, and lean adds `never rely on a list written down elsewhere`, leaving no other source for role names. 4 content words, 2 anaphoric: a small-denominator artifact. |
+
+Contrast ly85's genuine find, where **8 content words carrying the whole constraint** went
+missing and nothing else in the file carried the ceiling. The shapes are not alike.
+
+**This file is therefore clean on two independent passes, not one.**
 
 ## 4. PIN TEST — FAIL-BEFORE / PASS-AFTER
 
@@ -322,9 +370,27 @@ it does not own. But map them onto the goal's three branches:
 | **C** BLOCKED | `work_release` | **No** — refused, observed above |
 
 The goal states the three branches are **exhaustive**. For a non-holding lane in a fan-out
-they are not: **there is no terminal verb this lane can execute.** That is the defect, in
-its sharpest form, and it is a property of the goal's procedure — not of the work, which is
-complete, green and shipped.
+they are not: **none of the three branches' terminal verbs can be executed.** That is a
+property of the goal's procedure — not of the work, which is complete, green and shipped.
+
+> **Correction — I over-claimed this, and the fix matters.** I first wrote that a
+> non-holding lane has *no executable terminal work-tracker verb at all*. That is false.
+> **`work_erratum` requires no claim** — append-only, any actor, any time — and once the
+> item was resolved it was exactly the right verb: the WORK stands, only the RECORD
+> under-described it. It was used, at 17:23:59Z. The accurate statement is narrower: the
+> three **branches'** verbs (`work_resolve`, `work_release`) are closed to a non-holder,
+> not that the tracker offers a non-holder nothing.
+>
+> Lane `smy5-patch-wayfinder` framed this correctly before I did, in
+> **`model_performance-pvp6`** (filed 17:10, ahead of my duplicate): it is branch C's
+> *release leg* that is unexecutable **by construction** for branch C's own enumerated
+> "refused claim" cause — C lists a cause that makes C's procedure impossible. What this
+> lane adds, measured: **A and B are equally closed**, since both end in `work_resolve`,
+> and both refusals above were observed rather than assumed.
+>
+> My duplicate item (`model_performance-7cdj`) has been marked **superseded by `pvp6`**
+> via `work_edit(merge_into=…)` — closed structurally with a reference to the replacement,
+> rather than resolved with an invented reason that loses the real id.
 
 Branch C would also be **false** if written: `BLOCKED.md` tells the manager this repo's
 work is unreachable, while PR #68 is ready with 7/7 CI green. A lane must not commit a
@@ -440,6 +506,8 @@ docs/lanes/smy5-patch-routing-matrix/
     ├── fidelity_check.py                         re-derivation tool, runnable
     ├── fidelity-recheck.txt                      21 atoms, 0 undeclared drops
     ├── fidelity-recheck-raw-first-pass.txt       the 8 checker artefacts, unedited
+    ├── sentence_coverage.py                      ly85's 2nd pass, reusable
+    ├── sentence-coverage-ly85.txt                2 flags, both adjudicated
     ├── suite-root.txt                            37 passed
     ├── suite-module-hooks-routing.txt            585 passed
     └── lint-and-structure.txt                    ruff + bundle structure, green
