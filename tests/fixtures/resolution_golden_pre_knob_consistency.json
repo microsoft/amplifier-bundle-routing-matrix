@@ -688,22 +688,6 @@
       }
     ]
   },
-  "openai-chatgpt.yaml": {
-    "__fallback__reasoning_then_general": [],
-    "coding": [],
-    "creative": [],
-    "critical-ops": [],
-    "critique": [],
-    "fast": [],
-    "general": [],
-    "image-gen": [],
-    "reasoning": [],
-    "research": [],
-    "security-audit": [],
-    "ui-coding": [],
-    "vision": [],
-    "writing": []
-  },
   "openai.yaml": {
     "__fallback__reasoning_then_general": [
       {

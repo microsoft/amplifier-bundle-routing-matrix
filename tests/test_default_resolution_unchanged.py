@@ -121,7 +121,6 @@ RECORDED_MATRICES = frozenset(
         "economy.yaml",
         "gemini.yaml",
         "ollama.yaml",
-        "openai-chatgpt.yaml",
         "openai.yaml",
         "quality.yaml",
     }
