@@ -258,21 +258,13 @@ Only include `config` when a candidate genuinely needs different parameters from
 >         thinking_level: high     # minimal | low | medium | high
 > ```
 >
-> The same defect exists on **`openai-chatgpt`**, found the same way: it reads
-> no effort key from mount config either (its only effort read is
-> `request.reasoning_effort`, which nothing populates from config), so a
-> `reasoning_effort:` there is inert at every value and the loader rejects it.
-> Its live knob is the payload block the provider itself builds:
->
-> ```yaml
-> - provider: openai-chatgpt
->   model: gpt-?.?-terra
->   config:
->     extra_request_params:
->       reasoning:
->         effort: high
->         summary: detailed
-> ```
+> **`openai-chatgpt` used to have this defect too** (found 2026-09-07 the same
+> way) and was fixed at the source the same day: the provider now bridges
+> `reasoning_effort` from mount config to the request exactly as `provider-openai`
+> does (amplifier-module-provider-openai-chatgpt PR #10). No matrix-side
+> workaround remains, and none should be reintroduced -- if a provider is found
+> to drop a key, fix the provider, and only carry an `INERT_CONFIG_RULES` row
+> while the provider fix is unmerged.
 >
 > Caution: gemini-2.x models reject `thinking_level` with a 400 and accept
 > only the legacy `thinking_budget`, so a class glob that can resolve to a 2.x
@@ -493,15 +485,21 @@ suffixed sibling, a class glob will find it.
 > a ladder glob **classifies** a model already chosen (broad is right — a user
 > who hand-pins `gpt-5.6-terra-fast` must still land on the terra rung).
 
-**`openai-chatgpt` is not `openai`.** It is a separate provider MODULE (the
-OAuth/ChatGPT-subscription backend) — same models, different bill — so
-`find_provider_by_type` matches it neither by name nor via the module-type
-fallback. A matrix that names only `provider: openai` gives a ChatGPT-only user
-**zero** routing. Every matrix that names one names both, in the same role;
-`tests/test_single_provider_coverage.py` enforces that each supported provider
-can route `balanced` on its own. There is deliberately **no separate
-openai-chatgpt matrix** — same models and the same tier story, so a second file
-would only be a sync burden.
+**`openai-chatgpt` is `openai` to the resolver.** It is a separate provider
+MODULE (the OAuth/ChatGPT-subscription backend) — same models, different bill —
+so on its own `find_provider_by_type` would match it neither by name nor via
+the module-type fallback, and a matrix naming only `provider: openai` gave a
+ChatGPT-only user **zero** routing (0/13 roles on `balanced`, 2026-09-07).
+
+The fix is `PROVIDER_FAMILY_ALIASES` in `resolver.py`: `provider: openai` now
+satisfies either backend, trying the API key across all mounts first and the
+subscription second. So **write `provider: openai` and nothing else** — never a
+separate `openai-chatgpt` candidate (49 of those were added and then removed
+the same day; `tests/test_single_provider_coverage.py::test_no_matrix_names_the_chatgpt_backend_directly`
+now refuses them) and never a separate `openai-chatgpt` matrix. One candidate,
+one glob vocabulary, one `reasoning_effort` key, both bills. The alias is
+directional: `provider: openai-chatgpt` does NOT match a plain `openai` mount,
+because a curator who names the subscription backend explicitly means it.
 
 **Anchor the generation digit on Gemini.** A `gemini-*-...` glob also matches
 the `gemini-omni-*` lane, and because `omni` has no leading digit run the

@@ -94,10 +94,11 @@
 #      itself must be updated in the same change, since it matches the
 #      substring 'haiku' and would otherwise keep rejecting claude-haiku-5.
 #  12. The separate `openai-chatgpt.yaml` matrix was FOLDED INTO openai.yaml
-#      and deleted. The ChatGPT backend is the same models on a different
-#      bill, not a different tier story, so it did not warrant a second file
-#      to keep in sync -- every role in openai.yaml now carries a candidate
-#      for each backend.
+#      and deleted; then the per-role `openai-chatgpt` twin candidates were
+#      removed as well. `provider: openai` now matches both backends via the
+#      resolver's PROVIDER_FAMILY_ALIASES, and both read the same
+#      `reasoning_effort` key since provider-openai-chatgpt gained its
+#      config->request bridge. One candidate per role serves both bills.
 #  13. Every openai-family candidate glob lost its trailing `*`
 #      (`gpt-?.?-terra`, `gpt-?.?-luna`). The ChatGPT backend serves a `-fast`
 #      sibling for every model, and a trailing `*` silently selects it (tie on
