@@ -120,6 +120,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: low
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: low
+              summary: detailed
       - provider: anthropic
         model: claude-sonnet-*
         config:
@@ -142,6 +149,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: medium
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: medium
+              summary: detailed
       - provider: anthropic
         model: claude-sonnet-*
         config:
@@ -164,6 +178,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: high
+              summary: detailed
       - provider: anthropic
         model: claude-sonnet-*
         config:
@@ -186,6 +207,13 @@ roles:
         model: gpt-?.?-luna*
         config:
           reasoning_effort: max
+      - provider: openai-chatgpt
+        model: gpt-?.?-luna
+        config:
+          extra_request_params:
+            reasoning:
+              effort: max
+              summary: detailed
       - provider: anthropic
         model: claude-sonnet-*
         config:
@@ -208,6 +236,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: xhigh
+              summary: detailed
       - provider: anthropic
         model: claude-sonnet-*
         config:
@@ -230,6 +265,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: xhigh
+              summary: detailed
       - provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
@@ -252,6 +294,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: xhigh
+              summary: detailed
       - provider: anthropic
         model: claude-sonnet-*
         config:
@@ -274,6 +323,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: medium
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: medium
+              summary: detailed
       - provider: anthropic
         model: claude-opus-*
         config:
@@ -296,6 +352,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: medium
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: medium
+              summary: detailed
       - provider: anthropic
         model: claude-opus-*
         config:
@@ -318,6 +381,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: xhigh
+              summary: detailed
       - provider: anthropic
         model: claude-opus-*
         config:
@@ -346,6 +416,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: medium
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: medium
+              summary: detailed
       - provider: anthropic
         model: claude-sonnet-*
         config:
@@ -368,6 +445,13 @@ roles:
         model: gpt-?.?-terra*
         config:
           reasoning_effort: high
+      - provider: openai-chatgpt
+        model: gpt-?.?-terra
+        config:
+          extra_request_params:
+            reasoning:
+              effort: high
+              summary: detailed
       - provider: anthropic
         model: claude-opus-*
         config:

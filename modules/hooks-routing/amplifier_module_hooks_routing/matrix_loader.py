@@ -507,6 +507,53 @@ def _gemini_effort_remediation(model: str, value: Any) -> str:
     )
 
 
+# --- PROVIDER-keyed row: openai-chatgpt --------------------------------
+#
+# The SAME shape as the gemini row, found the same way: the provider reads
+# no effort key from mount config at all, so every model it serves is
+# affected and the value is irrelevant.
+_CHATGPT_EFFORT_REASON = (
+    "provider-openai-chatgpt never reads an effort key from mount config, so "
+    "this setting is inert at EVERY value -- not collapsed, not clamped, "
+    "simply never read. VERIFIED against the installed provider "
+    "(amplifier-module-provider-openai-chatgpt, cache 36f6cbc7a2650e2e): the "
+    "mount-config keys it consumes are read one by one in Provider.__init__ "
+    "(provider.py:207-257) -- priority, raw, default_model, timeout, "
+    "token_file_path, use_streaming, models_client_version, "
+    "extra_request_params, models_cache_ttl -- and there is no "
+    "`self._config.get(\"reasoning_effort\")` call site anywhere in the "
+    "module. Its only effort read is `request.reasoning_effort` "
+    "(provider.py:604, :720) -- a ChatRequest field, which amplifier_core "
+    "only DECLARES and never populates from mount config. Bridging config -> "
+    "request is each provider's own job (anthropic does it at "
+    "__init__.py:892-897, openai at __init__.py:1046-1049); this provider has "
+    "no such bridge, so a matrix `config:` block cannot reach the effort "
+    "ladder at all."
+)
+
+
+def _chatgpt_effort_remediation(model: str, value: Any) -> str:
+    """Return the exact replacement setting for an inert chatgpt effort value.
+
+    The provider builds `payload["reasoning"] = {"effort": ..., "summary":
+    "detailed"}` from `request.reasoning_effort` (provider.py:720-724), and
+    merges `extra_request_params` into the payload LAST (:731-732) -- so the
+    same block set through `extra_request_params` lands on the wire in exactly
+    the shape the provider itself would have produced.
+    """
+    effort = str(value).strip().lower()
+    return (
+        f"Use `extra_request_params: {{reasoning: {{effort: {effort}, "
+        f"summary: detailed}}}}` instead -- `extra_request_params` is a "
+        f"mount-config key this provider does consume (provider.py:245-253) "
+        f"and merges into the outgoing payload last (:731-732), and "
+        f"`reasoning.effort` is the exact field the provider's own effort "
+        f"branch writes (:720-724). CAUTION: this backend enforces a strict "
+        f"payload schema -- `reasoning` is safe because the provider sets it "
+        f"itself, but verify any OTHER key against the live backend first."
+    )
+
+
 # --- MODEL-keyed row: anthropic haiku ---------------------------------
 #
 # Carried over VERBATIM from the haiku guard this table subsumes (PR #48,
@@ -595,8 +642,8 @@ class InertKeyRule(NamedTuple):
 
 # The enforced rules. One row per (provider, model) pair with evidence.
 #
-# ORDER MATTERS: the first matching row wins. The provider-specific gemini row
-# is listed before the `provider="*"` haiku row so a wildcard row can never
+# ORDER MATTERS: the first matching row wins. The provider-specific rows are
+# listed before the `provider="*"` haiku row so a wildcard row can never
 # shadow a narrower one.
 INERT_CONFIG_RULES: tuple[InertKeyRule, ...] = (
     InertKeyRule(
@@ -605,6 +652,13 @@ INERT_CONFIG_RULES: tuple[InertKeyRule, ...] = (
         keys=EFFORT_KEYS,
         reason=_GEMINI_EFFORT_REASON,
         remediation=_gemini_effort_remediation,
+    ),
+    InertKeyRule(
+        provider="openai-chatgpt",
+        model_marker="",  # every model this provider serves
+        keys=EFFORT_KEYS,
+        reason=_CHATGPT_EFFORT_REASON,
+        remediation=_chatgpt_effort_remediation,
     ),
     InertKeyRule(
         provider="*",  # matched on the MODEL substring, under any provider

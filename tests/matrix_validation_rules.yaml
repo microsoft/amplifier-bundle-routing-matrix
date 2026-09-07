@@ -44,6 +44,17 @@ canonical_effort_key: reasoning_effort
 #                   loader guard (INERT_CONFIG_RULES in
 #                   modules/hooks-routing/.../matrix_loader.py), which also
 #                   names the replacement setting. See model_performance-565.
+#   openai-chatgpt: EMPTY, deliberately -- the same shape as gemini. The
+#                   provider reads no effort key from mount config: the keys
+#                   it consumes are read one by one in Provider.__init__
+#                   (provider.py:207-257) and `reasoning_effort` is not among
+#                   them; its only effort read is `request.reasoning_effort`
+#                   (:604, :720), a ChatRequest field nothing populates from
+#                   config. So NO value is valid. Set effort through
+#                   `extra_request_params.reasoning.effort` instead -- the
+#                   authoritative rejection is the loader guard
+#                   (INERT_CONFIG_RULES in matrix_loader.py), which names the
+#                   replacement.
 #   github-copilot: provider-github-copilot `REASONING_EFFORT_LEVELS`
 #                   (request_adapter.py) — the provider-wide superset, also
 #                   surfaced to operators as the ConfigField choice list.
@@ -51,4 +62,5 @@ reasoning_effort_values:
   anthropic: [low, medium, high, xhigh, max]
   openai: [none, minimal, low, medium, high, xhigh, max]
   gemini: []  # provider reads no effort key from mount config -- see note above
+  openai-chatgpt: []  # ditto -- use extra_request_params.reasoning.effort
   github-copilot: [none, low, medium, high, xhigh, max]
