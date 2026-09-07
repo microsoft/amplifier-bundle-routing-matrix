@@ -105,6 +105,10 @@
 #      support, swap back to `reasoning_effort` -- and note the guard rule
 #      itself must be updated in the same change, since it matches the
 #      substring 'haiku' and would otherwise keep rejecting claude-haiku-5.
+#  11. The last stale Copilot pin, `gpt-5.4-mini` in the `fast` role, moved to
+#      `gpt-5.6-luna` -- the same generation as every other GPT slot, and live
+#      on the Copilot API. It was the only remaining "fallback to 5.4-or-
+#      earlier" after item 6 cleared the openai side.
 
 name: balanced
 description: "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team."
@@ -179,7 +183,7 @@ roles:
         config:
           thinking_budget_tokens: 32000
       - provider: github-copilot
-        model: gpt-5.4-mini
+        model: gpt-5.6-luna
         config:
           reasoning_effort: medium
       - provider: ollama
