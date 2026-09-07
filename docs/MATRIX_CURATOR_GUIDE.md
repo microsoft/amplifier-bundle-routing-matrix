@@ -258,6 +258,22 @@ Only include `config` when a candidate genuinely needs different parameters from
 >         thinking_level: high     # minimal | low | medium | high
 > ```
 >
+> The same defect exists on **`openai-chatgpt`**, found the same way: it reads
+> no effort key from mount config either (its only effort read is
+> `request.reasoning_effort`, which nothing populates from config), so a
+> `reasoning_effort:` there is inert at every value and the loader rejects it.
+> Its live knob is the payload block the provider itself builds:
+>
+> ```yaml
+> - provider: openai-chatgpt
+>   model: gpt-?.?-terra
+>   config:
+>     extra_request_params:
+>       reasoning:
+>         effort: high
+>         summary: detailed
+> ```
+>
 > Caution: gemini-2.x models reject `thinking_level` with a 400 and accept
 > only the legacy `thinking_budget`, so a class glob that can resolve to a 2.x
 > id must be pinned first. The shipped matrices solve this with a DIGIT-ANCHORED
@@ -463,6 +479,21 @@ class boundaries (Opus and Haiku both match `claude-*`) and will silently
 swap a premium role to a budget model when the provider reorders its list.
 Avoid them outside of `model: "*"` for user-managed providers like Ollama.
 
+**Drop the trailing `*` on `openai-chatgpt`.** That backend serves a `-fast`
+sibling for every model (`gpt-5.6-terra` AND `gpt-5.6-terra-fast`). A trailing
+`*` matches both, they tie on version, and the tie-break prefers the LONGER
+name — so `gpt-?.?-terra*` silently selects the `-fast` variant. Use
+`gpt-?.?-terra` / `gpt-?.?-luna`. This is the same shape as `gpt-5.6-sol-fast`
+on GitHub Copilot: whenever a backend ships a suffixed sibling, a class glob
+will find it.
+
+**`openai-chatgpt` is not `openai`.** It is a separate provider MODULE (the
+OAuth/ChatGPT-subscription backend), so `find_provider_by_type` matches it
+neither by name nor via the module-type fallback. A matrix that names only
+`provider: openai` gives a ChatGPT-only user **zero** routing. Add explicit
+`provider: openai-chatgpt` candidates — `tests/test_single_provider_coverage.py`
+enforces that every supported provider can route `balanced` on its own.
+
 **Anchor the generation digit on Gemini.** A `gemini-*-...` glob also matches
 the `gemini-omni-*` lane, and because `omni` has no leading digit run the
 version-aware sort ranks it ABOVE the numbered models. Measured 2026-09-07:
@@ -490,6 +521,8 @@ reject `thinking_level`.
 > the base alias explicitly.
 | `gpt-?.?-sol*` | any dotted-version sol / flagship tier (e.g. `gpt-5.6-sol`) | base, terra, mini, nano, luna, pro |
 | `gpt-?.?-terra*` | any dotted-version terra / mid tier (e.g. `gpt-5.6-terra`) | base, sol, mini, nano, luna, pro |
+| `gpt-?.?-terra` | the standard terra id ONLY — use on `openai-chatgpt` | everything above, **plus `-fast` variants** |
+| `gpt-?.?-luna` | the standard luna id ONLY — use on `openai-chatgpt` | everything above, **plus `-fast` variants** |
 | `gpt-?.?-luna*` | any dotted-version luna / cheap-fast tier (e.g. `gpt-5.6-luna`) | base, terra, mini, nano, sol, pro |
 | `gpt-?.?-mini*` | any dotted-version mini (e.g. `gpt-5.4-mini`) | base, pro, nano, sol, luna, `gpt-5-mini` (no dot) |
 | `gpt-?.?-nano*` | any dotted-version nano | base, mini, pro, sol, luna |
@@ -545,6 +578,8 @@ Different providers use different naming conventions for the **same underlying m
 | GPT flagship (sol) | — | `gpt-?.?-sol*` (glob) | — | pinned, e.g. `gpt-5.6-sol` |
 | GPT cheap-fast (luna) | — | `gpt-?.?-luna*` (glob) | — | pinned, e.g. `gpt-5.6-luna` |
 | GPT-5.x mini | — | `gpt-?.?-mini*` (glob) | — | pinned, e.g. `gpt-5.4-mini` |
+| ChatGPT-backend terra | — | `gpt-?.?-terra` (glob, **no `*`**) | — | — |
+| ChatGPT-backend luna | — | `gpt-?.?-luna` (glob, **no `*`**) | — | — |
 | Gemini Pro | — | — | `gemini-[3-9]*-pro-preview` (glob) | — |
 | Gemini Flash | — | — | `gemini-[3-9]*-flash` (glob) | — |
 | Gemini Image | — | — | `gemini-3-pro-image` (exact) | — |
