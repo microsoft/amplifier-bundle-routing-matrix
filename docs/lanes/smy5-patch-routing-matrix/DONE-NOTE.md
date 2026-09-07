@@ -36,8 +36,8 @@ verified, zero-cost patch application over a bookkeeping collision.
 | 2 | Fidelity table re-verified at today's head, not inherited | **DONE** — 21 atoms, 0 undeclared drops |
 | 3 | Stock → lean char counts for every file touched | **DONE** — 1,148 → 735 (−413, −35.98%) |
 | 4 | Pin test so the text cannot drift back | **DONE** — 24 tests, 9 red on stock / 24 green on lean |
-| 5 | CI green where the repo has CI | **DONE** — this repo HAS CI (`.github/workflows/ci.yml`, added 2026-09-07 in #65); all four jobs' commands run green locally; the hosted run is on the PR |
-| 6 | DRAFT PR, do not merge | **DONE** — see `publication` block in `DONE.json` |
+| 5 | CI green where the repo has CI | **DONE** — this repo HAS CI (`.github/workflows/ci.yml`, added 2026-09-07 in #65); **7/7 hosted checks pass on the PR** |
+| 6 | DRAFT PR, do not merge | **DONE** — [**PR #68**](https://github.com/microsoft/amplifier-bundle-routing-matrix/pull/68), opened draft, marked ready once its own CI went green. **Not merged.** |
 | 7 | DONE-NOTE at the lane artifact root | **DONE** — this file, at `docs/lanes/smy5-patch-routing-matrix/` (never the repo root) |
 | — | `work_resolve` on the item | **NOT-POSSIBLE** — item held by a sibling lane; see F1 |
 
@@ -220,9 +220,22 @@ exact commands were run locally; transcripts in `evidence/`:
 | Tests — modules/hooks-routing | `uv run --frozen --extra dev --with git+…/amplifier-foundation python -m pytest -q` | **585 passed** |
 | Bundle structure | `uv run --no-project --with pyyaml python .github/scripts/check_bundle_structure.py` | **OK — bundle structure checks passed** |
 
-The hosted run is the one that counts for "green"; it runs on the PR. The PR is opened as
-a **draft** and is marked ready only once its own hosted CI is green. **Not merged** —
-the manager merges.
+**The hosted run is the one that counts, and it is green** — 7/7 on
+[PR #68](https://github.com/microsoft/amplifier-bundle-routing-matrix/pull/68),
+run `34146503031`:
+
+```
+Bundle structure                pass  11s
+Lint (ruff)                     pass   9s
+Tests — modules/hooks-routing   pass  13s
+Tests — root (Python 3.11)      pass  12s
+Tests — root (Python 3.12)      pass  12s
+Tests — root (Python 3.13)      pass  14s
+license/cla                     pass
+```
+
+The PR was opened as a **draft** and marked ready only after that. **Not merged** — the
+manager merges.
 
 ---
 
@@ -260,10 +273,19 @@ deliverable and simply did not, that is neither B nor C: finish the work"*, and 
 authority/goal that was mis-sized is a defect in the goal, not a failure of the lane."*
 The choice was made once and recorded here; there was no churn.
 
+The claim was **retried once at the end of the lane**, after all deliverables had landed
+and PR #68 was green and ready. It was refused identically — the sibling still held the
+item — so the finding is not a startup race that resolved itself:
+
+```
+17:00  claim … failed: issue already claimed by agent-spark-1-3875147
+17:11  claim … failed: issue already claimed by agent-spark-1-3875147
+```
+
 **What this costs, stated honestly:** the item's terminal `work_resolve` — with its
 3–6 line summary — will be written by whichever lane holds it, and that lane cannot see
-this repo's result. **The manager should treat this note and the linked draft PR as this
-repo's slice of `smy5`'s resolution.**
+this repo's result. **The manager should treat this note and PR #68 as this repo's slice
+of `smy5`'s resolution.**
 
 **The fix, for the next batch:** either (a) file one item per repo and give each lane its
 own, or (b) keep the umbrella item, have the **manager** hold it, and give lanes a
