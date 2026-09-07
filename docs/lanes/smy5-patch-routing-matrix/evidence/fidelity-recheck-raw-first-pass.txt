@@ -1,0 +1,34 @@
+stock chars: 1148   lean chars: 735   saved: 413 (35.98%)
+
+--- inline-code literal (5) ---
+OK 'Active routing matrix: … / Available model roles: …'  ->  verbatim
+OK 'model_role'  ->  verbatim
+OK 'general'  ->  verbatim
+OK 'fast'  ->  verbatim
+OK "load_skill(skill_name='role-definitions')"  ->  verbatim
+
+--- fenced-block line (6) ---
+!! 'model_role: coding                           # single role'  ->  MISSING
+!! 'model_role: [ui-coding, coding, general]     # fallback chain (specific → general)'  ->  MISSING
+!! 'model_role: fast                             # utility agent'  ->  MISSING
+!! '"agent": "foundation:explorer",'  ->  MISSING
+!! '"instruction": "Analyze these UI screenshots...",'  ->  MISSING
+OK '"model_role": "vision"'  ->  equivalent: 'model_role="vision"'
+
+--- rule sentence (5) ---
+OK 'Use those role names — they are\nauthoritative.'  ->  equivalent: 'is authoritative'
+!! 'Role sets and descriptions differ per matrix; do not rely on any list\nwritten down here.'  ->  MISSING
+!! 'Use `model_role` in agent frontmatter to declare what kind of model your agent needs:\n\n\n\nFallback chains are tried left-to-right.'  ->  MISSING
+OK 'Always end with `general` or `fast`.'  ->  equivalent: 'always end a chain with `general` or `fast`'
+!! "When delegating to sub-agents, you can override the model role:\n\n\n\nFor detailed role definitions, decision flowchart, model tier grid, and fallback chain guidance, use `load_skill(skill_name='role-definitions')`."  ->  MISSING
+
+=== RESULT ===
+8 atom(s) present in stock and ABSENT from lean:
+  - fenced-block line: 'model_role: coding                           # single role'
+  - fenced-block line: 'model_role: [ui-coding, coding, general]     # fallback chain (specific → general)'
+  - fenced-block line: 'model_role: fast                             # utility agent'
+  - fenced-block line: '"agent": "foundation:explorer",'
+  - fenced-block line: '"instruction": "Analyze these UI screenshots...",'
+  - rule sentence: 'Role sets and descriptions differ per matrix; do not rely on any list\nwritten down here.'
+  - rule sentence: 'Use `model_role` in agent frontmatter to declare what kind of model your agent needs:\n\n\n\nFallback chains are tried left-to-right.'
+  - rule sentence: "When delegating to sub-agents, you can override the model role:\n\n\n\nFor detailed role definitions, decision flowchart, model tier grid, and fallback chain guidance, use `load_skill(skill_name='role-definitions')`."
