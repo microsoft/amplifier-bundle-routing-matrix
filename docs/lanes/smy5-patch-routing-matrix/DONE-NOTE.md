@@ -309,6 +309,35 @@ contradicted it) and it lives outside the file this lane owns, so it was **not**
 It is worth its own one-line item: delete step 2, or reword it to "no action needed — the
 live injection picks the role up automatically."
 
+### F3 — `publication_readback.sh` can return a STALE `head_sha` if run immediately after `git push`
+
+Caught here, on this lane's own marker, which is exactly the claim the merge gate re-reads.
+
+Run ~1 second after a successful `git push`, the script reported the **previous** commit:
+
+```
+17:12:20Z  publication_readback.sh -> head_sha 82c5b496…   (local HEAD was 5a6cd546…)
+17:12:55Z  publication_readback.sh -> head_sha 5a6cd546…   (agrees)
+```
+
+Direct re-reads 20 s later agreed with each other and with local HEAD
+(`git ls-remote` → `5a6cd546…`, `gh pr … headRefOid` → `5a6cd546…`), so this is GitHub API
+propagation lag, not a bug in the script's logic. It **exits 0** either way.
+
+Why it matters: `publication/v1` exists precisely because *"you can see your own commit and
+you cannot see the absence of your own push"* (lane 74w). A stale-but-successful read
+produces the **74w failure mode with the safety net in place** — a marker carrying a
+40-hex sha that a remote genuinely returned, which nonetheless does not match the branch
+when `merge_gate.sh` re-reads it. The lane would look like it published the wrong commit.
+
+Caught here only because the returned sha was compared against a value already known
+(local `HEAD`) rather than trusted for exiting 0 — "an exit code is not verification; the
+content is."
+
+**Fix (one line, in the tool):** have `publication_readback.sh` compare its `head_sha`
+against `git rev-parse HEAD` in the checkout it was pointed at, and either retry or fail
+loud on a mismatch, instead of emitting a block that is internally consistent and wrong.
+
 ---
 
 ## DEVIATIONS / CHOICES MADE WITHOUT WAITING
