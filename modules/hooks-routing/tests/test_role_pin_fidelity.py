@@ -608,3 +608,120 @@ def test_vendored_protected_keys_match_upstream() -> None:
         spawn_utils.PROTECTED_CONFIG_KEYS
     )
     assert _protected_config_keys() == frozenset(spawn_utils.PROTECTED_CONFIG_KEYS)
+
+
+# ---------------------------------------------------------------------------
+# Config keys are judged on the surface a request reads, not on a dict name
+# ---------------------------------------------------------------------------
+
+
+class FakePrivateConfigProvider:
+    """A live provider that keeps its mount config under ``_config`` only.
+
+    This is provider-openai-chatgpt as shipped before 2026-09-07: attributes
+    snapshotted from config at construction (what a request reads), the dict
+    itself under a private name, no public ``config``. Every sibling exposes
+    ``config``; this shape is what made role_pin's dict-only read see None.
+    """
+
+    def __init__(self, name: str, priority: int, model: str, **config: Any) -> None:
+        self.name = name
+        self._config: dict[str, Any] = {
+            "priority": priority,
+            "default_model": model,
+            **config,
+        }
+        self.priority = priority
+        self.default_model = model
+        for key, value in config.items():
+            setattr(self, key, value)
+
+
+def test_gate_attribute_already_pinned_is_not_drift_without_a_config_dict() -> None:
+    """GATE. The 2026-09-07 false positive.
+
+    The child was spawned with the promotion applied: priority 0, the pinned
+    model, ``reasoning_effort="medium"`` snapshotted into the attribute -- and
+    the wire carried exactly that effort. Reading only ``.config`` saw None,
+    declared drift, and warned that the value had been "snapshotted
+    differently at mount". Nothing had drifted. No record, no warning.
+    """
+    providers = {
+        "openai-chatgpt": FakePrivateConfigProvider(
+            "openai-chatgpt", 0, "gpt-5.6-terra", reasoning_effort="medium"
+        ),
+        "opus": FakeAttrProvider("opus", 1, "claude-opus-5"),
+    }
+    coordinator = _coordinator(
+        providers,
+        [
+            {
+                "provider": "openai-chatgpt",
+                "model": "gpt-5.6-terra",
+                "config": {"reasoning_effort": "medium"},
+            }
+        ],
+    )
+
+    assert reassert_own_role_pin(coordinator) is None, (
+        "the attribute already holds the pinned value; a provider that keeps "
+        "its dict private has NOT drifted and must not be reasserted"
+    )
+
+
+def test_gate_inert_is_claimed_only_after_reading_the_attribute() -> None:
+    """GATE. With no config dict AND a genuinely different attribute, the key IS
+    inert -- and is reported as such because the attribute was read, not
+    because the dict was missing."""
+    providers = {
+        "openai-chatgpt": FakePrivateConfigProvider(
+            "openai-chatgpt", 0, "gpt-5.6-terra", reasoning_effort="low"
+        ),
+    }
+    coordinator = _coordinator(
+        providers,
+        [
+            {
+                "provider": "openai-chatgpt",
+                "model": "gpt-5.6-terra",
+                "config": {"reasoning_effort": "medium"},
+            }
+        ],
+    )
+
+    record = reassert_own_role_pin(coordinator)
+
+    assert record is not None
+    assert record["inert_config_keys"] == ["reasoning_effort"]
+    assert "unrestorable_config_keys" not in record
+    # Not written past its validator: the attribute keeps the live value.
+    assert providers["openai-chatgpt"].reasoning_effort == "low"
+
+
+def test_gate_no_surface_at_all_is_unrestorable_not_inert() -> None:
+    """GATE. No attribute and no dict: there is nothing to restore INTO. That is
+    a different fact from "snapshotted a different value", and is reported
+    under its own name."""
+
+    class Bare:
+        def __init__(self) -> None:
+            self.priority = 0
+            self.default_model = "gpt-5.6-terra"
+
+    providers = {"bare": Bare()}
+    coordinator = _coordinator(
+        providers,
+        [
+            {
+                "provider": "bare",
+                "model": "gpt-5.6-terra",
+                "config": {"reasoning_effort": "medium"},
+            }
+        ],
+    )
+
+    record = reassert_own_role_pin(coordinator)
+
+    assert record is not None
+    assert record["unrestorable_config_keys"] == ["reasoning_effort"]
+    assert "inert_config_keys" not in record
