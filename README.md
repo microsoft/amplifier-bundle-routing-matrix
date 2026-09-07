@@ -15,11 +15,12 @@ Eight curated matrices ship with this bundle, plus one explicit-name alias
 | **quality** | Maximum capability. Uses the strongest models for every role, regardless of cost. |
 | **economy** | Cost-optimized. Prefers free tiers, smaller models, and local providers like Ollama. |
 | **anthropic** | Anthropic Claude models exclusively. No knob-consistent delegation -- no measured win for this family yet (the "Anthropic guardrail"). |
-| **openai** | OpenAI models exclusively. **Ships knob-consistent delegation ON by default** (2026-09-02, a measured win -- see below). |
+| **openai** | OpenAI models exclusively. **Ships knob-consistent delegation ON by default** (2026-09-02, a measured win -- see below). The flagship `sol` tier is PAUSED as of 2026-09-07 pending further evals; roles that used it now run `terra` one effort notch higher, and `ui-coding` runs `luna` at `max`. |
 | **gemini** | Google Gemini models exclusively. |
 | **copilot** | GitHub Copilot-optimized. Balances multiplier costs, avoids the 30x fast-variant trap. |
-| **ollama** | Ollama across two instances: `ollama` (local) + `ollama-cloud` (Ollama Cloud). Routes heavy roles to `gpt-oss:120b` on cloud; local fallbacks. Requires both provider instances configured — see [provider README](https://github.com/microsoft/amplifier-module-provider-ollama#mixed-local--cloud-multi-instance). |
-| **openai-knob-consistent** | Byte-identical to `openai` (same roles, same `preset:` block) -- kept only as an explicit name to select by, for anyone who prefers to opt in by matrix name rather than rely on `openai`'s default. |
+| **ollama** | A **template**, deliberately minimal: only the two required roles (`general`, `fast`), both `model: "*"`. Every Ollama user has pulled a different set of models, so there is no useful curation to ship -- copy it and pin what you actually have. |
+
+> `openai-knob-consistent` was **removed on 2026-09-07**. Once the `preset:` block became `openai`'s default on 2026-09-02, the two files were the same matrix under two names. Select **`openai`** instead -- it is byte-for-byte what `openai-knob-consistent` used to give you.
 
 Browse the matrix files directly in the [`routing/`](routing/) directory.
 
@@ -128,7 +129,7 @@ Per-delegate `model_role` overrides (e.g. `delegate(agent="...", model_role="res
 
 Levels 1 and 2 stay strictly above level 3, so an author who deliberately pinned a specialist model still gets one. Inheritance is a default, never a ceiling on explicit intent.
 
-**Scoped by matrix, off unless the resolver can determine the caller's own model.** A matrix must carry a `preset:` block *and* the resolution must be able to determine the caller's own model. Only `openai.yaml` and its explicit-name alias `openai-knob-consistent.yaml` carry one. Every OTHER matrix shipped with this bundle still has no `preset:` key and resolves byte-identically — asserted, not asserted-to, by `tests/test_default_resolution_unchanged.py`, which replays a recording taken from the commit immediately before the feature landed, plus `modules/hooks-routing/tests/test_knob_consistent_routing.py::TestDefaultBehaviourUnchanged::test_anthropic_matrix_has_no_preset_block` and `::test_anthropic_root_resolution_unchanged_vs_pre_50_matrix` naming the Anthropic guardrail directly.
+**Scoped by matrix, off unless the resolver can determine the caller's own model.** A matrix must carry a `preset:` block *and* the resolution must be able to determine the caller's own model. Only `openai.yaml` carries one. Every OTHER matrix shipped with this bundle still has no `preset:` key and resolves byte-identically — asserted, not asserted-to, by `tests/test_default_resolution_unchanged.py`, which replays a recording taken from the commit immediately before the feature landed, plus `modules/hooks-routing/tests/test_knob_consistent_routing.py::TestDefaultBehaviourUnchanged::test_anthropic_matrix_has_no_preset_block` and `::test_anthropic_root_resolution_unchanged_vs_pre_50_matrix` naming the Anthropic guardrail directly.
 
 ```yaml
 # routing/openai.yaml -- shipped, DEFAULT ON
@@ -154,13 +155,15 @@ Under `strict` with a `gpt-5.6-terra @ medium` root, `model_role: reasoning` res
 
 **When intent cannot be honoured, you are told.** Every clamp, denial, substitution and no-op emits a `routing:intent-clamped` event carrying `{role, mode, honored, requested, granted, reason, escalations_remaining}`. It goes to the event log — never injected into the conversation, which would mutate the cached prefix.
 
-**It is already on if you use the `openai` matrix.** No action needed — this is the new default, and it is what the `openai-knob-consistent` name has always opted into, byte for byte:
+**It is already on if you use the `openai` matrix.** No action needed — this is the default:
 
 ```yaml
-# ~/.amplifier/settings.yaml -- equivalent, either name
+# ~/.amplifier/settings.yaml
 routing:
-  matrix: openai   # or: openai-knob-consistent
+  matrix: openai
 ```
+
+> If your settings still say `matrix: openai-knob-consistent`, change it to `openai`. That file was removed on 2026-09-07; the two had been identical since the preset became the default.
 
 **Opt out, and restore legacy behaviour.** If you need the pre-2026-09-02 unclamped `openai` matrix (root's dial governs only the root), set `disable_delegation_preset: true` in this hook's own mount config — the same `config:` block `default_matrix` already lives in (see [`behaviors/routing.yaml`](behaviors/routing.yaml)):
 

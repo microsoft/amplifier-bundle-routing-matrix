@@ -153,16 +153,17 @@ class TestDefaultBehaviourUnchanged:
 
     def test_every_pre_existing_matrix_has_no_preset_block(self) -> None:
         """Every shipped matrix EXCEPT `openai.yaml` (default ON, 2026-09-02
-        -- a measured win, see README "Knob-consistent delegation") and
-        `openai-knob-consistent.yaml` (the same block, kept as an
-        explicit-name pin) must stay default-off. If a curator adds a preset
+        -- a measured win, see README "Knob-consistent delegation") must stay
+        default-off. `openai-knob-consistent.yaml` used to be allowed here
+        too; it was DELETED on 2026-09-07, having become the same matrix
+        under a second name. If a curator adds a preset
         to any OTHER matrix, that is a behaviour change to live user settings
         and this test is where it gets noticed -- in particular,
         `anthropic.yaml` staying out of this set is the Anthropic guardrail:
         no measured win there yet, so no default change there."""
         import yaml
 
-        allowed_with_preset = {"openai-knob-consistent.yaml", "openai.yaml"}
+        allowed_with_preset = {"openai.yaml"}
         offenders = []
         for path in sorted(ROUTING_DIR.glob("*.yaml")):
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -783,8 +784,13 @@ class TestMountWithPreset:
     ) -> None:
         """The explicit opt-out, against the REAL shipped matrix: setting
         `disable_delegation_preset: true` on a terra root restores the
-        pre-2026-09-02 result (the flagship `sol` model) with no matrix edit
-        required."""
+        matrix's own uninherited answer with no matrix edit required.
+
+        That answer is `gpt-5.6-terra`, not `gpt-5.6-sol`: the flagship tier
+        was paused matrix-wide on 2026-09-07 pending further evals, so no
+        role selects sol any more. What this test guards is the OPT-OUT
+        mechanism -- that the flag stops the caller's knobs being inherited
+        -- not which model the matrix happens to name."""
         agents = {"explorer": {"model_role": "reasoning"}}
         coordinator = _mount_coordinator(agents)
         await mount(
@@ -797,7 +803,7 @@ class TestMountWithPreset:
         )
         await _run_session_start(coordinator)
         assert agents["explorer"]["provider_preferences"][0]["model"] == (
-            "gpt-5.6-sol"
+            "gpt-5.6-terra"
         )
 
 
@@ -807,34 +813,12 @@ class TestMountWithPreset:
 
 
 class TestShippedKnobConsistentMatrix:
-    @pytest.mark.asyncio
-    async def test_terra_root_never_resolves_to_sol_on_any_role(self) -> None:
-        """The headline claim, asserted across the whole role vocabulary."""
-        import yaml
-
-        data = yaml.safe_load(
-            (ROUTING_DIR / "openai-knob-consistent.yaml").read_text(encoding="utf-8")
-        )
-        preset = parse_preset(data)
-        assert preset is not None
-        roles = data["roles"]
-        escalations = EscalationState(max_uses=preset.escalate_max_uses)
-        for role in roles:
-            result = await resolve_model_role(
-                [role],
-                roles,
-                _providers(),
-                caller_context=TERRA_CALLER,
-                preset=preset,
-                escalations=escalations,
-            )
-            assert result, f"role {role} resolved to nothing"
-            assert result[0]["model"] != "gpt-5.6-sol", (
-                f"role {role} still resolves to sol under a terra caller"
-            )
-            assert result[0]["config"].get(CANONICAL_EFFORT_KEY) == "medium", (
-                f"role {role} did not inherit the caller's effort"
-            )
+    # `test_terra_root_never_resolves_to_sol_on_any_role` lived here and read
+    # `openai-knob-consistent.yaml`. That file was deleted on 2026-09-07, and
+    # repointing it at `openai.yaml` would have made it a byte-for-byte
+    # duplicate of `test_openai_root_delegate_resolution_stays_in_tier_by_default`
+    # below -- same matrix, same caller, same assertions. Removed rather than
+    # duplicated; the claim is still asserted, once.
 
     @pytest.mark.asyncio
     async def test_openai_matrix_cold_resolution_is_unchanged(self) -> None:
@@ -843,13 +827,19 @@ class TestShippedKnobConsistentMatrix:
         no longer preset-free. What must still hold is the OLD control-arm
         behaviour: resolved COLD (no caller context -- how every
         non-delegation consumer resolves, and how `amplifier routing show`
-        resolves), the preset is inert and reasoning still goes to sol."""
+        resolves), the preset is INERT -- cold resolution returns whatever the
+        roles block says, untouched.
+
+        The expected model changed from `gpt-5.6-sol` to `gpt-5.6-terra` on
+        2026-09-07 when the flagship tier was paused pending further evals.
+        That is a matrix change, not a preset change; the invariant under test
+        -- "a preset does nothing without a caller" -- is unaffected."""
         import yaml
 
         data = yaml.safe_load((ROUTING_DIR / "openai.yaml").read_text(encoding="utf-8"))
         assert parse_preset(data) is not None
         result = await resolve_model_role(["reasoning"], data["roles"], _providers())
-        assert result[0]["model"] == "gpt-5.6-sol"
+        assert result[0]["model"] == "gpt-5.6-terra"
         assert result[0]["config"][CANONICAL_EFFORT_KEY] == "xhigh"
 
     @pytest.mark.asyncio
@@ -937,13 +927,24 @@ class TestShippedKnobConsistentMatrix:
             )
 
     @pytest.mark.asyncio
-    async def test_a_sol_root_is_not_downgraded(self) -> None:
+    async def test_a_top_tier_root_is_not_downgraded(self) -> None:
+        """A caller ABOVE the matrix's own ceiling is not dragged below it.
+
+        Under `strict` inheritance a sub-agent is capped at the caller's tier
+        and effort. This asserts the cap is a CEILING and not a target: a
+        `gpt-5.6-sol` / xhigh caller still gets the matrix's own top candidate
+        at full effort, rather than being pulled down a rung.
+
+        Previously this read `openai-knob-consistent.yaml` (deleted
+        2026-09-07) and asserted the result was sol itself, because sol was in
+        the roles block. With the flagship tier paused, the matrix's ceiling
+        for `reasoning` is `gpt-5.6-terra` @ xhigh -- so that is what a sol
+        caller must still receive, undiminished."""
         import yaml
 
-        data = yaml.safe_load(
-            (ROUTING_DIR / "openai-knob-consistent.yaml").read_text(encoding="utf-8")
-        )
+        data = yaml.safe_load((ROUTING_DIR / "openai.yaml").read_text(encoding="utf-8"))
         preset = parse_preset(data)
+        assert preset is not None
         result = await resolve_model_role(
             ["reasoning"],
             data["roles"],
@@ -954,18 +955,11 @@ class TestShippedKnobConsistentMatrix:
             preset=preset,
             escalations=EscalationState(),
         )
-        assert result[0]["model"] == "gpt-5.6-sol"
+        assert result[0]["model"] == "gpt-5.6-terra"
         assert result[0]["config"][CANONICAL_EFFORT_KEY] == "xhigh"
 
-    def test_roles_block_is_identical_to_the_stock_openai_matrix(self) -> None:
-        """The treatment differs from the control by the preset block ALONE.
-        If the roles ever diverge, the A/B stops being single-variable."""
-        import yaml
-
-        stock = yaml.safe_load(
-            (ROUTING_DIR / "openai.yaml").read_text(encoding="utf-8")
-        )
-        knob = yaml.safe_load(
-            (ROUTING_DIR / "openai-knob-consistent.yaml").read_text(encoding="utf-8")
-        )
-        assert knob["roles"] == stock["roles"]
+    # `test_roles_block_is_identical_to_the_stock_openai_matrix` lived here. It
+    # asserted the treatment arm differed from the control by the preset block
+    # ALONE. Both arms are now one file (`openai-knob-consistent.yaml` deleted
+    # 2026-09-07), so there is no longer a pair to hold identical -- the
+    # property is structural rather than tested.

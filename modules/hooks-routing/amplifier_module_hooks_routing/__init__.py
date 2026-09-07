@@ -233,9 +233,10 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # A matrix with no `preset:` key yields None here, and None is the
     # default-off signal every downstream branch checks. Every shipped matrix
     # in routing/ except `openai.yaml` (default ON, measured win -- see
-    # README "Knob-consistent delegation") and `openai-knob-consistent.yaml`
-    # (the same block, kept as an explicit-name pin) has no `preset:` key, so
-    # this is None for all of them.
+    # README "Knob-consistent delegation") has no `preset:` key, so this is
+    # None for all of them. (`openai-knob-consistent.yaml` carried the same
+    # block and was deleted on 2026-09-07, having become a second name for
+    # `openai.yaml`.)
     from .knob_consistency import EscalationState, parse_preset, validate_preset
 
     preset = parse_preset(base_matrix)

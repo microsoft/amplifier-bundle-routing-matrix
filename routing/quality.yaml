@@ -9,249 +9,376 @@
 # Schema:
 #   provider: Module mount name (e.g., "anthropic", "gemini", "github-copilot")
 #   model:    Exact model name or class-scoped glob. Copilot PINNED (no static
-#             fallback in provider). Non-Copilot uses class-scoped globs so new
-#             within-class releases (Opus 4.6 -> 4.7 -> 4.10) auto-resolve via
-#             the version-aware sort.
-#   config:   Optional model parameters (e.g., reasoning_effort: high|xhigh)
+#             fallback in provider).
+#   config:   Optional model parameters (reasoning_effort, or for gemini
+#             extra_request_params.thinking_config.thinking_level)
 #
 # Required roles: "general" and "fast" must be defined in every matrix.
-# All other roles are optional — agents fall back through their model_role list.
+# All other roles are optional -- agents fall back through their model_role list.
 #
-# Ordering rule: Anthropic above OpenAI in every multi-provider role.
+# Ordering rule (CHANGED 2026-09-07): OpenAI candidates come ABOVE Anthropic
+# candidates in every multi-provider role. This inverts the 2026-04-22 rule.
+# Non-OpenAI/Anthropic candidates keep their previous relative slots -- in
+# particular `vision` stays Gemini-led. If this changes, revisit balanced.yaml,
+# quality.yaml, economy.yaml together.
 #
-# Curated by Amplifier Foundation team. See docs/MATRIX_CURATOR_GUIDE.md.
+# OpenAI tier status (2026-09-07): the flagship `gpt-?.?-sol*` tier is PAUSED
+# pending further evals; sol candidates became `gpt-?.?-terra*` one effort
+# notch higher, clamped at xhigh, and the `gpt-[0-9].[0-9]` base-alias twin
+# is gone (gpt-5.6 is live; a gpt-5.5 fallback bought nothing). `ui-coding`
+# deliberately runs `gpt-?.?-luna*` at `max` effort -- cheap tier, maximum
+# thinking.
+#
+# KNOWN ODDITY, retained deliberately: `fast` selects Sonnet, not Haiku. In a
+# quality-first matrix "fast" means "the quickest acceptable model", and this
+# matrix's floor is Sonnet-tier.
+#
+# Gemini notes:
+#   * Globs are DIGIT-ANCHORED (`gemini-[3-9]*-...`). The leading `[3-9]`
+#     excludes the `gemini-omni-*` lane (which an unanchored glob matches and
+#     the version sort ranks ABOVE the numbered models) and excludes 2.x ids
+#     (which reject `thinking_level` with a hard 400).
+#   * Thinking is set via `extra_request_params.thinking_config.thinking_level`,
+#     NOT `reasoning_effort` -- the latter is inert on gemini at every value.
+#     Levels are low/medium/high; Gemini has no xhigh or max.
+#
+# --- Review log ---
+# 2026-09-07: Curator refresh, verified against LIVE provider list_models()
+#   output on 2026-09-07 (anthropic, openai, gemini, github-copilot).
+#   1. OpenAI flagship (`gpt-?.?-sol*`) PAUSED pending further evals -- every
+#      sol candidate moved down one tier to `gpt-?.?-terra*` and up one effort
+#      notch, CLAMPED at xhigh (no `max`): bare -> high, low -> medium,
+#      medium -> high, high -> xhigh, xhigh -> xhigh. (`ui-coding` is the one
+#      exception -- see item 8.) See also item 6: the `gpt-[0-9].[0-9]`
+#      migration-fallback twin is gone entirely.
+#   2. Gemini globs re-anchored `gemini-[3-9]*-...`. The old
+#      `gemini-*-flash-preview` resolved to `gemini-omni-flash-preview` (the
+#      Omni lane, not the Flash lane) AND missed gemini-3.5/3.6/3.7/3.8-flash
+#      entirely, because Google dropped the `-preview` suffix. Verified with
+#      the shipped `_version_sort_key`.
+#   3. Gemini thinking is now requested through the knob the provider actually
+#      reads -- `extra_request_params.thinking_config.thinking_level`. A
+#      `reasoning_effort` on a gemini candidate is INERT at every value (see
+#      matrix_loader.INERT_CONFIG_RULES) and is rejected by the loader.
+#      Gemini's ceiling is `high`; there is no xhigh/max. `minimal` is NOT
+#      used -- gemini-3.8-flash errors on it.
+#   4. Image generation retargeted `nano-banana-pro-preview` ->
+#      `gemini-3-pro-image`. The old name is absent from list_models() and
+#      from every first-party Google source; `gemini-3-pro-image` is the GA
+#      flagship image model ("Nano Banana Pro"). No thinking_level: Gemini 3
+#      image models think by default and expose no level knob.
+#   5. GitHub Copilot pins refreshed to the newest models the live API lists
+#      (claude-sonnet-5, claude-opus-5, gpt-5.5). This also fixes an invalid
+#      effort: claude-sonnet-4.6 and claude-opus-4.6 accept only
+#      low/medium/high/max -- an `xhigh` on either was silently wrong. The
+#      repo test passes a provider-wide superset, so it did not catch this.
+#   6. The `gpt-[0-9].[0-9]` twin was DROPPED from every openai candidate.
+#      It existed as a pre-5.6 migration fallback; `gpt-5.6-terra` and
+#      `gpt-5.6-luna` are both confirmed present on the live openai
+#      list_models(), so a fallback to gpt-5.5-or-earlier buys nothing. The
+#      Copilot GPT slots moved the same generation for the same reason
+#      (`gpt-?.?-terra*` + `gpt-5.6-terra`, both live on the Copilot API).
+#   7. NO CANDIDATE IS LEFT WITH A BLANK EFFORT. An unset knob is not a
+#      neutral default to reason about, so every candidate that can carry one
+#      now says what it wants; `medium` where nothing more specific was
+#      established. Three exceptions, all enforced by the loader rather than
+#      chosen here (matrix_loader.INERT_CONFIG_RULES):
+#        * claude-haiku-* on ANY provider -- `reasoning_effort` is REJECTED at
+#          every value (measured: effort absent on the wire, budget pinned at
+#          32000). Its documented replacement is `thinking_budget_tokens`.
+#        * gemini/* -- `reasoning_effort` is REJECTED; `thinking_level` is the
+#          live knob and is set on every gemini candidate except flash-lite,
+#          where Google documents no levels for the text models.
+#        * ollama `model: "*"` -- no effort knob exists.
+#   8. `ui-coding` is `gpt-?.?-luna*` at `max` effort on EVERY matrix that
+#      routes to openai -- cheap tier, maximum thinking.
+#   9. OpenAI is now TERRA-OR-LUNA ONLY. The `gpt-?.?-mini*` and
+#      `gpt-?.?-nano*` rungs were removed alongside the `gpt-[0-9].[0-9]`
+#      twin (item 6): with sol paused, every openai candidate in every matrix
+#      is one of exactly two globs -- `gpt-?.?-terra*` (work) or
+#      `gpt-?.?-luna*` (cheap/fast, and `ui-coding` at max effort). There are
+#      no openai fallback rungs left at all.
+#  10. Haiku carries `thinking_budget_tokens: 32000` instead of a blank. The
+#      loader REJECTS `reasoning_effort` on any model whose name contains
+#      'haiku', under any provider -- it collapses every level above 'low'
+#      into one identical request. 32000 is what `medium` resolves to and what
+#      a blank already produced on the wire, so this is explicit, not a
+#      behaviour change. REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort
+#      support, swap back to `reasoning_effort` -- and note the guard rule
+#      itself must be updated in the same change, since it matches the
+#      substring 'haiku' and would otherwise keep rejecting claude-haiku-5.
 
 name: quality
 description: "Best available models. Prioritizes capability over cost."
-updated: "2026-07-22"
+updated: "2026-09-07"
 
 roles:
   general:
     description: "Versatile catch-all, no specialization needed"
     candidates:
-      - provider: anthropic
-        model: claude-sonnet-*
       - provider: openai
         model: gpt-?.?-terra*
         config:
           reasoning_effort: low
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+      - provider: anthropic
+        model: claude-sonnet-*
         config:
-          reasoning_effort: low
+          reasoning_effort: medium
       - provider: gemini
-        model: gemini-*-pro-preview
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: medium
       - provider: github-copilot
-        model: claude-sonnet-4.6
+        model: claude-sonnet-5
+        config:
+          reasoning_effort: medium
 
   fast:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
-      - provider: anthropic
-        model: claude-sonnet-*
       - provider: openai
         model: gpt-?.?-terra*
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: medium
+      - provider: anthropic
+        model: claude-sonnet-*
+        config:
+          reasoning_effort: medium
       - provider: gemini
-        model: gemini-*-flash-preview
+        model: "gemini-[3-9]*-flash"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: low
       - provider: github-copilot
-        model: claude-sonnet-4.6
+        model: claude-sonnet-5
+        config:
+          reasoning_effort: medium
 
   coding:
     description: "Code generation, implementation, debugging"
     candidates:
-      - provider: anthropic
-        model: claude-sonnet-*
       - provider: openai
         model: gpt-?.?-terra*
         config:
-          reasoning_effort: medium
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+          reasoning_effort: high
+      - provider: anthropic
+        model: claude-sonnet-*
         config:
           reasoning_effort: medium
       - provider: gemini
-        model: gemini-*-pro-preview
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: medium
       - provider: github-copilot
-        model: claude-sonnet-4.6
+        model: claude-sonnet-5
+        config:
+          reasoning_effort: medium
 
   ui-coding:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
+      - provider: openai
+        model: gpt-?.?-luna*
+        config:
+          reasoning_effort: max
       - provider: anthropic
         model: claude-sonnet-*
-      - provider: openai
-        model: gpt-?.?-terra*
-        config:
-          reasoning_effort: medium
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: medium
       - provider: gemini
-        model: gemini-*-pro-preview
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: medium
       - provider: github-copilot
-        model: claude-sonnet-4.6
+        model: claude-sonnet-5
+        config:
+          reasoning_effort: medium
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
-      # Anthropic promoted above OpenAI per ordering rule (2026-04-22).
-      - provider: anthropic
-        model: claude-sonnet-*
-        config:
-          reasoning_effort: high
       - provider: openai
         model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+      - provider: anthropic
+        model: claude-sonnet-*
         config:
-          reasoning_effort: xhigh
+          reasoning_effort: high
       - provider: gemini
-        model: gemini-*-pro-preview
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: high
       - provider: github-copilot
-        model: gpt-5.4
+        model: gpt-5.6-terra
         config:
           reasoning_effort: high
 
   reasoning:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: xhigh
+      - provider: gemini
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: high
       - provider: anthropic
         model: claude-opus-*
         config:
           reasoning_effort: high
-      - provider: gemini
-        model: gemini-*-pro-preview
-      - provider: openai
-        model: gpt-?.?-sol*
-        config:
-          reasoning_effort: xhigh
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: xhigh
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-5
         config:
           reasoning_effort: high
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
-      # Anthropic promoted above OpenAI per ordering rule (2026-04-22).
-      - provider: anthropic
-        model: claude-sonnet-*
-        config:
-          reasoning_effort: xhigh
       - provider: openai
         model: gpt-?.?-terra*
         config:
           reasoning_effort: xhigh
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+      - provider: anthropic
+        model: claude-sonnet-*
         config:
           reasoning_effort: xhigh
       - provider: gemini
-        model: gemini-*-pro-preview
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: high
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-5
         config:
           reasoning_effort: xhigh
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
       - provider: anthropic
         model: claude-opus-*
-      - provider: openai
-        model: gpt-?.?-sol*
         config:
-          reasoning_effort: low
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: low
+          reasoning_effort: medium
       - provider: gemini
-        model: gemini-*-pro-preview
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: medium
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-5
+        config:
+          reasoning_effort: medium
 
   writing:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: medium
       - provider: anthropic
         model: claude-opus-*
-      - provider: openai
-        model: gpt-?.?-sol*
         config:
-          reasoning_effort: low
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: low
+          reasoning_effort: medium
       - provider: gemini
-        model: gemini-*-pro-preview
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: medium
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-5
+        config:
+          reasoning_effort: medium
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: xhigh
       - provider: anthropic
         model: claude-opus-*
         config:
           reasoning_effort: high
-      - provider: openai
-        model: gpt-?.?-sol*
-        config:
-          reasoning_effort: high
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
-        config:
-          reasoning_effort: high
       - provider: gemini
-        model: gemini-*-pro-preview
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: high
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-5
+        config:
+          reasoning_effort: medium
 
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
       - provider: gemini
-        model: gemini-*-pro-preview
-      - provider: anthropic
-        model: claude-sonnet-*
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: low
       - provider: openai
         model: gpt-?.?-terra*
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: medium
+      - provider: anthropic
+        model: claude-sonnet-*
+        config:
+          reasoning_effort: medium
       - provider: github-copilot
-        model: claude-sonnet-4.6
+        model: claude-sonnet-5
+        config:
+          reasoning_effort: medium
 
   image-gen:
     description: "Image generation, visual mockup creation, visual ideation"
     candidates:
       - provider: gemini
-        model: nano-banana-pro-preview
+        model: gemini-3-pro-image
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
+      - provider: openai
+        model: gpt-?.?-terra*
+        config:
+          reasoning_effort: high
       - provider: anthropic
         model: claude-opus-*
-      - provider: openai
-        model: gpt-?.?-sol*
-        config:
-          reasoning_effort: medium
-      - provider: openai
-        model: "gpt-[0-9].[0-9]"
         config:
           reasoning_effort: medium
       - provider: gemini
-        model: gemini-*-pro-preview
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          extra_request_params:
+            thinking_config:
+              thinking_level: high
       - provider: github-copilot
-        model: claude-opus-4.6
+        model: claude-opus-5
+        config:
+          reasoning_effort: medium
