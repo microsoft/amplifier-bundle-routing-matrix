@@ -191,9 +191,10 @@ def find_provider_by_type(
     Returns:
         ``(module_id, provider_instance)`` or ``None``.
 
-    Matching strategy (each step is run for the canonical ``type_name``
-    FIRST and then for each of its :data:`PROVIDER_FAMILY_ALIASES`, so the
-    canonical backend always wins when more than one is mounted):
+    Matching strategy (BOTH steps are run for the canonical ``type_name``
+    before EITHER is run for any of its :data:`PROVIDER_FAMILY_ALIASES`, so
+    the canonical backend always wins when more than one is mounted -- however
+    its instances happen to be keyed):
         1. Exact key, "provider-" prefix stripped, or "provider-" prefix
            added — covers the single-instance case and any instance
            explicitly keyed by the bare type.
@@ -215,9 +216,21 @@ def find_provider_by_type(
            convention used elsewhere in the ecosystem.
     """
     accepted = _type_names_for(type_name)
+    provider_specs = _get_provider_specs(coordinator)
 
-    # Step 1, one full scan per accepted name so the canonical type beats an
-    # alias regardless of mount order.
+    # Each accepted name gets BOTH steps before the next name is tried. The
+    # canonical name must be exhausted -- by key AND by module type -- before
+    # any alias is considered, or the alias wins on a technicality.
+    #
+    # That technicality bit on 2026-09-07: a host with SIX provider-openai
+    # instances (sol, terra, luna, ...) all keyed by instance id, plus one
+    # provider-openai-chatgpt instance keyed by its bare type. The earlier
+    # shape ran step 1 for every name first: `openai` missed by key (no
+    # instance is keyed "openai"), then `openai-chatgpt` HIT by key -- and
+    # returned, before step 2 ever resolved `openai` through the mount plan.
+    # The explorer ran on the ChatGPT subscription while the API key sat
+    # unused at priority 2. Canonical-first has to mean "canonical through
+    # every avenue first", not "canonical first within each avenue".
     for wanted in accepted:
         for name, provider in providers.items():
             if wanted in (
@@ -226,17 +239,12 @@ def find_provider_by_type(
                 f"provider-{wanted}",
             ):
                 return (name, provider)
-
-    provider_specs = _get_provider_specs(coordinator)
-    if not provider_specs:
-        return None
-
-    # Step 2, likewise: resolve by module type for the canonical name first,
-    # and only fall through to an alias when no canonical instance exists.
-    for wanted in accepted:
-        found = _resolve_by_module_type(providers, provider_specs, wanted, model_pattern)
-        if found is not None:
-            return found
+        if provider_specs:
+            found = _resolve_by_module_type(
+                providers, provider_specs, wanted, model_pattern
+            )
+            if found is not None:
+                return found
     return None
 
 
