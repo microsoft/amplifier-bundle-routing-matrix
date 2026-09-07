@@ -479,20 +479,29 @@ class boundaries (Opus and Haiku both match `claude-*`) and will silently
 swap a premium role to a budget model when the provider reorders its list.
 Avoid them outside of `model: "*"` for user-managed providers like Ollama.
 
-**Drop the trailing `*` on `openai-chatgpt`.** That backend serves a `-fast`
-sibling for every model (`gpt-5.6-terra` AND `gpt-5.6-terra-fast`). A trailing
-`*` matches both, they tie on version, and the tie-break prefers the LONGER
-name — so `gpt-?.?-terra*` silently selects the `-fast` variant. Use
-`gpt-?.?-terra` / `gpt-?.?-luna`. This is the same shape as `gpt-5.6-sol-fast`
-on GitHub Copilot: whenever a backend ships a suffixed sibling, a class glob
-will find it.
+**No trailing `*` on ANY OpenAI-family candidate.** The ChatGPT backend serves
+a `-fast` sibling for every model (`gpt-5.6-terra` AND `gpt-5.6-terra-fast`).
+A trailing `*` matches both, they tie on version, and the tie-break prefers the
+LONGER name — so `gpt-?.?-terra*` silently selects `-fast`. Suffix-free, the
+SAME glob resolves to `gpt-5.6-terra` on *both* backends, which is what lets one
+glob vocabulary serve the pay-per-use API and the ChatGPT subscription alike.
+Same shape as `gpt-5.6-sol-fast` on GitHub Copilot: whenever a backend ships a
+suffixed sibling, a class glob will find it.
+
+> The preset `tier_ladder` is the one place that KEEPS its `*`. A candidate
+> glob **selects** one model (narrow is right — it is how `-fast` is excluded);
+> a ladder glob **classifies** a model already chosen (broad is right — a user
+> who hand-pins `gpt-5.6-terra-fast` must still land on the terra rung).
 
 **`openai-chatgpt` is not `openai`.** It is a separate provider MODULE (the
-OAuth/ChatGPT-subscription backend), so `find_provider_by_type` matches it
-neither by name nor via the module-type fallback. A matrix that names only
-`provider: openai` gives a ChatGPT-only user **zero** routing. Add explicit
-`provider: openai-chatgpt` candidates — `tests/test_single_provider_coverage.py`
-enforces that every supported provider can route `balanced` on its own.
+OAuth/ChatGPT-subscription backend) — same models, different bill — so
+`find_provider_by_type` matches it neither by name nor via the module-type
+fallback. A matrix that names only `provider: openai` gives a ChatGPT-only user
+**zero** routing. Every matrix that names one names both, in the same role;
+`tests/test_single_provider_coverage.py` enforces that each supported provider
+can route `balanced` on its own. There is deliberately **no separate
+openai-chatgpt matrix** — same models and the same tier story, so a second file
+would only be a sync burden.
 
 **Anchor the generation digit on Gemini.** A `gemini-*-...` glob also matches
 the `gemini-omni-*` lane, and because `omni` has no leading digit run the
@@ -521,8 +530,8 @@ reject `thinking_level`.
 > the base alias explicitly.
 | `gpt-?.?-sol*` | any dotted-version sol / flagship tier (e.g. `gpt-5.6-sol`) | base, terra, mini, nano, luna, pro |
 | `gpt-?.?-terra*` | any dotted-version terra / mid tier (e.g. `gpt-5.6-terra`) | base, sol, mini, nano, luna, pro |
-| `gpt-?.?-terra` | the standard terra id ONLY — use on `openai-chatgpt` | everything above, **plus `-fast` variants** |
-| `gpt-?.?-luna` | the standard luna id ONLY — use on `openai-chatgpt` | everything above, **plus `-fast` variants** |
+| `gpt-?.?-terra` | the standard terra id ONLY — **the shipped form** | everything above, **plus `-fast` variants and dated snapshots** |
+| `gpt-?.?-luna` | the standard luna id ONLY — **the shipped form** | everything above, **plus `-fast` variants and dated snapshots** |
 | `gpt-?.?-luna*` | any dotted-version luna / cheap-fast tier (e.g. `gpt-5.6-luna`) | base, terra, mini, nano, sol, pro |
 | `gpt-?.?-mini*` | any dotted-version mini (e.g. `gpt-5.4-mini`) | base, pro, nano, sol, luna, `gpt-5-mini` (no dot) |
 | `gpt-?.?-nano*` | any dotted-version nano | base, mini, pro, sol, luna |
@@ -573,13 +582,11 @@ Different providers use different naming conventions for the **same underlying m
 | Claude Sonnet 4.x | `claude-sonnet-*` (glob) | — | — | `claude-sonnet-4.6` (pin) |
 | Claude Opus 4.x | `claude-opus-*` (glob) | — | — | `claude-opus-4.8` (pin) |
 | Claude Haiku 4.x | `claude-haiku-*` (glob) | — | — | `claude-haiku-4.5` (pin) |
-| GPT mid-tier (terra) | — | `gpt-?.?-terra*` (glob) | — | pinned, e.g. `gpt-5.6-terra` |
+| GPT mid-tier (terra) | — | `gpt-?.?-terra` (glob, **no `*`**) | — | pinned, e.g. `gpt-5.6-terra` |
 | GPT base / pre-5.6 migration fallback | — | `gpt-[0-9].[0-9]` (glob) | — | — |
 | GPT flagship (sol) | — | `gpt-?.?-sol*` (glob) | — | pinned, e.g. `gpt-5.6-sol` |
-| GPT cheap-fast (luna) | — | `gpt-?.?-luna*` (glob) | — | pinned, e.g. `gpt-5.6-luna` |
+| GPT cheap-fast (luna) | — | `gpt-?.?-luna` (glob, **no `*`**) | — | pinned, e.g. `gpt-5.6-luna` |
 | GPT-5.x mini | — | `gpt-?.?-mini*` (glob) | — | pinned, e.g. `gpt-5.4-mini` |
-| ChatGPT-backend terra | — | `gpt-?.?-terra` (glob, **no `*`**) | — | — |
-| ChatGPT-backend luna | — | `gpt-?.?-luna` (glob, **no `*`**) | — | — |
 | Gemini Pro | — | — | `gemini-[3-9]*-pro-preview` (glob) | — |
 | Gemini Flash | — | — | `gemini-[3-9]*-flash` (glob) | — |
 | Gemini Image | — | — | `gemini-3-pro-image` (exact) | — |

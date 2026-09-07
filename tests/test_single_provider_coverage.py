@@ -197,17 +197,26 @@ def test_provider_alone_routes_every_role_of_the_default_matrix(
         )
 
 
-@pytest.mark.parametrize(
-    "matrix_name", ["balanced", "quality", "economy", "openai-chatgpt"]
-)
-def test_chatgpt_globs_never_select_a_fast_variant(matrix_name: str) -> None:
-    """The `-fast` trap, asserted on every matrix that names this provider.
+@pytest.mark.parametrize("matrix_name", ["balanced", "quality", "economy", "openai"])
+def test_openai_globs_are_suffix_free_and_never_select_a_fast_variant(
+    matrix_name: str,
+) -> None:
+    """The `-fast` trap, asserted across the whole OpenAI family.
 
-    This backend serves `gpt-5.6-terra` AND `gpt-5.6-terra-fast`. A trailing
-    `*` matches both, they tie on version, and the resolver's tie-break prefers
-    the LONGER name -- so `gpt-?.?-terra*` silently selects the `-fast`
-    variant. The shipped globs are suffix-free for exactly this reason. (Same
-    shape as `gpt-5.6-sol-fast` on GitHub Copilot.)
+    The ChatGPT backend serves `gpt-5.6-terra` AND `gpt-5.6-terra-fast`. A
+    trailing `*` matches both, they tie on version, and the resolver's
+    tie-break prefers the LONGER name -- so `gpt-?.?-terra*` silently selects
+    the `-fast` variant. (Same shape as `gpt-5.6-sol-fast` on GitHub Copilot.)
+
+    Suffix-free, the SAME glob resolves to the same clean id on BOTH backends,
+    which is what lets one glob vocabulary serve the pay-per-use API and the
+    ChatGPT subscription alike. So the rule is asserted for the whole family,
+    not just the backend that exposes the trap -- a `*` creeping back onto an
+    `openai` candidate would be copied onto a chatgpt one soon enough.
+
+    CANDIDATE globs only. The preset `tier_ladder` keeps its `*` on purpose:
+    it CLASSIFIES an already-chosen model rather than SELECTING one, so it
+    must still match a hand-pinned suffixed id.
     """
     roles = _roles(matrix_name)
     providers = _providers("openai-chatgpt")
@@ -215,15 +224,15 @@ def test_chatgpt_globs_never_select_a_fast_variant(matrix_name: str) -> None:
         (role, c)
         for role, r in roles.items()
         for c in r["candidates"]
-        if c.get("provider") == "openai-chatgpt"
+        if c.get("provider") in ("openai", "openai-chatgpt")
     ]
-    assert named, f"{matrix_name}.yaml names no openai-chatgpt candidate"
+    assert named, f"{matrix_name}.yaml names no openai-family candidate"
 
     for role, candidate in named:
         assert not candidate["model"].endswith("*"), (
-            f"{matrix_name}.yaml role {role!r}: openai-chatgpt model "
-            f"{candidate['model']!r} ends in '*', which will resolve to the "
-            "'-fast' variant. Drop the trailing '*'."
+            f"{matrix_name}.yaml role {role!r}: {candidate['provider']} model "
+            f"{candidate['model']!r} ends in '*'. On the ChatGPT backend that "
+            "resolves to the '-fast' variant. Drop the trailing '*'."
         )
 
     async def _run() -> dict[str, Any]:
