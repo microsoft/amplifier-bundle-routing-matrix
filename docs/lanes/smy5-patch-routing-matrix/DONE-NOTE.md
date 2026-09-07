@@ -19,12 +19,26 @@ shipped as a draft PR. Per the goal's LANDING STAGE clause, a draft PR is the ba
 merge is the manager's next stage.
 
 **One procedure step is NOT-POSSIBLE, and it is not the cap:** this lane could not
-`work_claim` — and therefore cannot `work_resolve` — item `model_performance-smy5`,
-because that single item is fanned out to **four concurrent lanes** and one of them holds
-it. See finding **F1**. That is a defect in the goal's procedure, not a blocker on the
-work: every deliverable was reachable and every deliverable landed. It is deliberately
-**not** OUTCOME branch C — writing `BLOCKED.md` here would have thrown away a complete,
-verified, zero-cost patch application over a bookkeeping collision.
+`work_claim` — and therefore can neither `work_resolve` nor `work_release` —
+`model_performance-smy5`, because that single item is fanned out to **four concurrent
+lanes** and one of them holds it. Both terminal verbs were **attempted and refused**; the
+refusals are quoted verbatim under finding **F1**. Every one of the goal's three branches
+bottoms out in one of those two verbs, so **for a non-holding lane the three branches are
+not exhaustive** — there is no terminal verb this lane can execute. That is a defect in the
+goal's procedure, not a blocker on the work: every deliverable was reachable and every
+deliverable landed.
+
+It is deliberately **not** OUTCOME branch C. Two reasons, and the second is the stronger:
+writing `BLOCKED.md` would have discarded a complete, verified, zero-cost patch application
+over a bookkeeping collision — and it would have been **false**, asserting this repo's work
+is unreachable while PR #68 sits ready with 7/7 CI green.
+
+**The terminal state was chosen once and has not moved.** What changed after review is
+evidence, not the decision: the two refusals went from inferred to observed, and both
+findings were filed as tracked queue items (`model_performance-17oq`,
+`model_performance-7cdj`) via `work_add`, which needs no custody. Lane 1ru's BLOCKED →
+REJECT → BLOCKED churn was produced by re-deciding under an ambiguous goal with no number
+changing; no number changed here either, so nothing was re-decided.
 
 ---
 
@@ -39,7 +53,8 @@ verified, zero-cost patch application over a bookkeeping collision.
 | 5 | CI green where the repo has CI | **DONE** — this repo HAS CI (`.github/workflows/ci.yml`, added 2026-09-07 in #65); **7/7 hosted checks pass on the PR** |
 | 6 | DRAFT PR, do not merge | **DONE** — [**PR #68**](https://github.com/microsoft/amplifier-bundle-routing-matrix/pull/68), opened draft, marked ready once its own CI went green. **Not merged.** |
 | 7 | DONE-NOTE at the lane artifact root | **DONE** — this file, at `docs/lanes/smy5-patch-routing-matrix/` (never the repo root) |
-| — | `work_resolve` on the item | **NOT-POSSIBLE** — item held by a sibling lane; see F1 |
+| — | `work_resolve` / `work_release` on the item | **NOT-POSSIBLE** — both attempted, both refused ("not currently holding … in this session"); item held by a live sibling lane. See F1 |
+| — | Findings filed as tracked work | **DONE** — `model_performance-17oq` (F3), `model_performance-7cdj` (F1), both linked `relates-to` smy5 |
 
 ---
 
@@ -281,6 +296,53 @@ item — so the finding is not a startup race that resolved itself:
 17:00  claim … failed: issue already claimed by agent-spark-1-3875147
 17:11  claim … failed: issue already claimed by agent-spark-1-3875147
 ```
+
+#### The sharper form: all three terminal branches require custody this lane cannot obtain
+
+This was **attempted and observed**, not inferred. After every deliverable had landed, both
+terminal verbs were called and both refused, in the tool's own words:
+
+```
+work_resolve(id="model_performance-smy5", reason="…")
+  -> not currently holding 'model_performance-smy5' in this session --
+     refusing to resolve an item this session did not claim
+
+work_release(id="model_performance-smy5")
+  -> not currently holding 'model_performance-smy5' in this session --
+     refusing to release an item this session did not claim
+```
+
+Both refusals are **correct tool behaviour** — a session must never resolve or release work
+it does not own. But map them onto the goal's three branches:
+
+| Branch | Terminal verb | Available to this lane? |
+|---|---|---|
+| **A** RESOLVED | `work_resolve` | **No** — refused, observed above |
+| **B** RESOLVED AT THE CAP | `work_resolve` ("you still resolve") | **No** — same verb, same refusal |
+| **C** BLOCKED | `work_release` | **No** — refused, observed above |
+
+The goal states the three branches are **exhaustive**. For a non-holding lane in a fan-out
+they are not: **there is no terminal verb this lane can execute.** That is the defect, in
+its sharpest form, and it is a property of the goal's procedure — not of the work, which is
+complete, green and shipped.
+
+Branch C would also be **false** if written: `BLOCKED.md` tells the manager this repo's
+work is unreachable, while PR #68 is ready with 7/7 CI green. A lane must not commit a
+statement it knows to be untrue in order to satisfy a checklist.
+
+#### What was done instead, so the finding is tracked rather than marker-only
+
+`work_add` needs **no** held item, and is the sanctioned way to put work in the queue. Both
+findings were filed as real, linked queue items rather than left as prose a reader might
+skip:
+
+| Item | Finding |
+|---|---|
+| **`model_performance-17oq`** | F3 — `publication_readback.sh` stale `head_sha` (affects the merge gate for **every** lane) |
+| **`model_performance-7cdj`** | F1 — this fan-out defect, with the three refused branches quoted |
+
+Both carry Given/When/Then acceptance criteria and a `relates-to` edge to
+`model_performance-smy5`.
 
 **What this costs, stated honestly:** the item's terminal `work_resolve` — with its
 3–6 line summary — will be written by whichever lane holds it, and that lane cannot see
