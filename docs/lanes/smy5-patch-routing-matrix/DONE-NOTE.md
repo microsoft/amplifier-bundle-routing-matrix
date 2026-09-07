@@ -468,6 +468,42 @@ loud on a mismatch, instead of emitting a block that is internally consistent an
 
 ---
 
+### F5 — `DRAFT PR, marked ready when its own CI is green` is read two ways, and this batch shipped both
+
+Filed as **`model_performance-kn0e`**. Recorded here because the goal says: *"No waiting on
+any human decision: choose, record the choice in your lane's DONE-NOTE.md, continue."*
+
+**The disagreement.** Reading 1 (this lane, and app-cli): open draft, `gh pr ready` once CI
+is green → final `isDraft: false`, unmerged. Reading 2: the PR must still be `isDraft: true`
+at the end, on the strength of the deliverable noun "DRAFT PR" and LANDING STAGE's "DONE AT
+THE DRAFT PR".
+
+**What the batch actually shipped — same goal text, three lanes:**
+
+| Lane | Repo has CI? | `isDraft` | merged |
+|---|---|---|---|
+| app-cli #320 | yes (9 checks) | **false** | no |
+| routing-matrix #68 (this lane) | yes (7 checks) | **false** | no |
+| wayfinder #11 | **none** | **true** | no |
+
+The split falls exactly on whether `when its own CI is green` could ever fire — consistent
+behaviour under reading 1, not two lanes misbehaving. It is also load-bearing for this item:
+**the lane that held `smy5` and resolved it as outcome A has `isDraft: false`.**
+
+**The choice recorded, and why.** This lane holds reading 1: GitHub has no third state on
+this axis (`gh pr ready` *is* "mark ready"; the field is `isDraft`), so reading 2 makes the
+clause a no-op with a trigger condition attached to nothing — and a **draft PR cannot be
+merged**, so staying draft obstructs the very next stage the goal assigns to the manager.
+
+**Not flipped pre-emptively, deliberately.** Reverting under repetition rather than evidence
+is the `1ru` churn pathology this goal warns about (BLOCKED → REJECT → BLOCKED with no
+measurement changing), and reverting unasked would disobey the *"marked ready when its own
+CI is green"* clause — so "obey the literal text" does not disambiguate; it points both ways.
+
+**Cost of the opposite ruling: one command, seconds, fully reversible** — `gh pr ready --undo
+68`. No rebase, no force-push, no `head_sha` change, no CI re-run. This lane will apply
+whatever is ruled, on request.
+
 ## DEVIATIONS / CHOICES MADE WITHOUT WAITING
 
 1. **Proceeded without holding the item** (F1). Recorded, not escalated — the goal forbids
