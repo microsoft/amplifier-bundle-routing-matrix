@@ -313,6 +313,7 @@ def test_config_key_the_provider_baked_into_an_attribute_is_reported() -> None:
 
     assert record is not None
     assert record["inert_config_keys"] == ["reasoning_effort"]
+    assert record["config_keys_reasserted"] == ["reasoning_effort"]
     # Config restored; the validated attribute left exactly as the provider set it.
     assert providers["luna"].config["reasoning_effort"] == "high"
     assert providers["luna"].reasoning_effort == "low"  # type: ignore[attr-defined]
@@ -682,10 +683,11 @@ def test_gate_attribute_already_pinned_is_not_drift_without_a_config_dict(
     assert caplog.records == [], "matching live attributes must not warn"
 
 
-def test_gate_inert_is_claimed_only_after_reading_the_attribute() -> None:
-    """GATE. With no config dict AND a genuinely different attribute, the key IS
-    inert -- and is reported as such because the attribute was read, not
-    because the dict was missing."""
+def test_gate_private_config_with_live_attribute_is_unrestorable(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """GATE. A differing attribute with no public config has no writable config
+    surface, so it is unrestorable rather than an inert config repair."""
     providers = {
         "openai-chatgpt": FakePrivateConfigProvider(
             "openai-chatgpt", 0, "gpt-5.6-terra", reasoning_effort="low"
@@ -702,13 +704,29 @@ def test_gate_inert_is_claimed_only_after_reading_the_attribute() -> None:
         ],
     )
 
-    record = reassert_own_role_pin(coordinator)
+    with caplog.at_level(
+        logging.WARNING, logger="amplifier_module_hooks_routing.role_pin"
+    ):
+        record = reassert_own_role_pin(coordinator)
 
     assert record is not None
-    assert record["inert_config_keys"] == ["reasoning_effort"]
-    assert "unrestorable_config_keys" not in record
-    # Not written past its validator: the attribute keeps the live value.
-    assert providers["openai-chatgpt"].reasoning_effort == "low"
+    assert record["config_keys_reasserted"] == []
+    assert record["unrestorable_config_keys"] == ["reasoning_effort"]
+    assert "inert_config_keys" not in record
+    warning_messages = [
+        captured.getMessage()
+        for captured in caplog.records
+        if captured.levelno == logging.WARNING
+    ]
+    assert warning_messages == [
+        "[ROUTING] config keys ['reasoning_effort'] are pinned for "
+        "'openai-chatgpt' but that provider exposes no writable public `config` "
+        "dict. Not restored; live attributes were not modified."
+    ]
+    # Neither the private mount dict nor its validated live attribute is modified.
+    provider = providers["openai-chatgpt"]
+    assert provider._config["reasoning_effort"] == "low"
+    assert provider.reasoning_effort == "low"
 
 
 def test_gate_no_surface_at_all_is_unrestorable_not_inert() -> None:
@@ -737,6 +755,7 @@ def test_gate_no_surface_at_all_is_unrestorable_not_inert() -> None:
 
     assert record is not None
     assert record["unrestorable_config_keys"] == ["reasoning_effort"]
+    assert record["config_keys_reasserted"] == []
     assert "inert_config_keys" not in record
 
 

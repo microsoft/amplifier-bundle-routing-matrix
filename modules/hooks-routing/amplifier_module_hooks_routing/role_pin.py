@@ -19,10 +19,10 @@ WHICH lifecycle event, corrected (model_performance-fde)
 This docstring used to say ``session:start`` fires on the resumed leg, and
 ``__init__.py`` used to register only for it. That is TRUE for a resumed
 DELEGATE child -- the population 74w was measured on -- because the child is
-reconstructed with ``is_resumed=False`` and so emits ``session:start``; the
-capture above is exactly such a child. It is FALSE for a resumed ROOT session,
-which emits ``session:resume`` INSTEAD (``amplifier_core/session.py:151``). For
-those legs this file never ran at all between 74w landing and fde.
+reconstructed with ``is_resumed=False`` and so emits ``session:start``. It is
+FALSE for a resumed ROOT session, which emits ``session:resume`` INSTEAD
+(``amplifier_core/session.py:151``). For those legs this file never ran at all
+between 74w landing and fde.
 
 Measured blast radius of that gap, committed captures: **nil**. 0 of 212 resumed
 root sessions in the corpus declared a session-level ``provider_preferences``,
@@ -661,23 +661,24 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
     # the record instead of writing an attribute past its own validation.
     inert_config_keys: list[str] = []
     unrestorable_config_keys: list[str] = []
+    config_keys_reasserted: list[str] = []
     if config_drift:
         provider_config = getattr(providers[target], "config", None)
         has_config_dict = isinstance(provider_config, dict)
         for ckey, cvalue in list(config_drift.items()):
             if has_config_dict:
                 provider_config[ckey] = cvalue
-            live = providers[target]
-            if hasattr(live, ckey):
+                config_keys_reasserted.append(ckey)
+                live = providers[target]
                 # The attribute is the surface that decides. "Inert" is a claim
                 # about THAT surface, so it is made only after reading it.
-                if getattr(live, ckey) != cvalue:
+                if hasattr(live, ckey) and getattr(live, ckey) != cvalue:
                     inert_config_keys.append(ckey)
-            elif not has_config_dict:
-                # No attribute and no dict: nothing to restore into. Say that,
-                # rather than asserting a snapshot nobody observed.
+            else:
+                # A live attribute can tell us that the value is wrong, but is
+                # deliberately not writable here. Without the public config
+                # dict spawn writes, there is no config surface to restore.
                 unrestorable_config_keys.append(ckey)
-                del config_drift[ckey]
 
     after = {name: _priority_of(p) for name, p in providers.items()}
     after_model = _read_field(providers[target], "default_model")
@@ -691,7 +692,7 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
         after_model,
         before,
         after,
-        sorted(config_drift) or "(none)",
+        sorted(config_keys_reasserted) or "(none)",
     )
     if inert_config_keys:
         logger.warning(
@@ -704,8 +705,8 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
     if unrestorable_config_keys:
         logger.warning(
             "[ROUTING] config keys %s are pinned for %r but that provider "
-            "exposes neither a matching attribute nor a `config` dict, so "
-            "there is no surface to restore them on. Not restored; reported.",
+            "exposes no writable public `config` dict. Not restored; live "
+            "attributes were not modified.",
             sorted(unrestorable_config_keys),
             target,
         )
@@ -721,7 +722,7 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
         "model_reasserted": model_drifted,
         "model_before": before_model,
         "model_after": after_model,
-        "config_keys_reasserted": sorted(config_drift),
+        "config_keys_reasserted": sorted(config_keys_reasserted),
     }
     if len(pins) > 1:
         record["preference_index"] = pins.index(pin)
