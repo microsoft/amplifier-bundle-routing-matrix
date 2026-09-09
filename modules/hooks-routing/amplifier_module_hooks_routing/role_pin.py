@@ -1,24 +1,10 @@
-"""Re-assert a session's OWN model_role provider pin at session:start.
+"""Re-assert a session's OWN model_role provider pin at its lifecycle event.
 
-Why this exists (model_performance-74w)
----------------------------------------
-A delegate spawned with ``model_role: fast`` gets its child mount plan
-promoted so the role's provider wins priority selection
-(``amplifier-foundation/spawn_utils.py`` ``_apply_single_override``: target to
-priority 0, ties demoted). That promotion does not survive a RESUME: the resume
-path re-applies the settings-level provider overrides over the persisted child
-plan, and settings speak in ``priority``, so the promotion is overwritten with
-the root's ordering. Upstream defect: ``model_performance-rc0``.
-
-Measured consequence, capture ``20260901-rebaseline/runs/val-rb-oai-sol-xhigh-s1-01``,
-delegate ``0000000000000000-25443a97b60d4965_anchors-amp-dev-git-ops``:
-
-    leg 1 (spawn)   luna pri=0, sol pri=1   -> 13 requests gpt-5.6-luna@high
-    leg 2 (resume)  luna pri=14, sol pri=0  -> 25 requests gpt-5.6-sol@xhigh
-
-Both legs still carried ``provider_preferences=[luna]`` and
-``model_role=["fast","general"]``. The intent was present in config the whole
-time and simply ignored by the mount plan.
+A declared ``provider_preferences`` pin can disagree with the live mounted
+provider state. That proves only that the declared and live surfaces differ:
+it does not establish which one reflects intent or why they diverged. This
+module conservatively restores fields it can safely write and reports any
+live attribute it deliberately leaves untouched.
 
 Why hooks-routing can fix it here
 ---------------------------------
@@ -44,15 +30,6 @@ so there was no pin to reassert on any of them -- root sessions do not carry
 role pins, delegates do. The gap was real, and the reassert it silenced was a
 no-op every time. The materially affected half of fde was layer-B
 ``model_role`` resolution, not this file.
-
-THIS IS DEFENSE IN DEPTH, NOT THE ROOT CAUSE
---------------------------------------------
-The root cause is the resume path itself re-imposing settings priority over a
-child's promoted mount plan. That is owned upstream in ``amplifier-app-cli``
-(lane n1i, PR #292) and tracked as ``model_performance-rc0``. Everything in
-this file is a second line of defence in the routing layer: it repairs the
-symptom on the live provider objects after the fact. It does not, and does not
-claim to, fix the resume path.
 
 Fidelity to ``_apply_single_override`` (model_performance-j8v)
 --------------------------------------------------------------
@@ -706,26 +683,21 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
     after_model = _read_field(providers[target], "default_model")
 
     logger.info(
-        "[ROUTING] restored this session's model_role pin on %r: selection was "
-        "resolving to %r; model %r -> %r. This session's config pinned %r all "
-        "along -- the live mount state had drifted (see model_performance-rc0: "
-        "a RESUME re-imposes settings priority over a child's promotion). "
-        "priorities %s -> %s; config keys restored: %s",
+        "[ROUTING] reasserted declared pin for %r: mounted selection was %r; "
+        "model %r -> %r; priorities %s -> %s; config keys restored: %s.",
         target,
         winner,
         before_model,
         after_model,
-        target,
         before,
         after,
         sorted(config_drift) or "(none)",
     )
     if inert_config_keys:
         logger.warning(
-            "[ROUTING] config keys %s were restored to %r's config but that "
-            "provider already snapshotted a different value into an attribute "
-            "at mount; a config write cannot change what it sends. Reported, "
-            "not silently forced. Root fix is upstream (model_performance-rc0).",
+            "[ROUTING] declared config keys %s differ from live attributes on "
+            "%r; restored config only. Config-only restoration does not change "
+            "request behavior; live attributes were not modified.",
             sorted(inert_config_keys),
             target,
         )

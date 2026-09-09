@@ -381,3 +381,22 @@ async def test_two_kernel_shaped_lifecycle_events_cannot_double_resolve(
     assert agents["scout"]["provider_preferences"] == [
         {"provider": "luna", "model": "gpt-5.6-luna"}
     ]
+
+
+@pytest.mark.asyncio
+async def test_repeated_lifecycle_events_do_not_repeat_role_pin_diagnostic(
+    tmp_path: Path,
+) -> None:
+    """The lifecycle latch keeps one unchanged drift state to one event."""
+    providers = _captured_providers()
+    coordinator, bus = _make_coordinator(
+        providers,
+        own_prefs=[{"provider": "luna", "model": "gpt-5.6-luna"}],
+    )
+    await _mount(coordinator, tmp_path)
+
+    await _handler_for(coordinator, "session:resume")("session:resume", {})
+    await _handler_for(coordinator, "session:start")("session:start", {})
+
+    emitted = [call.args[0] for call in bus.emit.call_args_list]
+    assert emitted.count("routing:role-pin-reasserted") == 1, emitted

@@ -27,13 +27,14 @@ not in providers``, so a pin saying ``"openai"`` missed a provider mounted as
 ``"provider-openai"`` entirely.
 
 Every test below marked GATE fails on ``lane/74w-fast-role-fallthrough`` @
-88a62eb and passes after. This remains defense in depth: the root cause is the
-resume path re-imposing settings priority over a child's promoted mount plan,
-owned upstream in amplifier-app-cli (lane n1i, PR #292; model_performance-rc0).
+88a62eb and passes after. These tests establish restoration behavior from an
+observed mount disagreement; they do not attribute that disagreement to a
+particular upstream lifecycle path.
 """
 
 from __future__ import annotations
 
+import logging
 import textwrap
 from pathlib import Path
 from typing import Any
@@ -543,7 +544,9 @@ def test_ambiguous_pin_is_resolved_by_model_intent() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_session_agreeing_on_every_field_is_untouched() -> None:
+def test_session_agreeing_on_every_field_is_untouched(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Priority, model and config all already correct -> no record, no writes."""
     providers = {
         "sol": FakeAttrProvider("sol", 1, "gpt-5.6-sol"),
@@ -561,8 +564,12 @@ def test_session_agreeing_on_every_field_is_untouched() -> None:
         ],
     )
 
-    assert reassert_own_role_pin(coordinator) is None
+    with caplog.at_level(
+        logging.WARNING, logger="amplifier_module_hooks_routing.role_pin"
+    ):
+        assert reassert_own_role_pin(coordinator) is None
     assert {n: dict(p.config) for n, p in providers.items()} == snapshot
+    assert caplog.records == [], "a matching child pin must stay quiet"
 
 
 def test_preference_entry_without_a_provider_name_is_skipped() -> None:
@@ -637,7 +644,9 @@ class FakePrivateConfigProvider:
             setattr(self, key, value)
 
 
-def test_gate_attribute_already_pinned_is_not_drift_without_a_config_dict() -> None:
+def test_gate_attribute_already_pinned_is_not_drift_without_a_config_dict(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """GATE. The 2026-09-07 false positive.
 
     The child was spawned with the promotion applied: priority 0, the pinned
@@ -663,10 +672,14 @@ def test_gate_attribute_already_pinned_is_not_drift_without_a_config_dict() -> N
         ],
     )
 
-    assert reassert_own_role_pin(coordinator) is None, (
-        "the attribute already holds the pinned value; a provider that keeps "
-        "its dict private has NOT drifted and must not be reasserted"
-    )
+    with caplog.at_level(
+        logging.WARNING, logger="amplifier_module_hooks_routing.role_pin"
+    ):
+        assert reassert_own_role_pin(coordinator) is None, (
+            "the attribute already holds the pinned value; a provider that keeps "
+            "its dict private has NOT drifted and must not be reasserted"
+        )
+    assert caplog.records == [], "matching live attributes must not warn"
 
 
 def test_gate_inert_is_claimed_only_after_reading_the_attribute() -> None:
@@ -725,3 +738,79 @@ def test_gate_no_surface_at_all_is_unrestorable_not_inert() -> None:
     assert record is not None
     assert record["unrestorable_config_keys"] == ["reasoning_effort"]
     assert "inert_config_keys" not in record
+
+
+# ---------------------------------------------------------------------------
+# Diagnostics describe observed state; they do not diagnose its history.
+# ---------------------------------------------------------------------------
+
+
+def test_reassert_info_describes_declared_and_mounted_state(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A priority mismatch is one concise observed-state diagnostic."""
+    providers = {
+        "sol": FakeAttrProvider("sol", 0, "gpt-5.6-sol"),
+        "luna": FakeAttrProvider("luna", 14, "gpt-5.6-luna"),
+    }
+    coordinator = _coordinator(
+        providers, [{"provider": "luna", "model": "gpt-5.6-luna"}]
+    )
+
+    with caplog.at_level(logging.INFO, logger="amplifier_module_hooks_routing.role_pin"):
+        record = reassert_own_role_pin(coordinator)
+
+    assert record is not None
+    messages = [
+        captured.getMessage()
+        for captured in caplog.records
+        if captured.levelno == logging.INFO
+    ]
+    assert messages == [
+        "[ROUTING] reasserted declared pin for 'luna': mounted selection was "
+        "'sol'; model 'gpt-5.6-luna' -> 'gpt-5.6-luna'; priorities "
+        "{'sol': 0, 'luna': 14} -> {'sol': 1, 'luna': 0}; "
+        "config keys restored: (none)."
+    ]
+    assert "model_performance-rc0" not in messages[0]
+
+
+def test_config_only_warning_names_the_live_attribute_disagreement(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A config-only repair leaves the validated attribute untouched and says so."""
+    provider = FakeAttrProvider(
+        "luna", 0, "gpt-5.6-luna", reasoning_effort="low"
+    )
+    provider.reasoning_effort = "low"  # type: ignore[attr-defined]
+    coordinator = _coordinator(
+        {"luna": provider},
+        [
+            {
+                "provider": "luna",
+                "model": "gpt-5.6-luna",
+                "config": {"reasoning_effort": "high"},
+            }
+        ],
+    )
+
+    with caplog.at_level(
+        logging.WARNING, logger="amplifier_module_hooks_routing.role_pin"
+    ):
+        record = reassert_own_role_pin(coordinator)
+
+    assert record is not None
+    warnings = [
+        captured.getMessage()
+        for captured in caplog.records
+        if captured.levelno == logging.WARNING
+    ]
+    assert warnings == [
+        "[ROUTING] declared config keys ['reasoning_effort'] differ from live "
+        "attributes on 'luna'; restored config only. Config-only restoration "
+        "does not change request behavior; live attributes were not modified."
+    ]
+    assert "model_performance-rc0" not in warnings[0]
+    assert "'luna''s" not in warnings[0]
+    assert provider.config["reasoning_effort"] == "high"
+    assert provider.reasoning_effort == "low"  # type: ignore[attr-defined]
