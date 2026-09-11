@@ -163,12 +163,11 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             f"{DEFAULT_MAX_CONCURRENT_ROLE_RESOLUTIONS})."
         )
 
-    # model_performance-74w: restore this session's own model_role pin at the
-    # session's lifecycle event when the live mount ordering has drifted from it
-    # (a RESUME re-imposes settings priority over a child's promotion --
-    # upstream defect model_performance-rc0). No-op unless there is a real
-    # disagreement; see role_pin.reassert_own_role_pin. Escape hatch for an
-    # operator who wants the pre-fix behaviour back.
+    # Restore this session's own model_role pin at its lifecycle event when the
+    # declared pin and live mount state disagree. The mismatch alone does not
+    # identify its cause. No-op unless there is a real disagreement; see
+    # role_pin.reassert_own_role_pin. Escape hatch for an operator who wants
+    # the pre-fix behaviour back.
     reassert_role_pin: bool = config.get("reassert_role_pin", True)
 
     from .matrix_loader import (

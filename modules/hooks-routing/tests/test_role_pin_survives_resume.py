@@ -4,8 +4,8 @@ Captured defect: a delegate spawned with ``model_role: fast`` resolved to
 luna@high and ran 13 requests, then was resumed -- and the resumed leg ran 25
 requests on sol@xhigh, the most expensive cell in the fleet. The session config
 still carried ``provider_preferences=[luna]`` on BOTH legs; only the *mount
-plan* lost the promotion, because the resume path re-imposes the settings-level
-``priority`` over the child's promoted plan (upstream: model_performance-rc0).
+plan* lost the promotion. The test treats that observed disagreement as a
+routing condition, not proof of its cause.
 
 ``loop-streaming._select_provider`` reads ``priority`` off the LIVE provider
 objects on every request, so hooks-routing can restore the promotion at
