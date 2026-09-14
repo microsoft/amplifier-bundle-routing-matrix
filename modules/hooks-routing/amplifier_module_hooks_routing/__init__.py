@@ -6,6 +6,7 @@ Provides model routing based on curated role-to-provider matrices.
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,10 @@ DEFAULT_MAX_CONCURRENT_ROLE_RESOLUTIONS = 4
 # docstring for why identity alone is not a safe re-wrap check once more
 # than one hook wraps the same system-prompt-factory slot.
 _PREFIX_MARKER = '<system-reminder source="routing-matrix">'
+_INSTRUCTION_CAPABILITY = "context.instructions.v1"
+_INSTRUCTION_SOURCE_ID = "routing-matrix"
+_INSTRUCTION_SOURCE_KEY = "catalog"
+_INSTRUCTION_REFRESH_ERROR = "Routing instruction catalog refresh failed"
 
 
 # Every custom event this module emits, declared for observability.
@@ -116,7 +121,7 @@ def _declare_observability_events(coordinator: Any) -> None:
         logger.debug("Could not declare observability.events", exc_info=True)
 
 
-async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
+async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> Any:
     """Mount the routing matrix hook.
 
     Loads the default matrix, composes with user overrides, registers
@@ -724,6 +729,14 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # redesign, W3). Mutable closure state lives in these names; nested
     # functions rebind them via `nonlocal`.
     # ------------------------------------------------------------------
+    # v1 callback work runs outside this hook's event-loop call stack.  Keep
+    # its sole input as a deep-detached render record, never the resolver,
+    # coordinator, or an asyncio primitive.  The first snapshot is rendered
+    # below during mount so a request that prepares before this hook's first
+    # provider:request handler cannot lose the catalog.
+    _instruction_lease: Any = None
+    _instruction_snapshot: tuple[dict[str, str], ...] = ()
+    _instruction_refresh_failed = False
     _prefix_factory: Any = None
     # rr wave 20260831 (D1 cache-regression fix): the last `current`
     # factory object we CONTENT-VERIFIED already carries our own marker
@@ -755,6 +768,128 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
 
         body = "\n".join(lines)
         return f'<system-reminder source="routing-matrix">\n{body}\n</system-reminder>'
+
+    def _current_instruction_catalog() -> tuple[dict[str, Any], dict[str, Any]]:
+        """Read the catalog that a v1 request should publish at its head.
+
+        Routing decisions remain owned by the session-start resolver.  This is
+        only the instruction-facing catalog: it intentionally re-reads its
+        existing matrix/config inputs so an explicit edit changes the next
+        request rather than replaying an old banner.
+        """
+        current_matrix_name = config.get("default_matrix", "balanced")
+        current_origin = resolve_matrix_source(
+            current_matrix_name, custom_routing_dirs, routing_dir
+        )
+        if current_origin.path is None:
+            return {}, {}
+
+        current_base_matrix = load_matrix(current_origin.path)
+        current_overrides = config.get("overrides", {})
+        current_effective_matrix = compose_matrix(
+            current_base_matrix.get("roles", {}), current_overrides
+        )
+        routing_capability = (
+            coordinator.get_capability("session.routing")
+            if hasattr(coordinator, "get_capability")
+            else None
+        )
+        if isinstance(routing_capability, dict) and routing_capability.get("overrides"):
+            current_effective_matrix = compose_matrix(
+                current_effective_matrix, routing_capability["overrides"]
+            )
+        current_effective_matrix, _ = strip_inert_config(
+            {"roles": current_effective_matrix}
+        )
+        return current_base_matrix, current_effective_matrix.get("roles", {})
+
+    def _render_instruction_banner(
+        current_base_matrix: dict[str, Any], current_effective_matrix: dict[str, Any]
+    ) -> str:
+        if not current_effective_matrix:
+            return ""
+
+        lines = [
+            "Active routing matrix: " + current_base_matrix.get("name", "unknown"),
+            "Available model roles (use model_role parameter when delegating):",
+        ]
+        for role_name, role_data in current_effective_matrix.items():
+            desc = (
+                role_data.get("description", "") if isinstance(role_data, dict) else ""
+            )
+            lines.append(f"  {role_name:16s} — {desc}")
+        return (
+            '<system-reminder source="routing-matrix">\n'
+            + "\n".join(lines)
+            + "\n</system-reminder>"
+        )
+
+    def _refresh_instruction_snapshot() -> None:
+        """Replace the callback's immutable catalog record for one request."""
+        nonlocal _instruction_refresh_failed, _instruction_snapshot
+
+        # Clear first: an actual render failure must never make a later
+        # callback replay the last good catalog as though it were current.
+        _instruction_snapshot = ()
+        try:
+            current_base_matrix, current_effective_matrix = _current_instruction_catalog()
+            banner = _render_instruction_banner(
+                current_base_matrix, current_effective_matrix
+            )
+            if banner:
+                _instruction_snapshot = (
+                    {
+                        "key": _INSTRUCTION_SOURCE_KEY,
+                        "content": banner,
+                        "placement": "head",
+                    },
+                )
+        except Exception:
+            _instruction_refresh_failed = True
+            raise
+        else:
+            # A valid empty catalog is a successful refresh: the callback
+            # should publish no record, not retain a prior failure.
+            _instruction_refresh_failed = False
+
+    def _instruction_snapshot_callback(_scope: dict[str, Any]) -> list[dict[str, str]]:
+        """Return only copied render records; this path must not touch runtime state."""
+        if _instruction_refresh_failed:
+            raise RuntimeError(_INSTRUCTION_REFRESH_ERROR) from None
+        return copy.deepcopy(list(_instruction_snapshot))
+
+    def _register_instruction_source() -> None:
+        """Opt into v1 assembly when the mounted context exposes its public API."""
+        nonlocal _instruction_lease
+
+        getter = getattr(coordinator, "get_capability", None)
+        if not callable(getter):
+            return
+        try:
+            assembly = getter(_INSTRUCTION_CAPABILITY)
+        except Exception:
+            logger.debug("Could not discover instruction assembly capability", exc_info=True)
+            return
+        register = getattr(assembly, "register", None)
+        if not callable(register):
+            return
+        try:
+            _instruction_lease = register(
+                _INSTRUCTION_SOURCE_ID, _instruction_snapshot_callback
+            )
+        except Exception:
+            logger.warning("Could not register routing instruction source", exc_info=True)
+
+    def _cleanup_instruction_source() -> None:
+        """Close only this optional source registration at session teardown."""
+        nonlocal _instruction_lease, _instruction_refresh_failed, _instruction_snapshot
+
+        lease = _instruction_lease
+        _instruction_lease = None
+        _instruction_snapshot = ()
+        _instruction_refresh_failed = False
+        if lease is not None:
+            lease.close()
 
     async def _ensure_prefix_placement() -> bool:
         """Ensure the banner rides the system prompt (stable prefix).
@@ -834,6 +969,11 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
 
         async def _routing_prefixed_factory() -> str:
             base = await base_factory()
+            # The wrapper may have been installed while this lease was still
+            # pending.  Once the request negotiates v1, omit only our own
+            # legacy contribution and leave every wrapped producer untouched.
+            if _instruction_lease is not None and _instruction_lease.route == "v1":
+                return base
             block = _render_banner()
             return f"{base}\n\n{block}" if block else base
 
@@ -850,6 +990,14 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # ------------------------------------------------------------------
     async def on_provider_request(event: str, data: dict[str, Any]) -> Any:
         nonlocal _prefix_unavailable_logged, _prefix_unavailable_reason
+
+        if _instruction_lease is not None and _instruction_lease.route == "v1":
+            # The request scope selects v1 before provider:request hooks.  Do
+            # the normal-loop render here; the callback itself only copies it.
+            _refresh_instruction_snapshot()
+            from amplifier_core.models import HookResult
+
+            return HookResult(action="continue")
 
         if not effective_matrix:
             return None
@@ -907,6 +1055,11 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             ephemeral=True,
         )
 
+    # Capture the mount-time catalog too.  This is the first-turn fallback
+    # when an assembler prepares immediately after entering its request scope.
+    _refresh_instruction_snapshot()
+    _register_instruction_source()
+
     # --- Register hooks ---
     hooks = coordinator.hooks if hasattr(coordinator, "hooks") else None
     if hooks:
@@ -937,3 +1090,5 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             priority=15,
             name="routing-context",
         )
+
+    return _cleanup_instruction_source
