@@ -57,11 +57,17 @@ class _Context:
 
 
 class _Coordinator:
-    def __init__(self, assembly: _Assembly | None, context: _Context | None = None) -> None:
+    def __init__(
+        self,
+        assembly: _Assembly | None,
+        context: _Context | None = None,
+        providers: dict[str, Any] | None = None,
+    ) -> None:
         self.events: list[str] = []
         self.assembly = assembly
         self.context = context
         self.hooks = _Hooks(self.events)
+        self.providers = providers or {}
         self.config = {"agents": {}}
         self.session_state: dict[str, Any] = {}
         self.capabilities: dict[str, Any] = {}
@@ -70,7 +76,7 @@ class _Coordinator:
         if name == "context":
             return self.context
         if name == "providers":
-            return {}
+            return self.providers
         return None
 
     def get_capability(self, name: str) -> Any:
@@ -85,7 +91,14 @@ class _Coordinator:
         return result
 
 
-def _write_matrix(tmp_path: Path, general_description: str = "General purpose") -> Path:
+def _write_matrix(
+    tmp_path: Path,
+    general_description: str = "General purpose",
+    *,
+    general_provider: str = "anthropic",
+    general_model: str = "claude-sonnet",
+    general_config: str = "original",
+) -> Path:
     bundle_root = tmp_path / "bundle"
     routing_dir = bundle_root / "routing"
     routing_dir.mkdir(parents=True, exist_ok=True)
@@ -100,8 +113,10 @@ def _write_matrix(tmp_path: Path, general_description: str = "General purpose") 
               general:
                 description: "{general_description}"
                 candidates:
-                  - provider: anthropic
-                    model: claude-sonnet
+                  - provider: {general_provider}
+                    model: {general_model}
+                    config:
+                      marker: "{general_config}"
               fast:
                 description: "Quick work"
                 candidates:
@@ -219,42 +234,81 @@ async def test_fresh_mount_uses_the_current_catalog_not_a_prior_mount_snapshot(
 
 
 @pytest.mark.asyncio
-async def test_v1_request_refreshes_after_explicit_matrix_and_config_changes(
+async def test_v1_banner_and_resolver_keep_the_mount_time_matrix_after_changes(
     tmp_path: Path,
 ) -> None:
-    bundle_root = _write_matrix(tmp_path, general_description="Before change")
-    coordinator = _Coordinator(_Assembly([]))
+    bundle_root = _write_matrix(
+        tmp_path,
+        general_description="Before change",
+        general_provider="original-provider",
+        general_model="original-model",
+        general_config="original-config",
+    )
+    coordinator = _Coordinator(
+        _Assembly([]), providers={"original-provider": object()}
+    )
     coordinator.assembly.events = coordinator.events
     config = {"default_matrix": "balanced", "_bundle_root": str(bundle_root)}
     await mount(coordinator, config)
     before = coordinator.assembly.callback({"request_id": "before"})
     assert "Before change" in before[0]["content"]
+    resolver = coordinator.capabilities["model_role_resolver"]
+    assert resolver.known_roles == ("general", "fast")
+    original_candidates = await resolver.resolve("general")
+    assert [
+        (candidate.provider, candidate.model, candidate.config)
+        for candidate in original_candidates
+    ] == [("original-provider", "original-model", {"marker": "original-config"})]
 
     coordinator.assembly.lease.route = "v1"
     config["overrides"] = {
         "general": {
             "description": "Config change",
-            "candidates": [{"provider": "anthropic", "model": "claude-sonnet"}],
+            "candidates": [
+                {
+                    "provider": "changed-provider",
+                    "model": "changed-model",
+                    "config": {"marker": "changed-config"},
+                }
+            ],
         }
     }
     result = await coordinator.hooks.handlers["provider:request"]("provider:request", {})
     after_config = coordinator.assembly.callback({"request_id": "after-config"})
     assert result.action == "continue"
-    assert "Config change" in after_config[0]["content"]
-    assert "Before change" not in after_config[0]["content"]
+    assert after_config == before
+    assert resolver.known_roles == ("general", "fast")
+    assert [
+        (candidate.provider, candidate.model, candidate.config)
+        for candidate in await resolver.resolve("general")
+    ] == [
+        ("original-provider", "original-model", {"marker": "original-config"})
+    ]
 
-    _write_matrix(tmp_path, general_description="After change")
+    _write_matrix(
+        tmp_path,
+        general_description="After change",
+        general_provider="file-provider",
+        general_model="file-model",
+        general_config="file-config",
+    )
     config["overrides"] = {}
     result = await coordinator.hooks.handlers["provider:request"]("provider:request", {})
     after = coordinator.assembly.callback({"request_id": "after"})
 
     assert result.action == "continue"
-    assert "After change" in after[0]["content"]
-    assert "Before change" not in after[0]["content"]
+    assert after == before
+    assert resolver.known_roles == ("general", "fast")
+    assert [
+        (candidate.provider, candidate.model, candidate.config)
+        for candidate in await resolver.resolve("general")
+    ] == [
+        ("original-provider", "original-model", {"marker": "original-config"})
+    ]
 
 
 @pytest.mark.asyncio
-async def test_v1_refresh_failure_stays_visible_after_ordinary_hook_error(
+async def test_v1_banner_does_not_reload_a_broken_matrix_mid_session(
     tmp_path: Path,
 ) -> None:
     bundle_root = _write_matrix(tmp_path, general_description="Catalog A")
@@ -267,39 +321,13 @@ async def test_v1_refresh_failure_stays_visible_after_ordinary_hook_error(
     coordinator.assembly.lease.route = "v1"
     handler = coordinator.hooks.handlers["provider:request"]
 
-    success_a = await handler("provider:request", {})
-    assert success_a.action == "continue"
+    assert (await handler("provider:request", {})).action == "continue"
     snapshot_a = coordinator.assembly.callback({"request_id": "success-a"})
     assert "Catalog A" in snapshot_a[0]["content"]
 
     (bundle_root / "routing" / "balanced.yaml").write_text("not: [valid")
-    try:
-        await handler("provider:request", {})
-    except Exception:
-        # This mirrors the ordinary hook registry: it logs a hook failure and
-        # continues request processing rather than surfacing the exception.
-        pass
-    else:  # pragma: no cover - protects the test setup, not production logic
-        pytest.fail("invalid matrix must make the refresh fail")
-
-    with pytest.raises(
-        RuntimeError, match="^Routing instruction catalog refresh failed$"
-    ) as failure:
-        coordinator.assembly.callback({"request_id": "after-failure"})
-    assert failure.value.__cause__ is None
-    assert failure.value.__suppress_context__ is True
-
-    (bundle_root / "routing" / "balanced.yaml").unlink()
-    empty_catalog = await handler("provider:request", {})
-    assert empty_catalog.action == "continue"
-    assert coordinator.assembly.callback({"request_id": "empty-catalog"}) == []
-
-    _write_matrix(tmp_path, general_description="Catalog B")
-    recovery = await handler("provider:request", {})
-    assert recovery.action == "continue"
-    snapshot_b = coordinator.assembly.callback({"request_id": "recovery-b"})
-    assert "Catalog B" in snapshot_b[0]["content"]
-    assert "Catalog A" not in snapshot_b[0]["content"]
+    assert (await handler("provider:request", {})).action == "continue"
+    assert coordinator.assembly.callback({"request_id": "after-broken-file"}) == snapshot_a
 
 
 @pytest.mark.asyncio
@@ -354,6 +382,7 @@ async def test_optional_context_simple_source_places_one_catalog_record_at_head(
 
     class _V1Provider:
         instruction_layout_version = 1
+        instruction_layout_authority_v1 = True
 
     rendered = []
     for request_id in ("one", "two", "three"):

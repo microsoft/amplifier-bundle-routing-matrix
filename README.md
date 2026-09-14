@@ -37,7 +37,10 @@ includes:
 
 ## How Agents Use `model_role`
 
-Agents declare what kind of model they need via the `model_role` frontmatter field. The routing hook resolves this to a concrete provider/model at session start.
+Agents declare what kind of model they need via the `model_role` frontmatter field. The routing hook resolves this to a concrete provider/model at session start. Its
+instruction-assembly banner is the same mount-time matrix snapshot: edits to a
+matrix file or configuration take effect only in a newly mounted session, so
+the banner cannot advertise roles the active resolver has not loaded.
 
 **String shorthand** — request a single role:
 

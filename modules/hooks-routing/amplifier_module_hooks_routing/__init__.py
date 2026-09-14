@@ -769,73 +769,16 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> Any:
         body = "\n".join(lines)
         return f'<system-reminder source="routing-matrix">\n{body}\n</system-reminder>'
 
-    def _current_instruction_catalog() -> tuple[dict[str, Any], dict[str, Any]]:
-        """Read the catalog that a v1 request should publish at its head.
-
-        Routing decisions remain owned by the session-start resolver.  This is
-        only the instruction-facing catalog: it intentionally re-reads its
-        existing matrix/config inputs so an explicit edit changes the next
-        request rather than replaying an old banner.
-        """
-        current_matrix_name = config.get("default_matrix", "balanced")
-        current_origin = resolve_matrix_source(
-            current_matrix_name, custom_routing_dirs, routing_dir
-        )
-        if current_origin.path is None:
-            return {}, {}
-
-        current_base_matrix = load_matrix(current_origin.path)
-        current_overrides = config.get("overrides", {})
-        current_effective_matrix = compose_matrix(
-            current_base_matrix.get("roles", {}), current_overrides
-        )
-        routing_capability = (
-            coordinator.get_capability("session.routing")
-            if hasattr(coordinator, "get_capability")
-            else None
-        )
-        if isinstance(routing_capability, dict) and routing_capability.get("overrides"):
-            current_effective_matrix = compose_matrix(
-                current_effective_matrix, routing_capability["overrides"]
-            )
-        current_effective_matrix, _ = strip_inert_config(
-            {"roles": current_effective_matrix}
-        )
-        return current_base_matrix, current_effective_matrix.get("roles", {})
-
-    def _render_instruction_banner(
-        current_base_matrix: dict[str, Any], current_effective_matrix: dict[str, Any]
-    ) -> str:
-        if not current_effective_matrix:
-            return ""
-
-        lines = [
-            "Active routing matrix: " + current_base_matrix.get("name", "unknown"),
-            "Available model roles (use model_role parameter when delegating):",
-        ]
-        for role_name, role_data in current_effective_matrix.items():
-            desc = (
-                role_data.get("description", "") if isinstance(role_data, dict) else ""
-            )
-            lines.append(f"  {role_name:16s} — {desc}")
-        return (
-            '<system-reminder source="routing-matrix">\n'
-            + "\n".join(lines)
-            + "\n</system-reminder>"
-        )
-
     def _refresh_instruction_snapshot() -> None:
-        """Replace the callback's immutable catalog record for one request."""
+        """Publish the same mount-time catalog used by the session resolver."""
         nonlocal _instruction_refresh_failed, _instruction_snapshot
 
-        # Clear first: an actual render failure must never make a later
-        # callback replay the last good catalog as though it were current.
+        # The resolver is intentionally mount-time state.  Re-reading the file
+        # here would advertise a catalog that the resolver does not use until a
+        # new session is mounted.
         _instruction_snapshot = ()
         try:
-            current_base_matrix, current_effective_matrix = _current_instruction_catalog()
-            banner = _render_instruction_banner(
-                current_base_matrix, current_effective_matrix
-            )
+            banner = _render_banner()
             if banner:
                 _instruction_snapshot = (
                     {
