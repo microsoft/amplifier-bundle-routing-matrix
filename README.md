@@ -17,7 +17,7 @@ Eight curated matrices ship with this bundle, plus one explicit-name alias
 | **anthropic** | Anthropic Claude models exclusively. No knob-consistent delegation -- no measured win for this family yet (the "Anthropic guardrail"). |
 | **openai** | OpenAI models exclusively. **Ships knob-consistent delegation ON by default** (2026-09-02, a measured win -- see below). Covers **both OpenAI backends** — the pay-per-use API (`openai`) and the ChatGPT subscription (`openai-chatgpt`) — with a single candidate per role: the resolver treats them as one family, API key first. The flagship `sol` tier is PAUSED as of 2026-09-07 pending further evals; roles that used it now run `terra` one effort notch higher, and `ui-coding` runs `luna` at `max`. |
 | **gemini** | Google Gemini models exclusively. |
-| **copilot** | GitHub Copilot-optimized. Balances multiplier costs, avoids the 30x fast-variant trap. |
+| **copilot** | Strongest model per role across the Claude, GPT and Gemini families Copilot serves, through a single provider. |
 | **ollama** | A **template**, deliberately minimal: only the two required roles (`general`, `fast`), both `model: "*"`. Every Ollama user has pulled a different set of models, so there is no useful curation to ship -- copy it and pin what you actually have. |
 
 > `openai-knob-consistent` was **removed on 2026-09-07**. Once the `preset:` block became `openai`'s default on 2026-09-02, the two files were the same matrix under two names. Select **`openai`** instead -- it is byte-for-byte what `openai-knob-consistent` used to give you.

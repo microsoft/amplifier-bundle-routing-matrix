@@ -540,15 +540,21 @@ reject `thinking_level`.
    raises `ProviderUnavailableError` if both the SDK and the disk cache are
    unavailable (still true at provider v2.7.0, `models.py:215`).
 
-   **Preferred shape (since 2026-09-07): a glob + pin PAIR, not a lone pin.**
-   `_resolve_glob` does not propagate that failure — it catches, logs, and
-   returns `None` (`resolver.py:532`), so resolution falls through to the next
-   candidate. Put the class glob first and the newest known pin immediately
-   after: the glob auto-tracks new Copilot releases when the API is reachable,
-   and the pin still resolves when it is not, because an exact name never calls
-   `list_models()` at all. The pin duplicating what the glob resolves to today
-   is the point, not redundancy — it is the offline path. See
-   [`routing/copilot.yaml`](../routing/copilot.yaml).
+   **The resolver supports a glob + pin pair when a curator wants catalogue
+   freshness plus an offline path.** `_resolve_glob` does not propagate a
+   listing failure — it catches, logs, and returns `None`, so resolution falls
+   through to the next candidate. Put the class glob first and the newest known
+   pin immediately after: the glob auto-tracks releases when listing is
+   reachable, and the exact pin still resolves when it is not because it never
+   calls `list_models()`.
+
+   This is a supported general resolver shape, not the policy of
+   [`routing/copilot.yaml`](../routing/copilot.yaml). That matrix deliberately
+   uses one exact `github-copilot` pin per role and no globs, so its model
+   selections are updated manually. A second exact candidate on the same
+   installed provider would not be fallback: the first exact pin resolves
+   without existence-checking and stops candidate traversal. A real fallback
+   needs a candidate on a different provider.
 
    ⚠️ Do NOT use `gpt-?.?-sol*` on Copilot: it resolves to `gpt-5.6-sol-fast`,
    which the API labels *"Internal only"* (two ids tie at 5.6, longer name
@@ -570,6 +576,47 @@ reject `thinking_level`.
 
 The only universal free-pass glob is `model: "*"` for providers like Ollama
 where users choose their own models.
+
+### Fallback Between Candidates Is Narrower Than It Looks
+
+`resolve_model_role()` walks a role's candidates in order and skips one only
+when its provider is not installed, or when its model is a glob that matches
+nothing. An exact pin whose provider *is* installed is never existence-checked:
+it resolves verbatim and the walk stops there.
+
+Later candidates therefore protect against an uninstalled provider or an
+unmatched glob. They do not protect against a retired model ID or any runtime
+failure — nothing is retried once a candidate resolves.
+
+A role whose candidates are all exact pins on one installed provider uses its
+first candidate and nothing else. Real fallback needs a candidate on a
+*different* provider; the caller's `model_role` list falls back across roles,
+not across models.
+
+### `reasoning_effort` Is Validated Per Provider, Not Per Model
+
+A matrix `config.reasoning_effort` is an **operator default** — a
+caller-supplied effort wins.
+
+`tests/matrix_validation_rules.yaml` checks the value against a **provider-wide**
+vocabulary, keyed on `provider` alone. It cannot see whether the pinned *model*
+advertises that level, so an effort that is legal for the provider but
+unsupported by the model passes validation here and is left to the provider to
+resolve at request time.
+
+That file's header also records which of those lists are provider-derived and
+which are only "the set already in use across the shipped matrices". Read the
+levels from the installed provider before pinning one.
+
+> **github-copilot only.** Once the model catalogue has loaded, an unadvertised
+> effort is omitted from the request and reported as a `ChatResponse.degradation`
+> — logged at INFO for an operator default, WARNING for a caller-supplied value.
+> A mis-typed effort is dropped the same way, not rejected, so it fails as a
+> quiet no-op. List a model's levels with:
+>
+> ```bash
+> amplifier provider models github-copilot
+> ```
 
 ### Provider-Specific Naming
 
