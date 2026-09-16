@@ -540,15 +540,21 @@ reject `thinking_level`.
    raises `ProviderUnavailableError` if both the SDK and the disk cache are
    unavailable (still true at provider v2.7.0, `models.py:215`).
 
-   **Preferred shape (since 2026-09-07): a glob + pin PAIR, not a lone pin.**
-   `_resolve_glob` does not propagate that failure — it catches, logs, and
-   returns `None` (`resolver.py:532`), so resolution falls through to the next
-   candidate. Put the class glob first and the newest known pin immediately
-   after: the glob auto-tracks new Copilot releases when the API is reachable,
-   and the pin still resolves when it is not, because an exact name never calls
-   `list_models()` at all. The pin duplicating what the glob resolves to today
-   is the point, not redundancy — it is the offline path. See
-   [`routing/copilot.yaml`](../routing/copilot.yaml).
+   **The resolver supports a glob + pin pair when a curator wants catalogue
+   freshness plus an offline path.** `_resolve_glob` does not propagate a
+   listing failure — it catches, logs, and returns `None`, so resolution falls
+   through to the next candidate. Put the class glob first and the newest known
+   pin immediately after: the glob auto-tracks releases when listing is
+   reachable, and the exact pin still resolves when it is not because it never
+   calls `list_models()`.
+
+   This is a supported general resolver shape, not the policy of
+   [`routing/copilot.yaml`](../routing/copilot.yaml). That matrix deliberately
+   uses one exact `github-copilot` pin per role and no globs, so its model
+   selections are updated manually. A second exact candidate on the same
+   installed provider would not be fallback: the first exact pin resolves
+   without existence-checking and stops candidate traversal. A real fallback
+   needs a candidate on a different provider.
 
    ⚠️ Do NOT use `gpt-?.?-sol*` on Copilot: it resolves to `gpt-5.6-sol-fast`,
    which the API labels *"Internal only"* (two ids tie at 5.6, longer name
