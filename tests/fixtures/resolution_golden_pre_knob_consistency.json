@@ -367,7 +367,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gemini-3.1-pro-preview",
+        "model": "gemini-3.5-flash",
         "provider": "github-copilot"
       }
     ],
