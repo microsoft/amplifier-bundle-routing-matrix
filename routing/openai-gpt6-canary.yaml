@@ -1,0 +1,344 @@
+# Routing Matrix: openai-gpt6-canary
+#
+# OPT-IN CANARY. Not the default, not referenced by behaviors/routing.yaml,
+# and not swapped in for anyone automatically. A user selects it explicitly:
+#
+#   amplifier routing use openai-gpt6-canary
+#   # or, in settings.yaml:
+#   routing:
+#     matrix: openai-gpt6-canary
+#
+# WHAT THIS IS. `openai.yaml` (the shipped default OpenAI matrix) is
+# untouched by this file. This is a SEPARATE, ninth matrix that carries the
+# stage-1 opt-in canary shape recommended by the routing study attached to
+# `microsoft-amplifier/amplifier-support#524`: "Canary `gpt-6-luna` for `fast` and
+# `gpt-6-sol` for `coding`; offer `gpt-6-astra` only as an opt-in `reasoning`
+# candidate until cost, latency, error, safety-stop, and task-quality
+# evidence meets promotion gates." Every role other than `fast`/`coding`/
+# `reasoning` is copied unchanged from `openai.yaml` (still `gpt-5.6-terra`).
+#
+# ATTRIBUTION, STATED PRECISELY. The study recommends the three role/model
+# canary pairings above and warns, generally, against reusing the existing
+# Luna/Terra/Sol tier ladder for GPT-6 rungs "without policy" (see "WHY A
+# FOURTH RUNG" below). It does NOT specify a four-rung-vs-three-rung ladder
+# shape, and it does NOT call for a `gpt-5.6-terra` fallback candidate on
+# `reasoning` -- neither appears in the study text. Both are THIS ROLLOUT'S
+# OWN design decisions, made to satisfy this task's requirement to keep the
+# canary narrow and reversible; they are consistent with the study's
+# guidance but not a direct quote of it, and are documented as such below
+# rather than attributed to the study.
+#
+# DEPENDENCY -- PROVIDER PR MUST LAND FIRST. `gpt-6-sol` and `gpt-6-luna`
+# request/response handling (reasoning controls, per-model effort sets,
+# streaming, structured outputs, cost accounting) ships in a companion PR to
+# `microsoft/amplifier-module-provider-openai`, tracked by
+# `microsoft/amplifier/amplifier-support#524`.
+#   Provider PR: https://github.com/microsoft/amplifier-module-provider-openai/pull/112
+#
+# THIS ROUTING PR MUST MERGE AFTER THAT ONE. Selecting this matrix for
+# `fast`/`coding` before the provider PR lands is NOT a safe, silently-
+# degrading configuration -- see "NO CATALOG/CAPABILITY PREFLIGHT,
+# THEREFORE NO RUNTIME FALLBACK" immediately below for exactly why, and do
+# not enable this canary for those two roles until the provider PR has
+# merged and been verified.
+#
+# NO CATALOG/CAPABILITY PREFLIGHT, THEREFORE NO RUNTIME FALLBACK. The study
+# observes this about the resolver directly (its section 3, citing
+# `resolver.py#L453-L465`): "Exact IDs are accepted without a catalog/
+# capability check ... Consequently, an exact account-gated ID can resolve
+# and fail only at request time; candidate fallback is not a general
+# runtime failover mechanism." Confirmed by reading that code path in this
+# tree: for any candidate whose `model:` is NOT a glob (no `*`/`?`/`[`),
+# `resolve_model_role` never calls `list_models()` and never checks the
+# model against any capability table -- it sets `resolved_model =
+# model_pattern` unconditionally, the instant `find_provider_by_type` finds
+# ANY installed instance of the named provider family. Every GPT-6
+# candidate in this file is an exact ID (see "EXACT MODEL IDS ONLY" below),
+# so this applies to all three canaried roles:
+#
+#   - `fast` and `coding` each carry exactly ONE candidate
+#     (`gpt-6-luna`/`gpt-6-sol`). Because exact-ID resolution never fails at
+#     the routing layer for the reason above, there is no second candidate
+#     to fall through to and no mechanism that would trigger a fallback even
+#     if there were: routing hands back the literal id as "resolved"
+#     whenever any `openai`-family provider is mounted, REGARDLESS of
+#     whether the mounted provider software actually implements
+#     `gpt-6-luna`/`gpt-6-sol` yet. Whatever happens next -- accept,
+#     generically default, or reject the model id -- happens at the
+#     provider/request layer, entirely outside this bundle's control, and
+#     depends entirely on whether the companion provider PR has merged. If
+#     it has not, do not expect a graceful degrade: expect whatever
+#     `microsoft/amplifier-module-provider-openai`'s CURRENT (pre-#524) code
+#     does with an id it does not recognise, which this routing PR does not
+#     verify and does not control.
+#   - `reasoning` carries `gpt-6-astra` first and `gpt-5.6-terra` second.
+#     `gpt-6-astra` is ALSO an exact ID and is therefore ALSO never
+#     preflighted, so the same "resolves regardless of true provider
+#     support" fact applies to it. In the common case (no caller context --
+#     a top-level session, or `amplifier routing show`), the second
+#     candidate is consequently NEVER REACHED: `resolve_model_role` returns
+#     as soon as the first candidate resolves, and the first candidate
+#     always "resolves" once `openai` is mounted. The only path that
+#     actually reaches `gpt-5.6-terra` is the STRICT knob-consistent
+#     delegation clamp (see "STRICT, FOUR-RUNG LADDER" below):
+#     `plan_candidates()` in `knob_consistency.py` rewrites the candidate
+#     list itself, before the ordinary loop runs, for a sub-agent whose
+#     caller is resolved below the `astra` rung -- filtering `gpt-6-astra`
+#     out and leaving `gpt-5.6-terra` as the new top candidate. That is a
+#     real, tested mechanism (see
+#     `tests/test_gpt6_canary_routing.py::test_reasoning_clamps_to_terra_for_a_terra_tier_caller`),
+#     but it is a DELEGATION-TIER clamp, not a capability/outage/unmerged-PR
+#     degrade path. Astra's provider support is already shipped (unlike
+#     Sol/Luna), which narrows this gap for `reasoning` relative to
+#     `fast`/`coding`, but the underlying mechanism -- and the underlying
+#     absence of any capability check -- is identical.
+#
+# EXACT MODEL IDS ONLY -- NO GLOBS FOR GPT-6. Per the study (cross-checked
+# against live `openai.com` docs and a live `GET /v1/models` call,
+# 2026-09-24): the GPT-6 family is exactly three model IDs -- `gpt-6-astra`,
+# `gpt-6-sol`, `gpt-6-luna` -- with no aliases and no dated snapshots. A
+# version glob (`gpt-?.?-*`) cannot express these names (they carry no
+# numeric sub-version), so every GPT-6 candidate below pins the bare id.
+# This also means there is no "-fast" ChatGPT-backend suffix risk for GPT-6
+# the way there is for `gpt-5.6-terra*` (see openai.yaml) -- nothing here
+# ends in `*`. See "NO CATALOG/CAPABILITY PREFLIGHT" above for what pinning
+# an exact id actually costs: no catalog check, ever, for these three.
+#
+# PER-MODEL EFFORT VALIDATION. The three GPT-6 models do NOT all accept the
+# same `reasoning_effort` set (source: the study's section on OpenAI's
+# first-party model pages, verified 2026-09-24): Sol and Luna accept
+# `none|low|medium|high|xhigh|max` (default `medium`); Astra accepts
+# `low|medium|high|xhigh|max` and REJECTS `none`. This matrix requests only
+# low/medium/high across its GPT-6 candidates, all valid for every GPT-6
+# model, so no candidate here can hit an invalid combination. Enforcement
+# lives in the repository's own per-model validation data,
+# `tests/matrix_validation_rules.yaml`'s `reasoning_effort_values_by_model`
+# map, exercised by `tests/test_matrix_config_validation.py` against every
+# shipped matrix (including this one) and, redundantly, by
+# `tests/test_gpt6_canary_routing.py` for this file specifically -- so a
+# future edit that moves a role to `none` on `gpt-6-astra` fails loudly
+# instead of going inert.
+#
+# WHY A FOURTH RUNG (this rollout's own choice, not a study quote -- see
+# "ATTRIBUTION" above). The study's only ladder guidance is: "add GPT-6
+# Luna/Sol/Astra rungs deliberately... Astra and Sol pricing/quality tiers
+# must not be guessed into the old Luna/Terra/Sol ladder without policy."
+# Folding `gpt-6-astra` onto the existing `sol` rung would be exactly that
+# kind of unpoliced guess, and it has a concrete bad consequence for
+# `strict` delegation: same rung means no clamp, so a `sol`-tier caller's
+# sub-agents could escalate onto `astra` -- the escalation `strict` exists
+# to prevent. Astra is also already live and unpaused (unlike `sol`, which
+# is PAUSED in `openai.yaml`'s own ladder), so treating it as sol-equivalent
+# would misclassify its actual status. Astra gets its own top rung instead:
+# a caller has to be AT that rung (i.e. already resolved to `gpt-6-astra`)
+# for `reasoning` sub-delegation to land on it unclamped.
+#
+# STRICT, FOUR-RUNG LADDER (cheapest -> most expensive):
+#   1. luna   (gpt-?.?-luna* / gpt-?.?-mini* / gpt-?.?-nano* / gpt-6-luna)
+#   2. terra  (gpt-?.?-terra*)
+#   3. sol    (gpt-?.?-sol* / gpt-[0-9].[0-9] / gpt-6-sol)
+#   4. astra  (gpt-6-astra) -- its own rung, per "WHY A FOURTH RUNG" above.
+# `inherit: strict` (same semantics as openai.yaml -- see that file's and
+# the bundle README's "Knob-consistent delegation" section): a sub-agent's
+# model_role resolution is clamped to the caller's own rung and effort
+# ceiling, with escalation denied outright. A `gpt-6-sol @ medium` root's
+# sub-agents cannot land on `gpt-6-astra`; a `gpt-6-astra @ high` root's
+# sub-agents can.
+#
+# PER-ROLE CANARY SCOPE, STATED EXACTLY (only these three roles change vs.
+# openai.yaml; every other role below is copied unchanged, description text
+# included -- character-for-character equal to `openai.yaml`'s):
+#   - fast:      gpt-6-luna  @ low     (single candidate -- no fallback of
+#                any kind; see "NO CATALOG/CAPABILITY PREFLIGHT" above)
+#   - coding:    gpt-6-sol   @ medium  (single candidate -- no fallback of
+#                any kind; see "NO CATALOG/CAPABILITY PREFLIGHT" above)
+#   - reasoning: gpt-6-astra @ high, THEN gpt-5.6-terra @ xhigh as a second
+#                candidate. This is this rollout's own choice (not the
+#                study's, see "ATTRIBUTION" above), kept as the strict-
+#                ladder's landing target for a below-`astra`-rung caller's
+#                delegated `reasoning` sub-agents -- it is exercised ONLY by
+#                that clamp path, never by a cold/no-caller-context
+#                resolution and never by any capability or outage
+#                condition; see "NO CATALOG/CAPABILITY PREFLIGHT" above.
+#                `fast` and `coding` were deliberately left WITHOUT a second
+#                candidate at all -- one would be equally inert for the same
+#                reason and would misleadingly read as a safety net that
+#                does not exist.
+#
+# DOCUMENTED LIMITATIONS:
+#   1. `fast` and `coding` have NO runtime protection of any kind against
+#      the companion provider PR being unmerged, absent, reverted, or
+#      incomplete. See "NO CATALOG/CAPABILITY PREFLIGHT, THEREFORE NO
+#      RUNTIME FALLBACK" above. Do not enable this canary for those two
+#      roles before that PR has merged and been verified.
+#   2. ChatGPT-backend (`openai-chatgpt`) availability of `gpt-6-sol` /
+#      `gpt-6-luna` is UNVERIFIED as of 2026-09-24 -- the study confirmed
+#      `gpt-6-astra` live on the API-key backend via a read-only `GET
+#      /v1/models` call, but explicitly marks whether the ChatGPT backend
+#      serves Sol/Luna as UNKNOWN and warns it "must not be inferred from
+#      API-key availability." Every candidate below still says `provider:
+#      openai`, so `PROVIDER_FAMILY_ALIASES` will route a ChatGPT-only user
+#      to whatever that backend actually serves -- and per limitation 1,
+#      there is no routing-layer signal either way if it does not yet serve
+#      these ids.
+#   3. This matrix does not alter `openai.yaml`, `behaviors/routing.yaml`'s
+#      `default_matrix`, or any resolver code -- it is additive and inert
+#      until a user opts in. `tests/test_default_resolution_unchanged.py`
+#      asserts every OTHER matrix's cold resolution is unaffected by this
+#      file's existence, and this file is explicitly excluded from that
+#      golden-fixture recording (it is new, so it was never in the
+#      pre-feature recording to begin with -- see that test's
+#      `EXCLUDED_FROM_RECORDING` comment for why exclusion, not silence, is
+#      the correct declaration).
+#   4. `ui-coding`, `security-audit`, `critique`, `creative`, `writing`,
+#      `research`, `vision`, `image-gen`, `critical-ops` and `general` are
+#      unchanged from `openai.yaml` (still `gpt-5.6-terra`/`gpt-?.?-luna*`)
+#      -- the study's evidence table names them Possible at best, not
+#      Recommended, for GPT-6 today, so they are out of scope for this
+#      canary, not overlooked.
+#
+# --- Review log ---
+# 2026-09-24: Created for microsoft-amplifier/amplifier-support#524, per its
+#   linked Amplifier model-routing study. Per-model effort data verified
+#   directly against OpenAI's first-party model pages (see the study,
+#   section citing developers.openai.com), independent of any provider-repo
+#   companion PR -- this matrix does not depend on that PR's code, only on
+#   its shipping (see DEPENDENCY above).
+# 2026-09-24: Reviewed and corrected -- removed false claims that exact-ID
+#   GPT-6 candidates degrade gracefully via routing-level fallback (they do
+#   not: see "NO CATALOG/CAPABILITY PREFLIGHT" above) and corrected the
+#   attribution of the four-rung ladder and the `reasoning` fallback
+#   candidate, neither of which is a literal recommendation of the routing
+#   study (see "ATTRIBUTION" above).
+
+name: openai-gpt6-canary
+description: "OPT-IN canary (amplifier-support#524): exact-ID GPT-6 (gpt-6-luna/gpt-6-sol/gpt-6-astra, no globs) on fast/coding/reasoning only; every other role is unchanged from openai.yaml. Strict knob-consistent delegation on a 4-rung ladder (luna < terra < sol < astra). Exact IDs are NOT preflighted against any catalog or provider capability declaration: fast/coding have no runtime fallback and require the companion microsoft/amplifier-module-provider-openai PR to merge FIRST -- do not enable this canary for those two roles before then."
+updated: "2026-09-24"
+
+# ---------------------------------------------------------------------------
+# Knob-consistent delegation preset -- same `strict` semantics as
+# openai.yaml, extended to a fourth rung for gpt-6-astra. See this file's
+# header ("WHY A FOURTH RUNG", "STRICT, FOUR-RUNG LADDER") for the rationale.
+# ---------------------------------------------------------------------------
+preset:
+  axis: [cheap, fast]
+
+  tier_ladder:
+    openai:
+      - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*", "gpt-6-luna"]
+      - ["gpt-?.?-terra*"]
+      - ["gpt-?.?-sol*", "gpt-[0-9].[0-9]", "gpt-6-sol"]
+      - ["gpt-6-astra"]
+
+  delegation:
+    inherit: strict
+    report_unhonored: true
+
+roles:
+  general:
+    description: "Versatile catch-all, no specialization needed"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: high
+
+  fast:
+    description: "Quick utility tasks — parsing, classification, file ops, bulk work"
+    candidates:
+      - provider: openai
+        model: gpt-6-luna
+        config:
+          reasoning_effort: low
+
+  coding:
+    description: "Code generation, implementation, debugging"
+    candidates:
+      - provider: openai
+        model: gpt-6-sol
+        config:
+          reasoning_effort: medium
+
+  ui-coding:
+    description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-luna
+        config:
+          reasoning_effort: max
+
+  security-audit:
+    description: "Vulnerability assessment, attack surface analysis, code auditing"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: xhigh
+
+  reasoning:
+    description: "Deep architectural reasoning, system design, complex multi-step analysis"
+    candidates:
+      - provider: openai
+        model: gpt-6-astra
+        config:
+          reasoning_effort: high
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: xhigh
+
+  critique:
+    description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: xhigh
+
+  creative:
+    description: "Design direction, aesthetic judgment, high-quality creative output"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: high
+
+  writing:
+    description: "Long-form content — documentation, marketing, case studies, storytelling"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: high
+
+  research:
+    description: "Deep investigation, information synthesis across multiple sources"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: xhigh
+
+  vision:
+    description: "Understanding visual input — screenshots, diagrams, UI mockups"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: medium
+
+  image-gen:
+    description: "Image generation (limited — gpt-image not available via chat API)"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: high
+
+  critical-ops:
+    description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-terra
+        config:
+          reasoning_effort: xhigh

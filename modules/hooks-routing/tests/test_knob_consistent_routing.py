@@ -163,7 +163,18 @@ class TestDefaultBehaviourUnchanged:
         no measured win there yet, so no default change there."""
         import yaml
 
-        allowed_with_preset = {"openai.yaml"}
+        # `openai-gpt6-canary.yaml` (amplifier-support#524, 2026-09-24) is a
+        # SEPARATE opt-in matrix, not a default: it is never selected unless
+        # a user names it explicitly (`amplifier routing use
+        # openai-gpt6-canary` / `routing.matrix:` in settings.yaml), and
+        # `behaviors/routing.yaml`'s `default_matrix` and hooks-routing's own
+        # code default both still say `balanced` -- untouched by this file.
+        # It carries a `preset:` block on purpose (a 4-rung strict ladder,
+        # see the file header) precisely because it exists to canary
+        # knob-consistent delegation for GPT-6, so it belongs on this
+        # allow-list for the same reason `openai.yaml` does: intentional,
+        # reviewed, not a default-behaviour regression.
+        allowed_with_preset = {"openai.yaml", "openai-gpt6-canary.yaml"}
         offenders = []
         for path in sorted(ROUTING_DIR.glob("*.yaml")):
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -963,3 +974,95 @@ class TestShippedKnobConsistentMatrix:
     # ALONE. Both arms are now one file (`openai-knob-consistent.yaml` deleted
     # 2026-09-07), so there is no longer a pair to hold identical -- the
     # property is structural rather than tested.
+
+
+# ---------------------------------------------------------------------------
+# The opt-in GPT-6 canary matrix (amplifier-support#524), end to end
+# ---------------------------------------------------------------------------
+
+
+class TestGpt6CanaryMatrixPreset:
+    """`routing/openai-gpt6-canary.yaml`'s `preset:` block, validated the
+    same way `TestShippedKnobConsistentMatrix` validates `openai.yaml`'s.
+
+    This matrix carries its own preset deliberately -- see that file's "WHY A
+    FOURTH RUNG" note -- and is allow-listed alongside `openai.yaml` in
+    `TestDefaultBehaviourUnchanged.test_every_pre_existing_matrix_has_no_preset_block`
+    above. What is asserted here is that the preset is well-formed, strict,
+    and four-rung, and that it behaves exactly like every other preset with
+    respect to the two guarantees the rest of this module establishes:
+    inert without a caller, and load-bearing with one.
+    """
+
+    @staticmethod
+    def _load() -> dict[str, Any]:
+        import yaml
+
+        return yaml.safe_load(
+            (ROUTING_DIR / "openai-gpt6-canary.yaml").read_text(encoding="utf-8")
+        )
+
+    def test_preset_block_is_strict_four_rung(self) -> None:
+        data = self._load()
+        preset = parse_preset(data)
+        assert preset is not None
+        assert preset.inherit == "strict"
+        rungs = preset.tier_ladder["openai"]
+        assert len(rungs) == 4
+        assert rungs[-1] == ["gpt-6-astra"]
+
+    @pytest.mark.asyncio
+    async def test_cold_resolution_is_unaffected_by_the_preset(self) -> None:
+        """The same "preset is opt-in twice over" invariant
+        `test_preset_bearing_matrix_is_stock_without_a_caller` checks for
+        `openai.yaml`, run directly against this matrix rather than through
+        the golden fixture (which excludes this file -- it postdates the
+        pre-feature recording; see `EXCLUDED_FROM_RECORDING` in
+        `tests/test_default_resolution_unchanged.py`)."""
+        data = self._load()
+        roles = data["roles"]
+        preset = parse_preset(data)
+        assert preset is not None
+        providers = {"openai": _openai_provider()}
+        providers["openai"].list_models = AsyncMock(
+            return_value=[
+                "gpt-6-astra",
+                "gpt-6-sol",
+                "gpt-6-luna",
+                "gpt-5.6-terra",
+                "gpt-5.6-luna",
+            ]
+        )
+        for role in roles:
+            cold = await resolve_model_role([role], roles, providers)
+            with_preset = await resolve_model_role(
+                [role], roles, providers, preset=preset, caller_context=None
+            )
+            assert with_preset == cold, (
+                f"role {role}: attaching the parsed preset with no caller "
+                "context changed cold resolution"
+            )
+
+    @pytest.mark.asyncio
+    async def test_terra_root_delegate_gets_clamped_off_astra(self) -> None:
+        """End to end, through `mount()`, against the REAL shipped
+        `openai-gpt6-canary.yaml`: a terra-tier root's `reasoning` sub-agent
+        must not land on `gpt-6-astra` -- it is clamped to the matrix's
+        second `reasoning` candidate, `gpt-5.6-terra`, by strict inherit.
+
+        `_mount_coordinator`'s default provider spec (`id: "terra"`,
+        `default_model: "gpt-5.6-terra"`) is what derives the terra-tier
+        caller context here; its default `_providers()` roster already
+        contains `gpt-5.6-terra` (for the glob candidate), and `gpt-6-astra`
+        needs no catalog entry at all (exact id -- see the matrix file's "NO
+        CATALOG/CAPABILITY PREFLIGHT" note)."""
+        agents = {"explorer": {"model_role": "reasoning"}}
+        coordinator = _mount_coordinator(agents)
+        await mount(
+            coordinator,
+            {"default_matrix": "openai-gpt6-canary", "_bundle_root": str(REPO_ROOT)},
+        )
+        await _run_session_start(coordinator)
+        assert agents["explorer"]["provider_preferences"][0]["model"] == (
+            "gpt-5.6-terra"
+        )

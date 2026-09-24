@@ -104,7 +104,17 @@ PRESET_BEARING = {"openai.yaml"}
 #     `test_preset_bearing_matrix_is_stock_without_a_caller` for the same
 #     invariant asserted directly. `openai.yaml` therefore stays recorded and
 #     stays checked, preset or no preset.
-EXCLUDED_FROM_RECORDING = {"openai.yaml"}
+#
+#     `openai-gpt6-canary.yaml` (added 2026-09-24 for
+#     amplifier-support#524) is excluded for a different, simpler reason: it
+#     is a brand-new opt-in matrix that never existed at the pre-feature
+#     commit this fixture was recorded from, so there is no historical
+#     "before" resolution for it to be byte-identical to. Its own cold-vs-
+#     preset invariant (the same one `test_preset_bearing_matrix_is_stock_
+#     without_a_caller` checks for `openai.yaml`) is asserted independently,
+#     without depending on this golden fixture, in
+#     `tests/test_gpt6_canary_routing.py`.
+EXCLUDED_FROM_RECORDING = {"openai.yaml", "openai-gpt6-canary.yaml"}
 
 # Every matrix present in the recording as it stands. A frozen manifest, so a
 # matrix vanishing from the fixture -- by a bad `--regenerate`, a bad merge, a

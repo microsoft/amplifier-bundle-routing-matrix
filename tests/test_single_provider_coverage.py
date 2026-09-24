@@ -275,3 +275,91 @@ def test_no_matrix_names_the_chatgpt_backend_directly() -> None:
         "`provider: openai` already reaches that backend via "
         "PROVIDER_FAMILY_ALIASES -- one candidate serves both bills."
     )
+
+
+# ---------------------------------------------------------------------------
+# openai-gpt6-canary.yaml: single-provider coverage, including a roster with
+# GPT-6 near-miss ids alongside the real ones.
+#
+# The opt-in canary is not swept by `test_provider_alone_routes_every_role_of_
+# the_default_matrix` above (that test is parametrized on `DEFAULT_MATRIX`
+# only, i.e. `balanced`). It gets its own equivalent here: mount ONLY
+# `openai`, with a roster carrying every GPT-6 near-miss id a live catalog
+# could plausibly contain (a `-preview`, a `-fast`, a `-mini`, a digit
+# near-miss) ALONGSIDE the real gpt-5.x/-6 ids, and require every role to
+# still resolve to the matrix's own declared candidate -- never to a
+# near-miss, and never to nothing.
+# ---------------------------------------------------------------------------
+
+GPT6_CANARY_MATRIX = "openai-gpt6-canary"
+
+# A roster containing every model this matrix's roles can select, PLUS
+# near-miss ids for each GPT-6 model that a stale or wrong catalog entry
+# might plausibly contain. None of the near-miss strings are valid GPT-6
+# ids; a correct resolution never selects one.
+OPENAI_ROSTER_WITH_GPT6_NEAR_MISSES: list[str] = [
+    # Real ids this matrix's roles can select.
+    "gpt-6-astra",
+    "gpt-6-sol",
+    "gpt-6-luna",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    # Near-miss ids -- must never be selected in place of the real id above.
+    "gpt-6-astra-preview",
+    "gpt-6-astra-fast",
+    "gpt-60-astra",
+    "gpt-6-sol-fast",
+    "gpt-6-sol-mini",
+    "gpt-6-luna-fast",
+    "gpt-6-luna-mini",
+]
+
+
+def test_gpt6_canary_matrix_resolves_every_role_with_openai_alone() -> None:
+    """With ONLY `openai` mounted and a roster that also contains GPT-6
+    near-miss ids, every role of `openai-gpt6-canary.yaml` must still
+    resolve -- and never to one of the near-miss ids."""
+    roles = _roles(GPT6_CANARY_MATRIX)
+    providers = _providers("openai")
+    providers["openai"].list_models = AsyncMock(
+        return_value=list(OPENAI_ROSTER_WITH_GPT6_NEAR_MISSES)
+    )
+
+    async def _run() -> dict[str, Any]:
+        return {
+            role: await resolve_model_role([role], roles, providers) for role in roles
+        }
+
+    resolved = asyncio.run(_run())
+    unresolved = {r for r, got in resolved.items() if not got}
+    assert not unresolved, (
+        f"with ONLY openai configured (roster includes GPT-6 near-misses), "
+        f"{GPT6_CANARY_MATRIX}.yaml leaves these roles unrouted: "
+        f"{sorted(unresolved)}"
+    )
+
+    near_misses = {m for m in OPENAI_ROSTER_WITH_GPT6_NEAR_MISSES if m not in (
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-terra", "gpt-5.6-luna",
+    )}
+    for role, got in resolved.items():
+        assert got[0]["model"] not in near_misses, (
+            f"role {role!r} resolved to near-miss id {got[0]['model']!r}"
+        )
+
+
+@pytest.mark.parametrize(
+    "role,expected_model",
+    [("fast", "gpt-6-luna"), ("coding", "gpt-6-sol"), ("reasoning", "gpt-6-astra")],
+)
+def test_gpt6_canary_canaried_roles_land_on_the_exact_clean_id(
+    role: str, expected_model: str
+) -> None:
+    """The three canaried roles specifically: with the near-miss roster
+    mounted, each must resolve to its own declared clean id, exactly."""
+    roles = _roles(GPT6_CANARY_MATRIX)
+    providers = _providers("openai")
+    providers["openai"].list_models = AsyncMock(
+        return_value=list(OPENAI_ROSTER_WITH_GPT6_NEAR_MISSES)
+    )
+    result = asyncio.run(resolve_model_role([role], roles, providers))
+    assert result and result[0]["model"] == expected_model

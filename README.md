@@ -22,6 +22,14 @@ Eight curated matrices ship with this bundle, plus one explicit-name alias
 
 > `openai-knob-consistent` was **removed on 2026-09-07**. Once the `preset:` block became `openai`'s default on 2026-09-02, the two files were the same matrix under two names. Select **`openai`** instead -- it is byte-for-byte what `openai-knob-consistent` used to give you.
 
+### Opt-in canary matrices
+
+Not "curated" in the same permanent sense as the eight above, and not selected by anyone automatically -- these exist so a rollout can be tried, measured and dropped without touching a default:
+
+| Matrix | When to use |
+|--------|-------------|
+| **openai-gpt6-canary** | **Opt-in only** -- select explicitly (`amplifier routing use openai-gpt6-canary` or `routing.matrix: openai-gpt6-canary` in settings.yaml). GPT-6 (exact `gpt-6-luna` / `gpt-6-sol` / `gpt-6-astra` IDs, no globs) on `fast`/`coding`/`reasoning` only; every other role is byte-for-byte identical to `openai.yaml`. Strict knob-consistent delegation on a four-rung ladder (`luna` < `terra` < `sol` < `astra`). **Exact IDs are not preflighted against any model catalog or provider capability declaration** -- `fast`/`coding` have no runtime fallback and depend entirely on the companion `microsoft/amplifier-module-provider-openai` PR (GPT-6 Sol/Luna support) landing FIRST; do not enable this canary for those two roles before that PR merges. Tracks `microsoft-amplifier/amplifier-support#524` -- see the file header in [`routing/openai-gpt6-canary.yaml`](routing/openai-gpt6-canary.yaml) for the full rationale, the dependency note, and its documented limitations. |
+
 Browse the matrix files directly in the [`routing/`](routing/) directory.
 
 ## Including the Bundle
@@ -129,7 +137,7 @@ Per-delegate `model_role` overrides (e.g. `delegate(agent="...", model_role="res
 
 Levels 1 and 2 stay strictly above level 3, so an author who deliberately pinned a specialist model still gets one. Inheritance is a default, never a ceiling on explicit intent.
 
-**Scoped by matrix, off unless the resolver can determine the caller's own model.** A matrix must carry a `preset:` block *and* the resolution must be able to determine the caller's own model. Only `openai.yaml` carries one. Every OTHER matrix shipped with this bundle still has no `preset:` key and resolves byte-identically — asserted, not asserted-to, by `tests/test_default_resolution_unchanged.py`, which replays a recording taken from the commit immediately before the feature landed, plus `modules/hooks-routing/tests/test_knob_consistent_routing.py::TestDefaultBehaviourUnchanged::test_anthropic_matrix_has_no_preset_block` and `::test_anthropic_root_resolution_unchanged_vs_pre_50_matrix` naming the Anthropic guardrail directly.
+**Scoped by matrix, off unless the resolver can determine the caller's own model.** A matrix must carry a `preset:` block *and* the resolution must be able to determine the caller's own model. Of the matrices a user can land on by picking a name with no other setup, only `openai.yaml` carries one — every other **default-selectable** matrix (`anthropic`, `balanced`, `quality`, `economy`, `gemini`, `copilot`, `ollama`) still has no `preset:` key and resolves byte-identically, asserted, not asserted-to, by `tests/test_default_resolution_unchanged.py`, which replays a recording taken from the commit immediately before the feature landed, plus `modules/hooks-routing/tests/test_knob_consistent_routing.py::TestDefaultBehaviourUnchanged::test_anthropic_matrix_has_no_preset_block` and `::test_anthropic_root_resolution_unchanged_vs_pre_50_matrix` naming the Anthropic guardrail directly. The **opt-in** `openai-gpt6-canary.yaml` (see [Opt-in canary matrices](#opt-in-canary-matrices)) also carries a `preset:` block on purpose — it exists to canary knob-consistent delegation onto GPT-6 — but it postdates that recording (it never existed at the pre-feature commit) so it is excluded from it by name rather than silently passing, and it is separately allow-listed alongside `openai.yaml` in `test_knob_consistent_routing.py`'s own preset-bearing guard.
 
 ```yaml
 # routing/openai.yaml -- shipped, DEFAULT ON

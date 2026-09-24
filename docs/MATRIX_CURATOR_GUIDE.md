@@ -593,20 +593,61 @@ first candidate and nothing else. Real fallback needs a candidate on a
 *different* provider; the caller's `model_role` list falls back across roles,
 not across models.
 
-### `reasoning_effort` Is Validated Per Provider, Not Per Model
+**Consequence for a brand-new model family: an exact pin is never a proxy for
+"has this model landed in the provider yet."** `resolve_model_role()` never
+calls `list_models()` for an exact (non-glob) candidate at all -- it hands
+back the literal string the instant the named provider family is installed,
+whether or not the mounted provider *software* actually recognises that model
+id. This makes exact-pin candidates for an unreleased-in-the-provider model a
+strictly WORSE guarantee than a glob against a stale catalogue: a glob at
+least fails closed (resolves to nothing, or falls through) when the id truly
+isn't there yet, where an exact pin resolves regardless and pushes the
+failure to request time, uncontrolled by this bundle.
+[`routing/openai-gpt6-canary.yaml`](../routing/openai-gpt6-canary.yaml) is the
+shipped example: GPT-6's model names have no numeric sub-version for a glob
+to match, so its candidates are necessarily exact pins, and two of its three
+roles (`fast`, `coding`) are consequently NOT protected by routing at all
+against the companion provider PR being unmerged -- see that file's own "NO
+CATALOG/CAPABILITY PREFLIGHT, THEREFORE NO RUNTIME FALLBACK" note before
+copying this pattern for another pre-release model family. Do not describe an
+exact pin on an unreleased model as "degrading gracefully" or "falling back"
+in a PR description or matrix comment -- say plainly that it has no routing-
+level protection, and name what (if anything) protects it instead (usually:
+the companion provider PR must land and be verified first).
+
+### `reasoning_effort` Is Validated Per Provider By Default, Per Model Where Declared
 
 A matrix `config.reasoning_effort` is an **operator default** — a
 caller-supplied effort wins.
 
 `tests/matrix_validation_rules.yaml` checks the value against a **provider-wide**
-vocabulary, keyed on `provider` alone. It cannot see whether the pinned *model*
-advertises that level, so an effort that is legal for the provider but
-unsupported by the model passes validation here and is left to the provider to
-resolve at request time.
+vocabulary, keyed on `provider` alone (`reasoning_effort_values`). By itself,
+that check cannot see whether the pinned *model* advertises the level: two
+models on the same provider can have genuinely different allowed sets (see
+GPT-6 below), so a value that is legal for the provider but unsupported by
+that specific model would otherwise pass validation here and be left to the
+provider to resolve at request time.
 
-That file's header also records which of those lists are provider-derived and
-which are only "the set already in use across the shipped matrices". Read the
-levels from the installed provider before pinning one.
+**For a model with real per-model differences, add it to
+`reasoning_effort_values_by_model` instead of relying on the provider-wide
+list alone.** That second map is keyed by the *exact* model id (glob
+candidates are not checked against it — a glob can resolve to more than one
+concrete model, so only an exact id has one set to check against) and, when a
+model has an entry there, `tests/test_matrix_config_validation.py` enforces it
+as the authoritative, narrower check for every shipped matrix that names that
+id. The GPT-6 family is the reason this map exists: `gpt-6-astra` accepts
+`low|medium|high|xhigh|max` and **rejects `none`**, while `gpt-6-sol` and
+`gpt-6-luna` accept `none` too — same provider (`openai`), three different
+per-model sets, none of which the provider-wide `openai` entry alone can tell
+apart. See [`routing/openai-gpt6-canary.yaml`](../routing/openai-gpt6-canary.yaml)
+for the shipped example.
+
+That file's header also records which of the provider-wide lists are
+provider-derived and which are only "the set already in use across the
+shipped matrices", and which of the per-model lists are sourced (with dates)
+from the vendor's own model pages. Read the levels from the installed
+provider (or its first-party docs, if a model is not yet fully live in the
+provider package) before pinning one.
 
 > **github-copilot only.** Once the model catalogue has loaded, an unadvertised
 > effort is omitted from the request and reported as a `ChatResponse.degradation`

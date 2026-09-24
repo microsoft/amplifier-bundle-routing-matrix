@@ -9,6 +9,15 @@
 #     The test FAILS on providers missing from this map — that failure is the
 #     prompt to look up the provider's valid set and record it here.
 #   - Provider gains/loses effort levels?  Edit its list below.
+#   - A specific MODEL (not just its provider) has a narrower or different
+#     allowed set than the provider-wide superset above? Add an entry under
+#     `reasoning_effort_values_by_model`, keyed by the exact model id as it
+#     appears in a candidate's `model:` field. This only applies to EXACT
+#     (non-glob) model ids -- a glob candidate is checked only against the
+#     provider-wide set, since it can resolve to more than one concrete
+#     model. When a model has a per-model entry here, it is the
+#     authoritative check for that model (narrower than, and enforced in
+#     addition to, the provider-wide `reasoning_effort_values` check).
 #
 # NOTE: this file must live OUTSIDE routing/ — any *.yaml in routing/ is
 # loaded as a matrix by the routing hook.
@@ -52,3 +61,25 @@ reasoning_effort_values:
   openai: [none, minimal, low, medium, high, xhigh, max]
   gemini: []  # provider reads no effort key from mount config -- see note above
   github-copilot: [none, low, medium, high, xhigh, max]
+
+# Per-MODEL valid values for `reasoning_effort`, narrower than (and checked
+# in addition to) the provider-wide superset above. Only exact model ids are
+# checked here -- see HOW TO EXTEND.
+#
+# Sources:
+#   gpt-6-astra:            OpenAI's gpt-6-astra model page (developers.
+#                            openai.com), per the amplifier-support#524
+#                            routing study: "low|medium|high|xhigh|max...
+#                            rejects `none`." Confirmed independently in
+#                            microsoft/amplifier-module-provider-openai's
+#                            `_GPT_6_ALLOWED_EFFORTS` (companion,
+#                            unmerged PR -- see routing/openai-gpt6-canary.yaml
+#                            DEPENDENCY note), both verified 2026-09-24.
+#   gpt-6-sol / gpt-6-luna:  Same study, same model pages: "Sol/Luna accept
+#                            `none|low|medium|high|xhigh|max` (default
+#                            `medium`)." Also mirrored in the same
+#                            provider-repo constant.
+reasoning_effort_values_by_model:
+  gpt-6-astra: [low, medium, high, xhigh, max]
+  gpt-6-sol: [none, low, medium, high, xhigh, max]
+  gpt-6-luna: [none, low, medium, high, xhigh, max]
