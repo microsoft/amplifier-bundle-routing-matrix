@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
+import inspect
 import logging
 import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+class _AvailabilityContractError(TypeError):
+    """Host integration failure, not a candidate that permits fallback."""
 
 
 # Matches trailing date suffixes on model snapshot IDs so clean-versioned model
@@ -79,7 +84,7 @@ def _spec_for_instance(
     for spec in provider_specs:
         if not isinstance(spec, dict):
             continue
-        spec_id = spec.get("id") or spec.get("module", "")
+        spec_id = spec.get("instance_id") or spec.get("id") or spec.get("module", "")
         if spec_id == instance_id:
             return spec
     return None
@@ -347,7 +352,7 @@ async def resolve_model_role(
         roles: Prioritised list of role names to try.
         matrix: Composed matrix ``roles`` dict (from :mod:`matrix_loader`).
         providers: Installed providers dict from ``coordinator.get("providers")``.
-        preresolved_models: Optional mutable dict of ``provider_type ->
+        preresolved_models: Optional mutable dict of ``mounted_instance_id ->
             model_names``.  When provided, :func:`_resolve_glob` reads from it
             to skip ``list_models()`` HTTP calls for providers whose model list
             was already fetched (e.g. by the parent session).
@@ -365,7 +370,7 @@ async def resolve_model_role(
             some earlier call has *finished*. Every member of a concurrent
             burst sees the same empty dict, so all of them fetch. That gap is
             what *inflight_model_lists* closes.
-        inflight_model_lists: Optional mutable dict of ``provider_type ->
+        inflight_model_lists: Optional mutable dict of ``mounted_instance_id ->
             asyncio.Future``, used to coalesce *simultaneous*
             ``list_models()`` fetches for one provider into a single HTTPS
             request.  ``None`` (the default) disables coalescing and preserves
@@ -392,7 +397,10 @@ async def resolve_model_role(
 
     Returns:
         List of ``{provider, model, config}`` dicts representing resolved
-        preferences.  Empty if no role resolves.
+        preferences. Empty if no role matches. With a host's synchronous
+        ``provider.check_available`` capability, exhausted failed candidates
+        raise their first availability/catalog error instead of returning no
+        match. An awaitable availability result is an immediate contract error.
 
         The ``"provider"`` value is the *actual mounted key* that
         :func:`find_provider_by_type` matched in ``providers`` -- NOT
@@ -422,6 +430,10 @@ async def resolve_model_role(
     # that shipped before this feature existed.
     _knob_active = preset is not None and getattr(preset, "active", False)
 
+    getter = getattr(coordinator, "get_capability", None)
+    availability = getter("provider.check_available") if callable(getter) else None
+    availability = availability if callable(availability) else None
+    failure = None
     for role in roles:
         role_data = matrix.get(role)
         if role_data is None:
@@ -450,19 +462,42 @@ async def resolve_model_role(
 
             matched_name, provider_instance = match
 
-            # Is the model pattern a glob?
-            if _is_glob(model_pattern):
-                resolved_model = await _resolve_glob(
-                    model_pattern,
-                    provider_instance,
-                    provider_key=provider_type,
-                    preresolved_models=preresolved_models,
-                    inflight_model_lists=inflight_model_lists,
-                )
-                if resolved_model is None:
-                    continue
-            else:
-                resolved_model = model_pattern
+            try:
+                # Account availability precedes exact names and cached catalogs.
+                # Only the declared matrix candidate/role order permits fallback.
+                if availability is not None:
+                    result = availability(matched_name)
+                    if inspect.isawaitable(result):
+                        # An async callback has not checked anything yet. Do not
+                        # accidentally treat its coroutine as successful, or try
+                        # another account to conceal a broken host contract.
+                        if inspect.iscoroutine(result):
+                            result.close()
+                        raise _AvailabilityContractError(
+                            "provider.check_available must be synchronous; "
+                            "it returned an awaitable"
+                        )
+                if _is_glob(model_pattern):
+                    resolved_model = await _resolve_glob(
+                        model_pattern,
+                        provider_instance,
+                        provider_key=matched_name,
+                        preresolved_models=preresolved_models,
+                        inflight_model_lists=inflight_model_lists,
+                        propagate_failure=availability is not None,
+                    )
+                    if resolved_model is None:
+                        continue
+                else:
+                    resolved_model = model_pattern
+            except _AvailabilityContractError:
+                raise
+            except Exception as error:
+                if availability is None:
+                    raise
+                if failure is None:
+                    failure = error
+                continue
 
             # Report only for the role that actually resolved -- a record for
             # a role that fell through would describe a decision nothing
@@ -484,6 +519,10 @@ async def resolve_model_role(
                 }
             ]
 
+    if failure is not None:
+        # [] means no match and lets callers inherit a default. A configured
+        # failed account is not an absent provider or an empty model catalog.
+        raise failure
     return []
 
 
@@ -566,6 +605,7 @@ async def _resolve_glob(
     provider_key: str = "",
     preresolved_models: dict[str, list[str]] | None = None,
     inflight_model_lists: dict[str, Any] | None = None,
+    propagate_failure: bool = False,
 ) -> str | None:
     """Resolve a glob model pattern against a provider's model list.
 
@@ -587,7 +627,8 @@ async def _resolve_glob(
     structurally cannot catch. See :func:`_fetch_model_names`.
 
     Returns the highest-ranked matching model name or ``None`` when no
-    candidate matches or the provider's ``list_models()`` raises.
+    candidate matches. A ``list_models()`` failure returns ``None`` by default;
+    ``propagate_failure=True`` preserves it for an opted-in host.
     """
     if preresolved_models is not None and provider_key in preresolved_models:
         model_names = preresolved_models[provider_key]
@@ -597,6 +638,8 @@ async def _resolve_glob(
                 provider, provider_key, inflight_model_lists
             )
         except Exception:
+            if propagate_failure:
+                raise
             logger.warning(
                 "Failed to list models for glob pattern '%s'", pattern, exc_info=True
             )

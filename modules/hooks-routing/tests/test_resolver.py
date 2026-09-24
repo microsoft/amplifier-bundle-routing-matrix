@@ -974,7 +974,7 @@ class TestPreresolvedModels:
                 ],
             },
         }
-        preresolved = {"anthropic": models}
+        preresolved = {"provider-anthropic": models}
 
         result = await resolve_model_role(
             ["coding"], roles, providers, preresolved_models=preresolved

@@ -927,7 +927,7 @@ class TestCustomRoutingDirs:
 
 
 class TestPreresolvedModelsFlow:
-    """session.routing["preresolved_models"] is read at on_session_start time
+    """session.routing["preresolved_models_by_instance"] is read at on_session_start time
     (not mount time) and written back afterward, so child sessions skip
     list_models() HTTP calls for providers the parent already resolved.
     """
@@ -941,7 +941,11 @@ class TestPreresolvedModelsFlow:
     ) -> MagicMock:
         """Coordinator that returns a routing capability from get_capability."""
         coordinator = _make_coordinator(providers=providers, agents=agents)
-        coordinator.get_capability = MagicMock(return_value=routing_capability)
+        coordinator.get_capability = MagicMock(
+            side_effect=lambda name: (
+                routing_capability if name == "session.routing" else None
+            )
+        )
         # register_capability is a no-op mock by default on MagicMock
         return coordinator
 
@@ -974,7 +978,7 @@ class TestPreresolvedModelsFlow:
         agents = {"coder": {"model_role": "coding"}}
 
         # Simulate parent having already fetched models — stored in session.routing
-        routing_cap = {"preresolved_models": {"anthropic": models}}
+        routing_cap = {"preresolved_models_by_instance": {"provider-anthropic": models}}
         coordinator = self._make_routing_coordinator(
             providers=providers, agents=agents, routing_capability=routing_cap
         )
@@ -1061,9 +1065,9 @@ class TestPreresolvedModelsFlow:
             "on_session_start must write preresolved_models back to session.routing"
         )
         written = routing_updates[0].args[1]
-        assert "preresolved_models" in written
-        assert "anthropic" in written["preresolved_models"]
-        assert written["preresolved_models"]["anthropic"] == models
+        assert "preresolved_models_by_instance" in written
+        assert "provider-anthropic" in written["preresolved_models_by_instance"]
+        assert written["preresolved_models_by_instance"]["provider-anthropic"] == models
 
 
 class TestUnsupportedEffortRejection:
