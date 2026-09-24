@@ -268,8 +268,8 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # NOTE: session.routing is registered by session_spawner.py AFTER initialize()
     # but BEFORE execute(), so it is NOT yet available here at mount() time.
     # Matrix overrides are read here for config-driven overrides only.
-    # The preresolved_models key is read inside on_session_start where timing is
-    # correct (session:start fires after session.routing is registered).
+    # The preresolved_models_by_instance key is read inside on_session_start,
+    # after session.routing is registered.
     capability_overrides: dict[str, Any] = {}
     routing_capability = (
         coordinator.get_capability("session.routing")
@@ -563,8 +563,8 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         # mount() time above) but BEFORE execute() — meaning it IS available when
         # session:start fires here.
         #
-        # A parent session populates session.routing["preresolved_models"] at the
-        # end of its own on_session_start (see below).  session_spawner.py then
+        # A parent populates session.routing["preresolved_models_by_instance"]
+        # at the end of its own on_session_start (see below). session_spawner.py
         # forwards the parent's session.routing to the child coordinator before
         # execute() runs, so the child's on_session_start finds those lists here
         # and can skip list_models() HTTP calls for providers already resolved.
@@ -573,9 +573,12 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             if hasattr(coordinator, "get_capability")
             else None
         )
-        # Shallow-copy so mutations below don't alias the registered capability dict.
+        # The legacy preresolved_models field used bare provider families. Never
+        # reinterpret those keys as account IDs: a family key may collide with a
+        # different mounted account in this session. Copy only the new namespace
+        # so mutations below do not alias the registered capability dict.
         preresolved_models: dict[str, list[str]] = dict(
-            (routing_cap or {}).get("preresolved_models", {})
+            (routing_cap or {}).get("preresolved_models_by_instance", {})
         )
 
         # Knob-consistent routing, level 3. Derived ONCE per session:start from
@@ -703,7 +706,16 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         # asyncio is cooperative and single-threaded, so dict reads/writes never
         # interleave (a coroutine only yields at explicit await points, and dict
         # mutation is not awaited).
-        await asyncio.gather(*(_resolve_one(cfg) for cfg in agents.values()))
+        # Hosts that resolve the requested child's role immediately before spawn
+        # can defer unrelated agent catalogs. This opt-in does not alter the
+        # resolver capability or implicitly inherit a default on route failure.
+        defer = (
+            coordinator.get_capability("routing.defer_agent_resolution")
+            if hasattr(coordinator, "get_capability")
+            else None
+        )
+        if defer is not True:
+            await asyncio.gather(*(_resolve_one(cfg) for cfg in agents.values()))
 
         # Write the now-populated model lists back into session.routing so child
         # sessions spawned from this one inherit them.  session_spawner.py already
@@ -714,7 +726,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             existing_routing = coordinator.get_capability("session.routing") or {}
             coordinator.register_capability(
                 "session.routing",
-                {**existing_routing, "preresolved_models": preresolved_models},
+                {**existing_routing, "preresolved_models_by_instance": preresolved_models},
             )
 
         return HookResult(action="continue")

@@ -34,6 +34,10 @@ returning a list with one or more ``ProviderPreference`` is the success path.
 The resolver honours fallback order encoded by the active strategy (matrix
 candidate order, cost ranking, etc.).
 
+When a host opts into ``provider.check_available``, failure of all declared
+fallbacks raises the first availability/catalog error. Consumers must propagate
+that failure rather than convert it into an empty result/default-account route.
+
 ``known_roles`` is advisory metadata, not a resolution guarantee: a role may be
 listed and still resolve to ``[]`` when no installed provider serves it. That is
 why it is named "known" rather than "available". Consumers use it to constrain
@@ -149,7 +153,7 @@ class MatrixModelRoleResolver:
         # context -- so consumers that surface these to a model agree with it.
         # Not sorted: the matrix order is curated (general, fast, coding, ...).
         self.known_roles: tuple[str, ...] = tuple(matrix_roles)
-        # Session-lifetime cache of provider_type -> fetched model names, shared
+        # Session-lifetime cache of mounted instance -> fetched model names, shared
         # across every resolve() call this instance ever makes. A resolver
         # instance is constructed once per mount() (see __init__.py's
         # ``coordinator.register_capability("model_role_resolver", _resolver)``)
