@@ -33,6 +33,10 @@
 # quality-first matrix "fast" means "the quickest acceptable model", and this
 # matrix's floor is Sonnet-tier.
 #
+# TEMPORARY Sonnet 5.5 gate: Anthropic Sonnet candidates pin to
+# claude-sonnet-5. Promote to a version glob or exact 5.5 only after live
+# tool-action + signed-history validation and review.
+#
 # Gemini notes:
 #   * Globs are DIGIT-ANCHORED (`gemini-[3-9]*-...`). The leading `[3-9]`
 #     excludes the `gemini-omni-*` lane (which an unanchored glob matches and
@@ -123,7 +127,7 @@
 
 name: quality
 description: "Best available models. Prioritizes capability over cost."
-updated: "2026-09-07"
+updated: "2026-09-29"
 
 roles:
   general:
@@ -134,7 +138,7 @@ roles:
         config:
           reasoning_effort: low
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: gemini
@@ -156,7 +160,7 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: gemini
@@ -178,7 +182,7 @@ roles:
         config:
           reasoning_effort: high
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: gemini
@@ -200,7 +204,7 @@ roles:
         config:
           reasoning_effort: max
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: gemini
@@ -222,7 +226,7 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: high
       - provider: gemini
@@ -266,7 +270,7 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: xhigh
       - provider: gemini
@@ -360,7 +364,7 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: github-copilot

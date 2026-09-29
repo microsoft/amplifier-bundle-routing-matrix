@@ -24,6 +24,10 @@
 # particular `vision` stays Gemini-led. If this changes, revisit balanced.yaml,
 # quality.yaml, economy.yaml together.
 #
+# TEMPORARY Sonnet 5.5 gate: Anthropic Sonnet candidates pin to
+# claude-sonnet-5. Promote to a version glob or exact 5.5 only after live
+# tool-action + signed-history validation and review.
+#
 # Gemini notes:
 #   * Globs are DIGIT-ANCHORED (`gemini-[3-9]*-...`). The leading `[3-9]`
 #     excludes the `gemini-omni-*` lane (which an unanchored glob matches and
@@ -122,7 +126,7 @@
 
 name: economy
 description: "Budget-first routing. Cheap tier for utility roles, mid-tier where quality matters."
-updated: "2026-09-07"
+updated: "2026-09-29"
 
 roles:
   general:
@@ -307,7 +311,7 @@ roles:
         config:
           reasoning_effort: high
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: high
       - provider: gemini
@@ -329,7 +333,7 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: gemini
@@ -355,7 +359,7 @@ roles:
         config:
           reasoning_effort: xhigh
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: xhigh
       - provider: gemini
@@ -377,7 +381,7 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: gemini
@@ -399,7 +403,7 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: gemini
@@ -421,7 +425,7 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: gemini
@@ -489,7 +493,7 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-sonnet-*
+        model: claude-sonnet-5
         config:
           reasoning_effort: medium
       - provider: gemini
