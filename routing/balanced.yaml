@@ -24,12 +24,10 @@
 # particular `vision` stays Gemini-led. If this changes, revisit balanced.yaml,
 # quality.yaml, economy.yaml together.
 #
-# OpenAI tier status (2026-09-07): the flagship `gpt-?.?-sol*` tier is PAUSED
-# pending further evals; sol candidates became `gpt-?.?-terra*` one effort
-# notch higher, clamped at xhigh, and the `gpt-[0-9].[0-9]` base-alias twin
-# is gone (gpt-5.6 is live; a gpt-5.5 fallback bought nothing). `ui-coding`
-# deliberately runs `gpt-?.?-luna*` at `max` effort -- cheap tier, maximum
-# thinking.
+# OpenAI tier status (2026-10-02): approved interim Terra -> exact Sol 6.1
+# migration, including Copilot GPT fallbacks. Existing role efforts remain.
+# Luna is current GPT-6; a comparative eval-driven selection review follows.
+# Historical September pause and rationale are retained in the review log.
 #
 # Gemini notes:
 #   * Globs are DIGIT-ANCHORED (`gemini-[3-9]*-...`). The leading `[3-9]`
@@ -125,14 +123,14 @@
 
 name: balanced
 description: "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team."
-updated: "2026-09-07"
+updated: "2026-10-02"
 
 roles:
   general:
     description: "Versatile catch-all, no specialization needed"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -146,11 +144,11 @@ roles:
             thinking_config:
               thinking_level: medium
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: medium
       - provider: github-copilot
-        model: gpt-5.6-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: ollama
@@ -160,7 +158,7 @@ roles:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: openai
-        model: gpt-?.?-luna
+        model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -196,7 +194,7 @@ roles:
         config:
           thinking_budget_tokens: 32000
       - provider: github-copilot
-        model: gpt-5.6-luna
+        model: gpt-6-luna
         config:
           reasoning_effort: medium
       - provider: ollama
@@ -206,7 +204,7 @@ roles:
     description: "Code generation, implementation, debugging"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
       - provider: anthropic
@@ -220,11 +218,11 @@ roles:
             thinking_config:
               thinking_level: medium
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: medium
       - provider: github-copilot
-        model: gpt-5.6-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: ollama
@@ -234,7 +232,7 @@ roles:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: openai
-        model: gpt-?.?-luna
+        model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: max
       - provider: anthropic
@@ -248,11 +246,11 @@ roles:
             thinking_config:
               thinking_level: medium
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: medium
       - provider: github-copilot
-        model: gpt-5.6-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
 
@@ -260,7 +258,7 @@ roles:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
       - provider: anthropic
@@ -274,7 +272,7 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: gpt-5.6-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
 
@@ -282,7 +280,7 @@ roles:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
       - provider: anthropic
@@ -296,7 +294,7 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: claude-opus-5
+        model: claude-opus-5.5
         config:
           reasoning_effort: high
       - provider: anthropic
@@ -308,7 +306,7 @@ roles:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
       - provider: anthropic
@@ -322,7 +320,7 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: gpt-5.6-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
 
@@ -330,7 +328,7 @@ roles:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
       - provider: anthropic
@@ -344,7 +342,7 @@ roles:
             thinking_config:
               thinking_level: medium
       - provider: github-copilot
-        model: claude-opus-5
+        model: claude-opus-5.5
         config:
           reasoning_effort: medium
 
@@ -352,7 +350,7 @@ roles:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
       - provider: anthropic
@@ -366,7 +364,7 @@ roles:
             thinking_config:
               thinking_level: medium
       - provider: github-copilot
-        model: claude-opus-5
+        model: claude-opus-5.5
         config:
           reasoning_effort: medium
 
@@ -374,7 +372,7 @@ roles:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
       - provider: anthropic
@@ -388,7 +386,7 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: claude-opus-5
+        model: claude-opus-5.5
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -412,7 +410,7 @@ roles:
             thinking_config:
               thinking_level: low
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -420,11 +418,11 @@ roles:
         config:
           reasoning_effort: medium
       - provider: github-copilot
-        model: gpt-5.6-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: medium
 
@@ -438,7 +436,7 @@ roles:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
       - provider: anthropic
@@ -452,6 +450,6 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: claude-opus-5
+        model: claude-opus-5.5
         config:
           reasoning_effort: medium

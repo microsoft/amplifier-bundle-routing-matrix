@@ -133,7 +133,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -142,7 +142,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -151,7 +151,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -160,7 +160,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -169,17 +169,17 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
     "fast": [
       {
         "config": {
-          "reasoning_effort": "medium"
+          "thinking_budget_tokens": 32000
         },
-        "model": "gpt-5.6-luna",
-        "provider": "openai"
+        "model": "claude-haiku-4-5",
+        "provider": "anthropic"
       }
     ],
     "general": [
@@ -187,7 +187,7 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -203,7 +203,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -212,7 +212,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -221,17 +221,17 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
     "ui-coding": [
       {
         "config": {
-          "reasoning_effort": "max"
+          "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-luna",
-        "provider": "openai"
+        "model": "claude-sonnet-5",
+        "provider": "anthropic"
       }
     ],
     "vision": [
@@ -252,7 +252,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ]
@@ -263,7 +263,7 @@
         "config": {
           "reasoning_effort": "max"
         },
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -272,7 +272,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -281,7 +281,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -290,7 +290,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -299,7 +299,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -315,14 +315,14 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "claude-sonnet-5",
+        "model": "claude-sonnet-5.5",
         "provider": "github-copilot"
       }
     ],
     "image-gen": [
       {
         "config": {},
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -331,7 +331,7 @@
         "config": {
           "reasoning_effort": "max"
         },
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -340,7 +340,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -349,7 +349,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-sol",
+        "model": "gpt-6.1-sol",
         "provider": "github-copilot"
       }
     ],
@@ -358,7 +358,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -367,7 +367,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gemini-3.5-flash",
+        "model": "claude-sonnet-5.5",
         "provider": "github-copilot"
       }
     ],
@@ -376,7 +376,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "claude-opus-5",
+        "model": "claude-opus-5.5",
         "provider": "github-copilot"
       }
     ]
@@ -387,17 +387,17 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
     "coding": [
       {
         "config": {
-          "reasoning_effort": "medium"
+          "thinking_budget_tokens": 32000
         },
-        "model": "gpt-5.6-luna",
-        "provider": "openai"
+        "model": "claude-haiku-4-5",
+        "provider": "anthropic"
       }
     ],
     "creative": [
@@ -405,7 +405,7 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -414,7 +414,7 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -423,26 +423,26 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
     "fast": [
       {
         "config": {
-          "reasoning_effort": "medium"
+          "thinking_budget_tokens": 32000
         },
-        "model": "gpt-5.6-luna",
-        "provider": "openai"
+        "model": "claude-haiku-4-5",
+        "provider": "anthropic"
       }
     ],
     "general": [
       {
         "config": {
-          "reasoning_effort": "medium"
+          "thinking_budget_tokens": 32000
         },
-        "model": "gpt-5.6-luna",
-        "provider": "openai"
+        "model": "claude-haiku-4-5",
+        "provider": "anthropic"
       }
     ],
     "image-gen": [
@@ -457,7 +457,7 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -466,7 +466,7 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -475,17 +475,17 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
     "ui-coding": [
       {
         "config": {
-          "reasoning_effort": "max"
+          "thinking_budget_tokens": 32000
         },
-        "model": "gpt-5.6-luna",
-        "provider": "openai"
+        "model": "claude-haiku-4-5",
+        "provider": "anthropic"
       }
     ],
     "vision": [
@@ -502,7 +502,7 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ]
@@ -690,7 +690,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -699,7 +699,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -708,7 +708,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -717,7 +717,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -726,25 +726,17 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
-    "fast": [
-      {
-        "config": {
-          "reasoning_effort": "medium"
-        },
-        "model": "gpt-5.6-luna",
-        "provider": "openai"
-      }
-    ],
+    "fast": [],
     "general": [
       {
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -753,7 +745,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -762,7 +754,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -771,7 +763,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -780,25 +772,17 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
-    "ui-coding": [
-      {
-        "config": {
-          "reasoning_effort": "max"
-        },
-        "model": "gpt-5.6-luna",
-        "provider": "openai"
-      }
-    ],
+    "ui-coding": [],
     "vision": [
       {
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -807,7 +791,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ]
@@ -818,7 +802,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -827,7 +811,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -836,7 +820,7 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -845,7 +829,7 @@
         "config": {
           "reasoning_effort": "high"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -854,7 +838,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -863,7 +847,7 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -872,7 +856,7 @@
         "config": {
           "reasoning_effort": "low"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -888,7 +872,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -897,7 +881,7 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
@@ -906,17 +890,17 @@
         "config": {
           "reasoning_effort": "xhigh"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ],
     "ui-coding": [
       {
         "config": {
-          "reasoning_effort": "max"
+          "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-luna",
-        "provider": "openai"
+        "model": "claude-sonnet-5",
+        "provider": "anthropic"
       }
     ],
     "vision": [
@@ -937,7 +921,7 @@
         "config": {
           "reasoning_effort": "medium"
         },
-        "model": "gpt-5.6-terra",
+        "model": "gpt-6.1-sol",
         "provider": "openai"
       }
     ]

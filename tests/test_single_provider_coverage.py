@@ -72,6 +72,8 @@ PROVIDER_MODELS: dict[str, list[str]] = {
         "claude-fable-5-1",
     ],
     "openai": [
+        "gpt-6.1-sol",
+        "gpt-6-luna",
         "gpt-6-astra",
         "gpt-5.6-sol",
         "gpt-5.6-terra",
@@ -82,6 +84,10 @@ PROVIDER_MODELS: dict[str, list[str]] = {
         "gpt-5.4-nano",
     ],
     "openai-chatgpt": [
+        "gpt-6.1-sol",
+        "gpt-6.1-sol-fast",
+        "gpt-6-luna",
+        "gpt-6-luna-fast",
         "gpt-6-astra",
         "gpt-6-astra-fast",
         "gpt-5.6-sol",
