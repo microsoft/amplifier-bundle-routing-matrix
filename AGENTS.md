@@ -5,6 +5,7 @@
 Read `README.md`, `docs/HANDOFF.md`, `docs/VISION.md`, and the documents relevant to your change:
 - Catalog, identity, scope or host integration: `contracts/routing-catalog.v1.md`, `docs/CATALOG-SPEC.md`, `docs/PROVIDER_AVAILABILITY.md`.
 - Model preferences, evaluation or evidence: `docs/EVALUATION-PROGRAM.md`, `docs/MATRIX_CURATOR_GUIDE.md`.
+- Offline routing evaluation tooling: `evals/AGENTS.md` and `evals/README.md`.
 - Tests and release gates: `.github/workflows/ci.yml`, `ruff.toml`, module `pyproject.toml` and module tests.
 
 The new vision/catalog contract are **DRAFT**. They describe proposed direction, not delivered behavior, frozen promises or permission to implement. Handoff distinguishes current source facts, proposed changes and decisions still needed. Re-read local conventions at design/code/verification/publication transitions.
@@ -12,6 +13,8 @@ The new vision/catalog contract are **DRAFT**. They describe proposed direction,
 ## Ownership and invariants
 
 This bundle owns matrix identities, aliases, role definitions, preference policy and resolver semantics. Consumers own presentation, configuration persistence and credential authority. Do not import a consumer application or evaluation runner into the runtime hook. Portable dispatch enforcement is a separately qualified integration dependency, not a capability this routing hook already supplies.
+
+Routing-specific evaluation configurations, scenarios, graders, reuse rules and promotion policy are maintained in `evals/` and `docs/EVALUATION-PROGRAM.md`. Evaluation assets/library bricks are optional development dependencies, never runtime hook imports or production dependencies. The offline tools require an explicit local benchmark root; the separate CI job acquires pinned public assets without executing upstream scripts. Keep that dependency isolated from routing policy and ordinary root/module tests.
 
 Preserve custom-file precedence, explicit intent, caller inheritance, exact mounted-instance provenance and failure behavior. The current `openai` matrix is API-first across API and ChatGPT; it is **not API-only**. Do not silently change saved IDs, widen account scope, invent fallback IDs, or label wildcard/template discovery verified. Catalog membership and entitlement are different evidence.
 
@@ -26,6 +29,8 @@ Runtime/provider/spawn changes also need an isolated full-stack smoke with real 
 Root CI now needs actual Core/Foundation because catalog tests exercise lifecycle and capability paths. Pre-import them in the **same pytest process** before module fixtures can install a stub; a separate import command is insufficient. Canonical/alias collapse also needs the entire winning-source group to match: a custom canonical profile must not suppress a still-valid bundled alias strategy.
 
 No inference or recurring paid benchmarks in ordinary offline CI. Live runs need an approved token/time/spend envelope, private ignored output storage, lifecycle accounting and safe credentials; parsed-but-inert preset knobs are not budget controls.
+
+Run the independent `evals/` suite with `ROUTING_EVAL_BENCHMARK_ROOT` explicitly set as documented there. Missing assets fail, never skip or fall back to ambient sibling checkouts. Preserve historical sample source/task/grader locks during relocation; they do not attest the current routing revision. `/.eval-deps/` is an ignored asset cache and `/evals/results/` is only an accidental-output safeguard, not an approved raw-result location.
 
 ## Publication and privacy
 

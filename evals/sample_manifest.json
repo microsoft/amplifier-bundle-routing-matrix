@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "synthetic": true,
+  "stage": "exploratory",
+  "hypothesis": "Explore the conditional effect of a coding-role Sol 6.1/high to Astra 6/high substitution under a fixed Sol 6.1/high root; unqualified portfolio, no claims.",
+  "estimand": "model",
+  "target_role": "coding",
+  "sources": {
+    "cli": "33b75749920472257d1d85d20a5699ecf9d1ece7",
+    "core": "e78bcad13f82c64c8f84243a00c8d9f90d8b876a",
+    "foundation": "18546f64709df8d737b851fada431466b124b359",
+    "routing": "183b453c5674fa9c4d51c24cd68e79bce34b28ea",
+    "evaluation": "7c3646796eea2b042bbe6ffb2de3906d31daa381",
+    "provider-openai": "819bc44d7039d481b3938c3b4e46466efad7297c",
+    "provider-anthropic": "5cdfd9f581103aee13d21ce62e50cfc18ec37c75",
+    "provider-gemini": "b736b66529b0a9969ddabf69c3909516de22f9ca",
+    "provider-github-copilot": "ed942e2c8a0c6d4ff6d878bc4ba480592f6c676a",
+    "provider-ollama": "f86ae6c7bdf55745294cc1719b5df5dda4f84c2b"
+  },
+  "root": {"backend": "openai", "model": "gpt-6.1-sol", "native_config": {"reasoning_effort": "high"}},
+  "backend_topology": [
+    {"mount": "openai", "backend": "openai"},
+    {"mount": "anthropic", "backend": "anthropic"},
+    {"mount": "gemini", "backend": "gemini"},
+    {"mount": "github-copilot", "backend": "github-copilot"},
+    {"mount": "ollama", "backend": "ollama"}
+  ],
+  "credential_env_names": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "GITHUB_TOKEN"],
+  "evaluator": {
+    "driver": {"backend": "anthropic", "model": "claude-sonnet-5.5", "native_config": {"reasoning_effort": "medium"}, "source": "evaluation", "protocol_sha256": "6a9f3efb1f8823494564e900462b7e699f4c7d73d1666b9c64d53d1aeeac78a2", "config_sha256": "8fcc7551470a8adad7ba0a9bf8f516ac7be1c11253818040800128caa3c8d107"},
+    "extractor": {"backend": "anthropic", "model": "claude-sonnet-5.5", "native_config": {"reasoning_effort": "medium"}, "source": "evaluation", "protocol_sha256": "84081cc77e22cae7cbfbbab13278157d15ca455d6dd4cca1912166e9543aa1ac", "config_sha256": "3675345650c7833c88bf16c6039eb9747568399a83591ff96b8c1d542f855c17"},
+    "judge": {"backend": "anthropic", "model": "claude-sonnet-5.5", "native_config": {"reasoning_effort": "medium"}, "source": "evaluation", "protocol_sha256": "834fbb556854c135aa6f13882b5a5a4116056bef33e31005f931f2000ff6a57f", "config_sha256": "4dd17a505a52f4ae87e6ea44f31b40c1627dfb2eb16a22203e9163a0fa642226"}
+  },
+  "seed": 42,
+  "repetitions": 3,
+  "budgets": {"subject_tokens": null, "time_s": null, "subject_usd": null, "evaluation_usd": null, "application_usd": null},
+  "tasks": [
+    {
+      "id": "pdf-hr-q2", "path": "pdf-hr-q2", "split": "development",
+      "sha256": "b0c70344f71badcab630d2d4b6d1351b6b53c7431f9b95de5c27aeeec5b1cd9e",
+      "rubric_sha256": "348394811d0b74336bcf680d46da86c6b258d8f801a13f21a4cc87949186fc51",
+      "required_criteria": [{"id": "end_to_end.answer_within_tolerance", "min": 0, "max": 100}],
+      "success_rule": {"minimum_awards": {"end_to_end.answer_within_tolerance": 100}},
+      "critical_rule": {"minimum_awards": {"end_to_end.answer_within_tolerance": 100}}
+    },
+    {
+      "id": "code-discrepancy-docs-knack", "path": "code-discrepancy-docs-knack", "split": "development",
+      "sha256": "bf5f8b84cb572dec9847a2cc66abd5c05ba3b10bfd53207485226d72bbf66a93",
+      "rubric_sha256": "2d998e4c258ff3afa47163eb1131127f5c1324a99c05c37c8ccb8b4172ec7a86",
+      "required_criteria": [
+        {"id": "check_discrepancies.file_created", "min": 0, "max": 5},
+        {"id": "check_discrepancies.discrepancy_1_config_get", "min": 0, "max": 19},
+        {"id": "check_discrepancies.discrepancy_2_validator_order", "min": 0, "max": 19},
+        {"id": "check_discrepancies.discrepancy_3_table_transformer_query", "min": 0, "max": 19},
+        {"id": "check_discrepancies.discrepancy_4_logging_flags", "min": 0, "max": 19},
+        {"id": "check_discrepancies.discrepancy_5_choices_order", "min": 0, "max": 19}
+      ],
+      "success_rule": {"minimum_awards": {"check_discrepancies.file_created": 5, "check_discrepancies.discrepancy_1_config_get": 19, "check_discrepancies.discrepancy_2_validator_order": 19, "check_discrepancies.discrepancy_3_table_transformer_query": 19, "check_discrepancies.discrepancy_4_logging_flags": 19, "check_discrepancies.discrepancy_5_choices_order": 19}},
+      "critical_rule": {"minimum_awards": {}},
+      "false_positive_policy": "Exploratory only: upstream does not establish supported-findings precision; freeze a hidden reference and false-positive penalty before execution."
+    },
+    {
+      "id": "cpsc_recall_monitor", "path": "cpsc_recall_monitor", "split": "development",
+      "sha256": "14735ecfca8c31b9531a7ff5426df1654477c789dcc61cb76ec24c3f2dff9ffb",
+      "rubric_sha256": "704bed7522158f652904f626c24cdab5a27e04c1215feea48ebfa77002df8aa5",
+      "required_criteria": [
+        {"id": "end_to_end.readme_clear", "min": 0, "max": 5},
+        {"id": "end_to_end.tool_runs_successfully", "min": 0, "max": 20},
+        {"id": "end_to_end.csv_file_created", "min": 0, "max": 10},
+        {"id": "end_to_end.required_columns_present", "min": 0, "max": 10},
+        {"id": "end_to_end.csv_properly_formatted", "min": 0, "max": 5},
+        {"id": "end_to_end.csv_has_data", "min": 0, "max": 5},
+        {"id": "end_to_end.recall_dates_correct_month", "min": 0, "max": 10},
+        {"id": "end_to_end.urls_are_valid_cpsc", "min": 0, "max": 5},
+        {"id": "end_to_end.urls_actually_work", "min": 0, "max": 10},
+        {"id": "end_to_end.data_fields_meaningful", "min": 0, "max": 10},
+        {"id": "end_to_end.alternative_format_works", "min": 0, "max": 10}
+      ],
+      "success_rule": {"minimum_awards": {"end_to_end.readme_clear": 5, "end_to_end.tool_runs_successfully": 20, "end_to_end.csv_file_created": 10, "end_to_end.required_columns_present": 10, "end_to_end.csv_properly_formatted": 5, "end_to_end.csv_has_data": 5, "end_to_end.recall_dates_correct_month": 10, "end_to_end.urls_are_valid_cpsc": 5, "end_to_end.urls_actually_work": 10, "end_to_end.data_fields_meaningful": 10, "end_to_end.alternative_format_works": 10}},
+      "critical_rule": {"minimum_awards": {"end_to_end.tool_runs_successfully": 20}},
+      "false_positive_policy": "Exploratory only: upstream does not establish supported-findings precision; freeze a hidden reference and false-positive penalty before execution."
+    },
+    {
+      "id": "news_research_tool", "path": "news_research_tool", "split": "development",
+      "sha256": "9bf35b22531d4abb97137c76a7337ec6349a118dc9864845ac0c7aa634e48a64",
+      "rubric_sha256": "8d1228cd3aa214980f4b3ed3a7e5b4b1aea473c1347448e8bef2fafbbffded70",
+      "required_criteria": [
+        {"id": "capabilities.ddgs_dependency", "min": 0, "max": 25},
+        {"id": "capabilities.llm_synthesis", "min": 0, "max": 15},
+        {"id": "capabilities.supporting_information", "min": 0, "max": 10},
+        {"id": "capabilities.markdown_output", "min": 0, "max": 5},
+        {"id": "capabilities.cli_accepts_topic", "min": 0, "max": 5},
+        {"id": "capabilities.readme_exists", "min": 0, "max": 5},
+        {"id": "capabilities.grounded_citations", "min": 0, "max": 10},
+        {"id": "capabilities.uses_recent_model", "min": 0, "max": 25},
+        {"id": "run_and_validate.readme_exists", "min": 0, "max": 5},
+        {"id": "run_and_validate.tool_runs_successfully", "min": 0, "max": 20},
+        {"id": "run_and_validate.markdown_output_created", "min": 0, "max": 10},
+        {"id": "run_and_validate.has_summary", "min": 0, "max": 10},
+        {"id": "run_and_validate.articles_are_relevant", "min": 0, "max": 10},
+        {"id": "run_and_validate.articles_are_recent", "min": 0, "max": 10},
+        {"id": "run_and_validate.synthesizes_multiple_sources", "min": 0, "max": 10},
+        {"id": "run_and_validate.has_multiple_citations", "min": 0, "max": 5},
+        {"id": "run_and_validate.citations_have_urls", "min": 0, "max": 5},
+        {"id": "run_and_validate.citations_have_dates", "min": 0, "max": 5},
+        {"id": "run_and_validate.content_is_grounded", "min": 0, "max": 5},
+        {"id": "run_and_validate.proper_attribution", "min": 0, "max": 5}
+      ],
+      "success_rule": {"minimum_awards": {"capabilities.ddgs_dependency": 25, "capabilities.llm_synthesis": 15, "capabilities.supporting_information": 10, "capabilities.markdown_output": 5, "capabilities.cli_accepts_topic": 5, "capabilities.readme_exists": 5, "capabilities.grounded_citations": 10, "capabilities.uses_recent_model": 25, "run_and_validate.readme_exists": 5, "run_and_validate.tool_runs_successfully": 20, "run_and_validate.markdown_output_created": 10, "run_and_validate.has_summary": 10, "run_and_validate.articles_are_relevant": 10, "run_and_validate.articles_are_recent": 10, "run_and_validate.synthesizes_multiple_sources": 10, "run_and_validate.has_multiple_citations": 5, "run_and_validate.citations_have_urls": 5, "run_and_validate.citations_have_dates": 5, "run_and_validate.content_is_grounded": 5, "run_and_validate.proper_attribution": 5}},
+      "critical_rule": {"minimum_awards": {"run_and_validate.tool_runs_successfully": 20, "run_and_validate.content_is_grounded": 5}}
+    },
+    {
+      "id": "markdown_deck_converter", "path": "markdown_deck_converter", "split": "development",
+      "sha256": "f8063e9d1d79eb81a3a49e6e85003d479824bc56cfd3b8397e3fae32f804b229",
+      "rubric_sha256": "f87703962c80a253ac193af47f611e9784fbaac5219c480888a150badf37df64",
+      "required_criteria": [
+        {"id": "cli_and_generation.readme_exists", "min": 0, "max": 10},
+        {"id": "cli_and_generation.readme_quality", "min": 0, "max": 10},
+        {"id": "cli_and_generation.tool_runs_basic", "min": 0, "max": 25},
+        {"id": "cli_and_generation.pptx_file_created", "min": 0, "max": 25},
+        {"id": "cli_and_generation.theme_support", "min": 0, "max": 15},
+        {"id": "cli_and_generation.markdown_structure", "min": 0, "max": 15},
+        {"id": "editability_validation.file_opens", "min": 0, "max": 10},
+        {"id": "editability_validation.slide_count_correct", "min": 0, "max": 10},
+        {"id": "editability_validation.titles_correct", "min": 0, "max": 10},
+        {"id": "editability_validation.uses_placeholders", "min": 0, "max": 35},
+        {"id": "editability_validation.proper_layouts", "min": 0, "max": 15},
+        {"id": "editability_validation.content_preserved", "min": 0, "max": 10},
+        {"id": "editability_validation.actually_editable", "min": 0, "max": 10}
+      ],
+      "success_rule": {"minimum_awards": {"cli_and_generation.readme_exists": 10, "cli_and_generation.readme_quality": 10, "cli_and_generation.tool_runs_basic": 25, "cli_and_generation.pptx_file_created": 25, "cli_and_generation.theme_support": 15, "cli_and_generation.markdown_structure": 15, "editability_validation.file_opens": 10, "editability_validation.slide_count_correct": 10, "editability_validation.titles_correct": 10, "editability_validation.uses_placeholders": 35, "editability_validation.proper_layouts": 15, "editability_validation.content_preserved": 10, "editability_validation.actually_editable": 10}},
+      "critical_rule": {"minimum_awards": {"editability_validation.uses_placeholders": 35, "editability_validation.actually_editable": 10}}
+    }
+  ],
+  "arms": [
+    {
+      "id": "baseline",
+      "matrix_sha256": "e6ef990deaab2ece81a30d050890c8377c36d6ba713767bf9817e852c6e098d4",
+      "matrix": {
+        "name": "balanced",
+        "description": "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team.",
+        "updated": "2026-10-02",
+        "roles": {
+          "general": {"description": "Versatile catch-all, no specialization needed", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-sonnet-5.5", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "ollama", "model": "*"}]},
+          "fast": {"description": "Quick utility tasks — parsing, classification, file ops, bulk work", "candidates": [{"provider": "openai", "model": "gpt-[6-9]*-luna", "config": {"reasoning_effort": "medium"}}, {"provider": "anthropic", "model": "claude-haiku-*", "config": {"thinking_budget_tokens": 32000}}, {"provider": "gemini", "model": "gemini-[3-9]*-flash", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "low"}}}}, {"provider": "github-copilot", "model": "claude-haiku-4.5", "config": {"thinking_budget_tokens": 32000}}, {"provider": "github-copilot", "model": "gpt-6-luna", "config": {"reasoning_effort": "medium"}}, {"provider": "ollama", "model": "*"}]},
+          "coding": {"description": "Code generation, implementation, debugging", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "high"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-sonnet-5.5", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "ollama", "model": "*"}]},
+          "ui-coding": {"description": "Frontend/UI code — components, layouts, styling, spatial reasoning", "candidates": [{"provider": "openai", "model": "gpt-[6-9]*-luna", "config": {"reasoning_effort": "max"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-sonnet-5.5", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}]},
+          "security-audit": {"description": "Vulnerability assessment, attack surface analysis, code auditing", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "high"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "high"}}]},
+          "reasoning": {"description": "Deep architectural reasoning, system design, complex multi-step analysis", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "high"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "high"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}]},
+          "critique": {"description": "Analytical evaluation — finding flaws in existing work, not generating solutions", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "xhigh"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}]},
+          "creative": {"description": "Design direction, aesthetic judgment, high-quality creative output", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "high"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "medium"}}]},
+          "writing": {"description": "Long-form content — documentation, marketing, case studies, storytelling", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "high"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "medium"}}]},
+          "research": {"description": "Deep investigation, information synthesis across multiple sources", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "high"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "medium"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}]},
+          "vision": {"description": "Understanding visual input — screenshots, diagrams, UI mockups", "candidates": [{"provider": "gemini", "model": "gemini-[3-9]*-flash", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "low"}}}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "low"}}}}, {"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "claude-sonnet-5.5", "config": {"reasoning_effort": "medium"}}]},
+          "image-gen": {"description": "Image generation, visual mockup creation, visual ideation", "candidates": [{"provider": "gemini", "model": "gemini-3-pro-image"}]},
+          "critical-ops": {"description": "High-reliability operational tasks — infrastructure, orchestration, coordination", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "medium"}}]}
+        }
+      }
+    },
+    {
+      "id": "candidate",
+      "matrix_sha256": "9fb4800d71e73d8e7230a2b973004966c179b908562206dbdcef5912e028c426",
+      "matrix": {
+        "name": "balanced",
+        "description": "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team.",
+        "updated": "2026-10-02",
+        "roles": {
+          "general": {"description": "Versatile catch-all, no specialization needed", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-sonnet-5.5", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "ollama", "model": "*"}]},
+          "fast": {"description": "Quick utility tasks — parsing, classification, file ops, bulk work", "candidates": [{"provider": "openai", "model": "gpt-[6-9]*-luna", "config": {"reasoning_effort": "medium"}}, {"provider": "anthropic", "model": "claude-haiku-*", "config": {"thinking_budget_tokens": 32000}}, {"provider": "gemini", "model": "gemini-[3-9]*-flash", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "low"}}}}, {"provider": "github-copilot", "model": "claude-haiku-4.5", "config": {"thinking_budget_tokens": 32000}}, {"provider": "github-copilot", "model": "gpt-6-luna", "config": {"reasoning_effort": "medium"}}, {"provider": "ollama", "model": "*"}]},
+          "coding": {"description": "Code generation, implementation, debugging", "candidates": [{"provider": "openai", "model": "gpt-6-astra", "config": {"reasoning_effort": "high"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-sonnet-5.5", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "ollama", "model": "*"}]},
+          "ui-coding": {"description": "Frontend/UI code — components, layouts, styling, spatial reasoning", "candidates": [{"provider": "openai", "model": "gpt-[6-9]*-luna", "config": {"reasoning_effort": "max"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-sonnet-5.5", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}]},
+          "security-audit": {"description": "Vulnerability assessment, attack surface analysis, code auditing", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "high"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "high"}}]},
+          "reasoning": {"description": "Deep architectural reasoning, system design, complex multi-step analysis", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "high"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "high"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}]},
+          "critique": {"description": "Analytical evaluation — finding flaws in existing work, not generating solutions", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "xhigh"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}]},
+          "creative": {"description": "Design direction, aesthetic judgment, high-quality creative output", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "high"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "medium"}}]},
+          "writing": {"description": "Long-form content — documentation, marketing, case studies, storytelling", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "high"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "medium"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "medium"}}]},
+          "research": {"description": "Deep investigation, information synthesis across multiple sources", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "high"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "medium"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}]},
+          "vision": {"description": "Understanding visual input — screenshots, diagrams, UI mockups", "candidates": [{"provider": "gemini", "model": "gemini-[3-9]*-flash", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "low"}}}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "low"}}}}, {"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "anthropic", "model": "claude-sonnet-*", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "medium"}}, {"provider": "github-copilot", "model": "claude-sonnet-5.5", "config": {"reasoning_effort": "medium"}}]},
+          "image-gen": {"description": "Image generation, visual mockup creation, visual ideation", "candidates": [{"provider": "gemini", "model": "gemini-3-pro-image"}]},
+          "critical-ops": {"description": "High-reliability operational tasks — infrastructure, orchestration, coordination", "candidates": [{"provider": "openai", "model": "gpt-6.1-sol", "config": {"reasoning_effort": "xhigh"}}, {"provider": "anthropic", "model": "claude-opus-*", "config": {"reasoning_effort": "medium"}}, {"provider": "gemini", "model": "gemini-[3-9]*-pro-preview", "config": {"extra_request_params": {"thinking_config": {"thinking_level": "high"}}}}, {"provider": "github-copilot", "model": "claude-opus-5.5", "config": {"reasoning_effort": "medium"}}]}
+        }
+      }
+    }
+  ]
+}

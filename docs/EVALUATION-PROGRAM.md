@@ -2,6 +2,8 @@
 
 Proposed policy process, not a paid schedule, implemented executor or model recommendation. [Vision](VISION.md) sets the destination; [HANDOFF](HANDOFF.md) separates current evidence and implementation gaps. This document does not change shipped preferences.
 
+Routing owns the evaluation configurations, scenarios, graders, reuse rules and promotion policy. The maintained offline implementation is [`../evals/`](../evals/README.md), with a reusable library and thin Click CLI; it is not another consumer example. Generic execution bricks remain in the separate evaluation library as optional development dependencies, not runtime routing-hook imports.
+
 ## 1. What is measured
 
 Measure configurations, not model names in isolation: actual backend, delivered model revision, native effort, root/controller, tools/context, bundle/provider/dispatch versions, environment, task family and grader. Compatibility, controlled worker-role performance and whole-matrix workflow effects are distinct questions. Equal effort labels are not equal compute; a provider family is not a billing connection.
@@ -129,6 +131,6 @@ Exports need schema allowlists, private-shape/secret scans, locally derived iden
 
 ## 8. Current boundary and next acceptance
 
-No runner, archive, adapters or recurring paid jobs are implemented by this proposal. The existing evaluation example verifies an offline contract only; it rejects preset-bearing and non-primary OpenAI leaf treatments. Its current rubric locks include known defects. A recommendation consumer contract is deferred until a real result consumer and discriminating fixtures exist; this program must not create a fake pass ledger.
+No runner, archive, adapters or recurring paid jobs are implemented by this proposal. The maintained routing [`evals/`](../evals/README.md) tooling verifies an offline contract only; it rejects preset-bearing and non-primary OpenAI leaf treatments. Its historical synthetic sample and task/grader locks are preserved, including known rubric defects. Every CLI command requires an explicit `--benchmark-root`; the independent offline CI job checks out public evaluation assets at the sample's pinned revision without executing upstream scripts or installing its runtime. A recommendation consumer contract is deferred until a real result consumer and discriminating fixtures exist; this program must not create a fake pass ledger.
 
 Next acceptance: independently authored hard synthetic task/grader pairs; approved external acquisition/license manifests; versioned normalized telemetry and reuse comparisons; instrumented isolated baseline and paired calibration; measurable budget/cleanup behavior. Then approve the targeted cycle or deeper study. Evidence packets propose policy diffs; they do not silently edit defaults.

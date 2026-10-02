@@ -71,7 +71,9 @@ ratification or runtime proof.
 
 ## Evaluation starting point
 
-A separate evaluation consumer example already implements offline plan/readiness/analyze and has 93 independently passing tests plus pinned task/grader schema checks for five benchmark tasks. It has no live execution, telemetry normalization, privacy export, cost enforcement or recurring runner. The five existing rubrics include unqualified criteria. Preserve that honest boundary.
+The maintained routing [`evals/`](../evals/README.md) program implements offline plan/readiness/analyze through a reusable library and thin Click CLI. Relocation preserves the original 93 contract cases and adds bounded dependency/import/CLI regressions; the original independent task/grader schema checks covered five benchmark tasks. Routing owns evaluation configurations, scenarios, graders, reuse rules and promotion policy; generic execution bricks remain in the separate evaluation library as optional development dependencies. It has no live execution, telemetry normalization, privacy export, cost enforcement or recurring runner. The five existing rubrics include unqualified criteria. Preserve that honest boundary.
+
+Every command requires an explicit local `--benchmark-root`; tests require `ROUTING_EVAL_BENCHMARK_ROOT` only for the two pinned-portfolio cases and fail actionably if absent. CI acquires the sample's pinned public task assets in an ignored development cache, with no evaluator runtime install, upstream-script execution, secrets or result uploads. Historical subject/source/task/grader locks are not rewritten to the new repository HEAD. Raw results remain outside source repositories.
 
 Public synthetic proposals and benchmark pins are in EVALUATION-PROGRAM; no raw protected inputs or source maps belong here. Related mechanisms must not be counted as independent trials. Provisional seeds lack executed/live qualification; writing/creative/image-gen gaps remain. No current model is proven better by these proposals.
 
@@ -108,6 +110,8 @@ Before freezing the contract, require written spec, machine-checkable kit, passi
 The first slice adds routing-library source/tests, two exact-module profiles,
 catalog metadata and implementation documentation. Evaluation, Core/Foundation,
 providers, consumer configuration and shared installations are not changed.
+The subsequent routing-owned relocation adds `evals/` and its separate offline
+CI job; it leaves the historical evaluation-branch sources untouched.
 Use the real-dependency pre-import test command in [catalog-api](catalog-api.md)
 and CI's gates. Existing eight golden entries must not be bulk regenerated.
 
@@ -121,6 +125,18 @@ actual session initialization/execute/cleanup and the routing entry point for
 legacy both-backend resolution, approved-account narrowing, rebound binding
 rejection and custom canonical/alias separation were observed with zero
 inference or network transport. Provider discovery there was fabricated only.
+
+The routing-owned relocation was independently checked in a fresh isolated
+environment: **104 evaluation tests** (93 retained plus 11 relocation cases) and
+all **858 routing tests** passed together, **962 total with no skips**. Ruff
+**0.15.11**, scoped formatting and bundle structure checks passed. The relocated
+CLI ran from an unrelated working directory using explicit pinned benchmark
+inputs; actual TaskSpec and GraderConfig loading matched all five task IDs,
+timeouts and criterion bounds. The unchanged library/sample bytes and historical
+locks were verified. `plan` exited 0, `readiness` exited 1 with execution
+unsupported, and omission of `--benchmark-root` exited 2 before input reads.
+No subject evaluation or model call was made. Independent relocation and
+publication review found no material blocker.
 
 Independent source/stranger review found three release blockers: custom
 canonical/bundled-alias identity collapse, root CI's missing runtime dependencies,

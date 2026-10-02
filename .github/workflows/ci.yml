@@ -148,6 +148,41 @@ jobs:
           --with git+https://github.com/microsoft/amplifier-foundation
           python -c "import amplifier_core, amplifier_foundation.spawn_utils, pytest; raise SystemExit(pytest.main(['../../tests/test_catalog_refresh.py', '-q', '--tb=short']))"
 
+  # Maintained routing-specific offline contracts, not a paid evaluation runner.
+  # The second checkout is public pinned task data only: never execute its scripts
+  # or install its evaluator runtime. No secrets or result-artifact uploads.
+  routing-evidence:
+    name: Routing evidence — Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: microsoft/amplifier-bundle-evaluation
+          ref: 7c3646796eea2b042bbe6ffb2de3906d31daa381
+          path: .eval-deps/amplifier-bundle-evaluation
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+      - name: Run offline contract tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONDONTWRITEBYTECODE: "1"
+          ROUTING_EVAL_BENCHMARK_ROOT: ${{ github.workspace }}/.eval-deps/amplifier-bundle-evaluation/amplifier-benchmark/tasks
+        run: >-
+          uv run --no-project --python ${{ matrix.python-version }}
+          --with pytest --with click --with pyyaml
+          python -m pytest -q -p no:cacheprovider --import-mode=importlib evals
+      - name: Lint offline routing evidence
+        run: uvx ruff@0.15.11 check evals
+      - name: Check offline routing evidence formatting
+        # Retain the original library bytes (88 columns), not whole-repo formatting.
+        run: uvx ruff@0.15.11 format --check --config line-length=88 evals
+
   # ---------------------------------------------------------------------------
   # Bundle structure — a cheap YAML parse of bundle.md's frontmatter, every
   # behaviors/*.yaml and every routing/*.yaml. No network, no keys, ~1 second.

@@ -6,3 +6,7 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
+# Pinned public evaluation assets are a dev/CI cache, not routing source.
+/.eval-deps/
+# Safeguard only: raw results belong in private ignored storage outside repos.
+/evals/results/

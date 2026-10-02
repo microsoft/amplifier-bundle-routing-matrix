@@ -97,6 +97,36 @@ ChatGPT OAuth and local Ollama are outside this hosted workflow; their omission
 is coverage not provided, not proof of freshness. Ordinary PR tests remain
 secret-free. Fresh catalogs do not replace inference smoke tests or quality evals.
 
+## Routing evaluation program
+
+[`evals/`](evals/README.md) is this bundle's maintained routing-specific evaluation
+tooling, not a generic evaluation-library example or a live-results archive.
+The reusable `evidence.py` library and thin Click wrapper support offline
+`plan`, `readiness`, and `analyze` only. Routing owns its evaluation configurations,
+scenarios, graders, reuse rules and promotion decisions; generic execution bricks
+remain in the separate evaluation library as optional development dependencies.
+Nothing here adds evaluator imports to the runtime hook or changes model policy.
+
+From the routing repository root, with Click/PyYAML already available and an
+explicit tasks path from the pinned public evaluation checkout:
+
+```sh
+export ROUTING_EVAL_BENCHMARK_ROOT=/path/to/pinned/amplifier-benchmark/tasks
+python evals/cli.py plan evals/sample_manifest.json \
+  --benchmark-root "$ROUTING_EVAL_BENCHMARK_ROOT"
+```
+
+See [`evals/README.md`](evals/README.md) for the public revision, library usage,
+all commands and the independent offline test job. CI acquires those pinned
+public in-repo task assets automatically, without running benchmark scripts,
+installing the evaluator runtime, using secrets, or uploading result artifacts.
+The sample remains historical and explicitly synthetic/exploratory; its source
+and grader locks are not updated to claim current-policy evidence. Readiness is
+always execution-unsupported, and existing rubric defects remain visible.
+The broader method in [`docs/EVALUATION-PROGRAM.md`](docs/EVALUATION-PROGRAM.md)
+is still DRAFT: no live quality result, paid recurrence, frozen contract or
+automatic promotion is supplied.
+
 ## Including the Bundle
 
 **Foundation already includes this bundle** — no extra configuration needed if you use Foundation.
