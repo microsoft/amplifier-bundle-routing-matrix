@@ -605,13 +605,23 @@ def derive_caller_context(
 
     module = str(best.get("module") or "")
     family = module.replace("provider-", "") or str(best.get("id") or "")
+    # Model selection and tier inheritance must agree about backend aliases.
+    # Preserve an explicitly declared backend ladder in a custom preset.
+    if preset is not None and family not in preset.tier_ladder:
+        from .resolver import PROVIDER_FAMILY_ALIASES
+
+        family = next(
+            (canonical for canonical, aliases in PROVIDER_FAMILY_ALIASES.items()
+             if family in aliases and canonical in preset.tier_ladder),
+            family,
+        )
     effort_key = (preset or Preset()).effort_key_for(family)
     effort = cfg.get(effort_key)
     return CallerContext(
         family=family,
         model=model,
         effort=str(effort) if effort is not None else None,
-        provider_key=str(best.get("id") or module),
+        provider_key=str(best.get("instance_id") or best.get("id") or module),
     )
 
 
@@ -840,10 +850,20 @@ def plan_candidates(
         return candidates, record if preset.report_unhonored else None
 
     rung_index = min(caller_rung, len(sub_ladder) - 1)
+    # A ladder classifies suffix variants; it is not a safe selection glob.
+    # In-family fallback can honor the caller's exact chosen model, including
+    # an explicitly chosen -fast variant, without inventing a different sibling.
+    substitute_model = sub_ladder[rung_index][0]
+    substitute_provider = sub_family
+    if sub_family == caller.family and rung_of(caller.model, sub_ladder) == rung_index:
+        substitute_model = caller.model
+        # Backend-specific models (for example ChatGPT -fast variants) must
+        # remain on the mount that selected them, not API-first family lookup.
+        substitute_provider = caller.provider_key or sub_family
     substitute = _with_effort(
         {
-            "provider": sub_family,
-            "model": sub_ladder[rung_index][0],
+            "provider": substitute_provider,
+            "model": substitute_model,
             "config": dict(original_top.get("config") or {}),
         },
         preset,

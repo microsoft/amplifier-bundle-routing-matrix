@@ -484,6 +484,10 @@ suffixed sibling, a class glob will find it.
 > glob **selects** one model (narrow is right — it is how `-fast` is excluded);
 > a ladder glob **classifies** a model already chosen (broad is right — a user
 > who hand-pins `gpt-5.6-terra-fast` must still land on the terra rung).
+> In-family ceiling substitution uses the caller's exact model, not that broad
+> classification glob. This prevents an unrequested fast-sibling substitution.
+> ChatGPT caller contexts use the canonical OpenAI ladder unless a custom preset
+> explicitly declares a backend-specific ladder.
 
 **`openai-chatgpt` is `openai` to the resolver.** It is a separate provider
 MODULE (the OAuth/ChatGPT-subscription backend) — same models, different bill —
@@ -529,7 +533,7 @@ reject `thinking_level`.
 | `gpt-?.?-sol*` | any dotted-version sol / flagship tier (e.g. `gpt-5.6-sol`) | base, terra, mini, nano, luna, pro |
 | `gpt-?.?-terra*` | any dotted-version terra / mid tier (e.g. `gpt-5.6-terra`) | base, sol, mini, nano, luna, pro |
 | `gpt-?.?-terra` | the standard terra id ONLY — **the shipped form** | everything above, **plus `-fast` variants and dated snapshots** |
-| `gpt-?.?-luna` | the standard luna id ONLY — **the shipped form** | everything above, **plus `-fast` variants and dated snapshots** |
+| `gpt-[0-9]*-luna` | standard dotted or whole-generation Luna IDs — **the shipped form** | other named tiers, **plus `-fast` variants and dated snapshots** |
 | `gpt-?.?-luna*` | any dotted-version luna / cheap-fast tier (e.g. `gpt-5.6-luna`) | base, terra, mini, nano, sol, pro |
 | `gpt-?.?-mini*` | any dotted-version mini (e.g. `gpt-5.4-mini`) | base, pro, nano, sol, luna, `gpt-5-mini` (no dot) |
 | `gpt-?.?-nano*` | any dotted-version nano | base, mini, pro, sol, luna |

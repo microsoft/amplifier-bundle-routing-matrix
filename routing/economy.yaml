@@ -122,14 +122,14 @@
 
 name: economy
 description: "Budget-first routing. Cheap tier for utility roles, mid-tier where quality matters."
-updated: "2026-09-07"
+updated: "2026-10-02"
 
 roles:
   general:
     description: "Versatile catch-all, no specialization needed"
     candidates:
       - provider: openai
-        model: gpt-?.?-luna
+        model: "gpt-[0-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -173,7 +173,7 @@ roles:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: openai
-        model: gpt-?.?-luna
+        model: "gpt-[0-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -211,7 +211,7 @@ roles:
         config:
           thinking_budget_tokens: 32000
       - provider: github-copilot
-        model: gpt-5.6-luna
+        model: gpt-6-luna
         config:
           reasoning_effort: medium
       - provider: ollama
@@ -221,7 +221,7 @@ roles:
     description: "Code generation, implementation, debugging"
     candidates:
       - provider: openai
-        model: gpt-?.?-luna
+        model: "gpt-[0-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -263,7 +263,7 @@ roles:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: openai
-        model: gpt-?.?-luna
+        model: "gpt-[0-9]*-luna"
         config:
           reasoning_effort: max
       - provider: anthropic
@@ -317,7 +317,7 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: high
 
@@ -339,7 +339,7 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: medium
       - provider: github-copilot
@@ -387,7 +387,7 @@ roles:
             thinking_config:
               thinking_level: medium
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: medium
 
@@ -409,7 +409,7 @@ roles:
             thinking_config:
               thinking_level: medium
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: medium
 
@@ -431,7 +431,7 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: medium
 
@@ -458,7 +458,7 @@ roles:
         config:
           thinking_budget_tokens: 32000
       - provider: openai
-        model: gpt-?.?-luna
+        model: "gpt-[0-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -499,6 +499,6 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: claude-sonnet-5
+        model: claude-sonnet-5.5
         config:
           reasoning_effort: medium

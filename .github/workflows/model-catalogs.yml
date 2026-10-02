@@ -1,0 +1,36 @@
+name: Live model catalogs
+
+# No inference. Disabled until dedicated credentials and the enable variable
+# are provisioned; missing credentials on a requested check fail, not skip.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 15 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  catalogs:
+    if: github.event_name == 'workflow_dispatch' || vars.MODEL_CATALOG_CHECKS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [openai, anthropic, gemini, github-copilot]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+      - name: Check fresh provider catalog
+        env:
+          OPENAI_API_KEY: ${{ matrix.provider == 'openai' && secrets.OPENAI_API_KEY || '' }}
+          ANTHROPIC_API_KEY: ${{ matrix.provider == 'anthropic' && secrets.ANTHROPIC_API_KEY || '' }}
+          GOOGLE_API_KEY: ${{ matrix.provider == 'gemini' && secrets.GOOGLE_API_KEY || '' }}
+          COPILOT_GITHUB_TOKEN: ${{ matrix.provider == 'github-copilot' && secrets.COPILOT_GITHUB_TOKEN || '' }}
+        run: >
+          uv run --no-project --python 3.13
+          --with ./modules/hooks-routing --with click
+          --with git+https://github.com/microsoft/amplifier-module-provider-${{ matrix.provider }}@main
+          --with git+https://github.com/microsoft/amplifier-core@main
+          python scripts/check_model_catalogs.py --provider '${{ matrix.provider }}'

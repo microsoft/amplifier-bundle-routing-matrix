@@ -151,7 +151,7 @@
 
 name: openai
 description: "OpenAI routing for BOTH backends -- the pay-per-use API (`openai`) and the ChatGPT subscription (`openai-chatgpt`). Flagship (sol) tier paused pending evals; knob-consistent delegation ON by default -- sub-agents inherit the caller's tier/effort ceiling."
-updated: "2026-09-07"
+updated: "2026-10-02"
 
 # ---------------------------------------------------------------------------
 # Knob-consistent delegation preset -- DEFAULT ON for this matrix.
@@ -180,9 +180,9 @@ preset:
   # covers both.
   tier_ladder:
     openai:
-      - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
+      - ["gpt-[0-9]*-luna", "gpt-[0-9]*-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
       - ["gpt-?.?-terra*"]
-      - ["gpt-?.?-sol*", "gpt-[0-9].[0-9]"]
+      - ["gpt-[0-9]*-sol*", "gpt-[0-9]*-astra*", "gpt-[0-9].[0-9]"]
 
   delegation:
     # none | effort | tier-and-effort | strict
@@ -206,7 +206,7 @@ roles:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: openai
-        model: gpt-?.?-luna
+        model: "gpt-[0-9]*-luna"
         config:
           reasoning_effort: medium
 
@@ -222,7 +222,7 @@ roles:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: openai
-        model: gpt-?.?-luna
+        model: "gpt-[0-9]*-luna"
         config:
           reasoning_effort: max
 

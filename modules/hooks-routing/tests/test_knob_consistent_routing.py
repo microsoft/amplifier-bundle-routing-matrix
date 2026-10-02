@@ -93,7 +93,7 @@ def _providers() -> dict[str, Any]:
 
 
 TERRA_CALLER = CallerContext(
-    family="openai", model="gpt-5.6-terra", effort="medium", provider_key="terra"
+    family="openai", model="gpt-5.6-terra", effort="medium", provider_key="openai"
 )
 
 
@@ -231,7 +231,7 @@ class TestResolveWithPreset:
         )
         assert len(seen) == 1
         assert seen[0].role == "reasoning"
-        assert seen[0].granted_model == "gpt-?.?-terra*"
+        assert seen[0].granted_model == "gpt-5.6-terra"
 
     @pytest.mark.asyncio
     async def test_no_record_when_nothing_resolves(self) -> None:
@@ -296,7 +296,7 @@ def _coordinator_for_resolver(
         config[CANONICAL_EFFORT_KEY] = effort
     coordinator = MagicMock()
     coordinator.config = {
-        "providers": [{"module": "provider-openai", "id": "terra", "config": config}]
+        "providers": [{"module": "provider-openai", "id": "openai", "config": config}]
     }
     return coordinator
 
@@ -487,7 +487,7 @@ def _mount_coordinator(
         "providers": [
             {
                 "module": "provider-openai",
-                "id": "terra",
+                "id": "openai",
                 "config": provider_config
                 if provider_config is not None
                 else {
@@ -629,7 +629,7 @@ class TestMountWithPreset:
         payload = emitted[0][1]
         assert payload["role"] == "reasoning"
         assert payload["requested"]["model"] == "gpt-?.?-sol*"
-        assert payload["granted"]["model"] == "gpt-?.?-terra*"
+        assert payload["granted"]["model"] == "gpt-5.6-terra"
         # provider:request must NOT have been turned into an injection carrier
         # for this record -- it goes to the event log only.
         assert "context_injection" not in payload

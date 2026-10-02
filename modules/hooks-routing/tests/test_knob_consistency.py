@@ -471,12 +471,12 @@ class TestPlanCandidatesStrict:
             EscalationState(),
         )
         assert len(planned) == 1
-        assert planned[0]["model"] == "gpt-?.?-terra*"
+        assert planned[0]["model"] == "gpt-5.6-terra"
         assert planned[0]["config"][CANONICAL_EFFORT_KEY] == "medium"
         assert record is not None
         assert record.honored is True
         assert record.requested_model == "gpt-?.?-sol*"
-        assert record.granted_model == "gpt-?.?-terra*"
+        assert record.granted_model == "gpt-5.6-terra"
         assert "substituted the ladder rung" in record.reason
 
     def test_candidate_already_below_ceiling_is_kept(self) -> None:
@@ -536,7 +536,7 @@ class TestPlanCandidatesStrict:
         planned, record = plan_candidates(
             "reasoning", REASONING_CANDIDATES, TERRA_CALLER, preset, state
         )
-        assert planned[0]["model"] == "gpt-?.?-terra*"
+        assert planned[0]["model"] == "gpt-5.6-terra"
         assert state.used == 0
         assert record is not None and record.escalated is False
 
@@ -597,7 +597,7 @@ class TestPlanCandidatesEscalation:
             "reasoning", REASONING_CANDIDATES, TERRA_CALLER, preset, state
         )
         assert first[0]["model"] == "gpt-?.?-sol*"
-        assert second[0]["model"] == "gpt-?.?-terra*"
+        assert second[0]["model"] == "gpt-5.6-terra"
         assert state.remaining == 0
         assert record is not None and record.escalated is False
 
@@ -611,7 +611,7 @@ class TestPlanCandidatesEscalation:
             preset,
             state,
         )
-        assert planned[0]["model"] == "gpt-?.?-terra*"
+        assert planned[0]["model"] == "gpt-5.6-terra"
         assert state.used == 0
 
     def test_escalation_not_consumed_when_candidate_is_already_below(self) -> None:

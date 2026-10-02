@@ -24,6 +24,48 @@ Eight curated matrices ship with this bundle, plus one explicit-name alias
 
 Browse the matrix files directly in the [`routing/`](routing/) directory.
 
+### October 2026 catalog refresh
+
+Copilot pins use Sonnet/Opus 5.5, Luna 6 and Sol 6.1; Copilot vision uses
+advertised Sonnet 5.5 instead of the unadvertised Gemini 3.5 Flash pin. OpenAI
+Luna globs now accept both dotted and whole-generation IDs without `-fast`
+siblings. Terra remains the mid-tier selection; the OpenAI Sol pause remains.
+
+The `openai` preset canonicalizes the ChatGPT backend through the same provider
+family aliases as model selection. When no curated candidate fits the caller's
+ceiling, in-family substitution preserves the caller's exact model and effort,
+instead of turning a broad classification glob into a `-fast` selection. Explicit
+fast callers remain fast. The ladder recognizes GPT-6 Luna, Sol and Astra;
+Astra shares the upper ordinal rung for ceiling classification only, not as a
+cost-equivalence claim or a new role candidate.
+
+### Catalog freshness checks
+
+`scripts/check_model_catalogs.py` is a catalog-only Click wrapper around reusable
+checks in the routing module. Install the routing hook, Click and the requested
+provider modules, then run:
+
+```bash
+python scripts/check_model_catalogs.py --provider openai --provider anthropic \
+  --provider gemini --provider github-copilot
+```
+
+It fails on missing pins/glob matches, newer same-family standard IDs, or vision
+without advertised support. It checks lower-priority candidates too, preserves
+the Sol/Terra policy boundary, disables Copilot disk fallback, and never generates
+content or edits model settings. Missing/empty/failed catalogs are failures, not
+freshness success. Output contains coverage counts and repo-declared patterns,
+not credentials, exception bodies or account-specific inventories.
+
+`.github/workflows/model-catalogs.yml` provides manual dispatch and a weekly
+schedule. The schedule is **disabled** unless the repository variable
+`MODEL_CATALOG_CHECKS_ENABLED=true` is set and dedicated provider secrets are
+provisioned (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
+`COPILOT_GITHUB_TOKEN`). The Actions token alone does not grant Copilot access.
+ChatGPT OAuth and local Ollama are outside this hosted workflow; their omission
+is coverage not provided, not proof of freshness. Ordinary PR tests remain
+secret-free. Fresh catalogs do not replace inference smoke tests or quality evals.
+
 ## Including the Bundle
 
 **Foundation already includes this bundle** — no extra configuration needed if you use Foundation.
