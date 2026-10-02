@@ -104,7 +104,9 @@ PRESET_BEARING = {"openai.yaml"}
 #     `test_preset_bearing_matrix_is_stock_without_a_caller` for the same
 #     invariant asserted directly. `openai.yaml` therefore stays recorded and
 #     stays checked, preset or no preset.
-EXCLUDED_FROM_RECORDING = {"openai.yaml"}
+# Additive exact-module profiles are covered separately in test_catalog_v1.py.
+# The eight pre-existing recordings are retained byte-for-byte.
+EXCLUDED_FROM_RECORDING = {"openai.yaml", "openai-api.yaml", "openai-chatgpt.yaml"}
 
 # Every matrix present in the recording as it stands. A frozen manifest, so a
 # matrix vanishing from the fixture -- by a bad `--regenerate`, a bad merge, a

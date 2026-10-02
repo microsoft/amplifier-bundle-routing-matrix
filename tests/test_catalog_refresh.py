@@ -115,7 +115,8 @@ def test_interim_openai_candidates_are_v6_and_terra_is_no_longer_selected():
                     checked += 1
                 if candidate["provider"] == "github-copilot" and candidate["model"].startswith("gpt-"):
                     assert candidate["model"] in {"gpt-6.1-sol", "gpt-6-luna"}
-    assert checked == 49
+    # Original 49 plus 13 unchanged policy candidates in each additive profile.
+    assert checked == 49 + 26
 
 
 @pytest.mark.asyncio

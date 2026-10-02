@@ -12,6 +12,39 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+class NoScopedRouteError(ValueError):
+    """Constrained role resolution exhausted; inheriting a default is unsafe."""
+
+
+def filter_provider_modules(
+    providers: dict[str, Any], coordinator: Any,
+    allowlist: tuple[str, ...] | None,
+) -> dict[str, Any]:
+    """Filter before aliases/priority using exact mount provenance, not key guesses."""
+    if allowlist is None:
+        return providers
+    if (
+        not isinstance(allowlist, (tuple, list)) or not allowlist
+        or any(
+            not isinstance(m, str) or not re.fullmatch(r"provider-[a-z][a-z0-9-]*", m)
+            for m in allowlist
+        )
+        or len(set(allowlist)) != len(allowlist)
+    ):
+        raise ValueError("Invalid provider module constraint")
+    specs = _get_provider_specs(coordinator)
+    result = {}
+    for key, provider in providers.items():
+        matches = [
+            s for s in specs if isinstance(s, dict)
+            and (s.get("instance_id") or s.get("id") or s.get("module")) == key
+        ]
+        # Ambiguous/unknown provenance cannot satisfy an exact constraint.
+        if len(matches) == 1 and matches[0].get("module") in allowlist:
+            result[key] = provider
+    return result
+
+
 class _AvailabilityContractError(TypeError):
     """Host integration failure, not a candidate that permits fallback."""
 
@@ -165,6 +198,8 @@ def find_provider_by_type(
     type_name: str,
     coordinator: Any = None,
     model_pattern: str = "",
+    provider_module_allowlist: tuple[str, ...] | None = None,
+    report_logs: bool = True,
 ) -> tuple[str, Any] | None:
     """Find an installed provider by module type name or instance ID.
 
@@ -220,6 +255,7 @@ def find_provider_by_type(
            (lowest priority number) — mirroring the "default provider"
            convention used elsewhere in the ecosystem.
     """
+    providers = filter_provider_modules(providers, coordinator, provider_module_allowlist)
     accepted = _type_names_for(type_name)
     provider_specs = _get_provider_specs(coordinator)
 
@@ -238,6 +274,18 @@ def find_provider_by_type(
     # every avenue first", not "canonical first within each avenue".
     for wanted in accepted:
         for name, provider in providers.items():
+            if provider_module_allowlist is not None:
+                spec = _spec_for_instance(provider_specs, name)
+                # A misleading mount key cannot impersonate a known module/family.
+                known_types = {
+                    m.removeprefix("provider-") for m in provider_module_allowlist
+                } | set(PROVIDER_FAMILY_ALIASES) | {
+                    alias for aliases in PROVIDER_FAMILY_ALIASES.values() for alias in aliases
+                }
+                if wanted.removeprefix("provider-") in known_types and (
+                    _module_type_of(spec) != wanted.removeprefix("provider-")
+                ):
+                    continue
             if wanted in (
                 name,
                 name.replace("provider-", ""),
@@ -246,7 +294,7 @@ def find_provider_by_type(
                 return (name, provider)
         if provider_specs:
             found = _resolve_by_module_type(
-                providers, provider_specs, wanted, model_pattern
+                providers, provider_specs, wanted, model_pattern, report_logs=report_logs
             )
             if found is not None:
                 return found
@@ -258,6 +306,7 @@ def _resolve_by_module_type(
     provider_specs: Any,
     type_name: str,
     model_pattern: str,
+    report_logs: bool = True,
 ) -> tuple[str, Any] | None:
     """Step 2 of :func:`find_provider_by_type` for ONE module type name.
 
@@ -318,7 +367,7 @@ def _resolve_by_module_type(
     if model_matched:
         candidates.sort(key=lambda t: t[0])
         priority_only_name = candidates[0][1]
-        if priority_only_name != best_name:
+        if priority_only_name != best_name and report_logs:
             # Observable, not silent: this is a routing decision a curator
             # reading the matrix alone cannot see.
             logger.info(
@@ -345,6 +394,9 @@ async def resolve_model_role(
     escalations: Any = None,
     on_clamp: Any = None,
     inflight_model_lists: dict[str, Any] | None = None,
+    provider_module_allowlist: tuple[str, ...] | None = None,
+    observations: Any = None,
+    report_logs: bool = True,
 ) -> list[dict[str, Any]]:
     """Resolve model role(s) against routing matrix.
 
@@ -394,6 +446,9 @@ async def resolve_model_role(
         on_clamp: Optional callable invoked with the ``ClampRecord`` for the
             role that actually resolved. Emit-only: the record goes to the
             event log, never into the conversation.
+        report_logs: Emit resolver diagnostics by default. Snapshot planning
+            supplies False to avoid external logging handlers without mutating
+            global logging state. Resolution and failure behavior are unchanged.
 
     Returns:
         List of ``{provider, model, config}`` dicts representing resolved
@@ -428,7 +483,15 @@ async def resolve_model_role(
     # unchanged, and a None record, whenever the feature is off -- so when no
     # preset is active this block is a no-op and the loop below is the one
     # that shipped before this feature existed.
+    providers = filter_provider_modules(providers, coordinator, provider_module_allowlist)
     _knob_active = preset is not None and getattr(preset, "active", False)
+
+    def observe(status: str, role: str, candidate: dict, provider: str | None = None) -> None:
+        if observations is not None:
+            observations({
+                "status": status, "role": role, "candidate": candidate,
+                "provider": provider,
+            })
 
     getter = getattr(coordinator, "get_capability", None)
     availability = getter("provider.check_available") if callable(getter) else None
@@ -455,9 +518,12 @@ async def resolve_model_role(
 
             # Is this provider installed?
             match = find_provider_by_type(
-                providers, provider_type, coordinator, model_pattern=model_pattern
+                providers, provider_type, coordinator, model_pattern=model_pattern,
+                provider_module_allowlist=provider_module_allowlist,
+                report_logs=report_logs,
             )
             if match is None:
+                observe("missing_provider", role, candidate)
                 continue
 
             matched_name, provider_instance = match
@@ -485,8 +551,10 @@ async def resolve_model_role(
                         preresolved_models=preresolved_models,
                         inflight_model_lists=inflight_model_lists,
                         propagate_failure=availability is not None,
+                        report_logs=report_logs,
                     )
                     if resolved_model is None:
+                        observe("glob_no_match", role, candidate, matched_name)
                         continue
                 else:
                     resolved_model = model_pattern
@@ -497,7 +565,16 @@ async def resolve_model_role(
                     raise
                 if failure is None:
                     failure = error
+                observe("unavailable", role, candidate, matched_name)
                 continue
+
+            if (
+                provider_module_allowlist is not None
+                and matched_name not in filter_provider_modules(
+                    providers, coordinator, provider_module_allowlist
+                )
+            ):
+                raise NoScopedRouteError("Final provider module provenance changed during resolution")
 
             # Report only for the role that actually resolved -- a record for
             # a role that fell through would describe a decision nothing
@@ -506,8 +583,10 @@ async def resolve_model_role(
                 try:
                     await on_clamp(clamp_record)
                 except Exception:  # pragma: no cover - reporting must not break routing
-                    logger.warning("routing clamp reporting failed", exc_info=True)
+                    if report_logs:
+                        logger.warning("routing clamp reporting failed", exc_info=True)
 
+            observe("selected", role, candidate, matched_name)
             return [
                 {
                     # The mounted key find_provider_by_type() actually
@@ -523,6 +602,8 @@ async def resolve_model_role(
         # [] means no match and lets callers inherit a default. A configured
         # failed account is not an absent provider or an empty model catalog.
         raise failure
+    if provider_module_allowlist is not None:
+        raise NoScopedRouteError("No role route within the exact module constraint")
     return []
 
 
@@ -606,6 +687,7 @@ async def _resolve_glob(
     preresolved_models: dict[str, list[str]] | None = None,
     inflight_model_lists: dict[str, Any] | None = None,
     propagate_failure: bool = False,
+    report_logs: bool = True,
 ) -> str | None:
     """Resolve a glob model pattern against a provider's model list.
 
@@ -640,14 +722,20 @@ async def _resolve_glob(
         except Exception:
             if propagate_failure:
                 raise
-            logger.warning(
-                "Failed to list models for glob pattern '%s'", pattern, exc_info=True
-            )
+            if report_logs:
+                logger.warning(
+                    "Failed to list models for glob pattern '%s'", pattern, exc_info=True
+                )
             return None
 
         if preresolved_models is not None and provider_key:
             preresolved_models[provider_key] = model_names
 
+    return select_glob_model(pattern, model_names)
+
+
+def select_glob_model(pattern: str, model_names: list[str]) -> str | None:
+    """Pure model selection shared by runtime and snapshot planning."""
     # Case-insensitive, OS-independent glob matching: lowercase both sides
     # before comparing (raw fnmatch.filter() uses os.path.normcase, which is
     # case-sensitive on Linux/Mac and case-insensitive on Windows -- an

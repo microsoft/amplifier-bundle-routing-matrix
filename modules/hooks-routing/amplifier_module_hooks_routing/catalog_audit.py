@@ -69,6 +69,9 @@ def audit_matrix_catalogs(matrices: dict[str, dict], catalogs: dict[str, dict]) 
         models = {m["id"]: m for m in catalog["models"]}
         names = list(models)
         for matrix_name, matrix in matrices.items():
+            allowlist = matrix.get("provider_module_allowlist")
+            if allowlist is not None and f"provider-{backend}" not in allowlist:
+                continue
             for role, definition in matrix["roles"].items():
                 for index, candidate in enumerate(definition["candidates"]):
                     wanted = candidate["provider"]

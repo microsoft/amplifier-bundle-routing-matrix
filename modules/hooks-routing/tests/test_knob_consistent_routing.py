@@ -164,7 +164,8 @@ class TestDefaultBehaviourUnchanged:
         no measured win there yet, so no default change there."""
         import yaml
 
-        allowed_with_preset = {"openai.yaml"}
+        # Exact-module profiles clone OpenAI policy; no other family's default moves.
+        allowed_with_preset = {"openai.yaml", "openai-api.yaml", "openai-chatgpt.yaml"}
         offenders = []
         for path in sorted(ROUTING_DIR.glob("*.yaml")):
             data = yaml.safe_load(path.read_text(encoding="utf-8"))

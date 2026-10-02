@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from collections.abc import Callable
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -31,6 +32,32 @@ import yaml
 
 USER_SOURCE = "user"
 BUNDLE_SOURCE = "bundle"
+SOURCE_ALIASES = {"github-copilot": "copilot"}
+
+
+def validate_matrix_name(name: str) -> None:
+    """Matrix IDs are file stems, never paths."""
+    if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", name):
+        raise ValueError("Invalid matrix ID")
+
+
+def provider_module_allowlist(matrix: dict[str, Any]) -> tuple[str, ...] | None:
+    """An absent constraint is legacy policy; an empty/malformed one is not."""
+    if "provider_module_allowlist" not in matrix:
+        return None
+    value = matrix["provider_module_allowlist"]
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(
+            not isinstance(module, str)
+            or not re.fullmatch(r"provider-[a-z][a-z0-9-]*", module)
+            for module in value
+        )
+        or len(set(value)) != len(value)
+    ):
+        raise ValueError("provider_module_allowlist must be a nonempty exact module list")
+    return tuple(value)
 
 
 @dataclass(frozen=True)
@@ -101,7 +128,8 @@ def resolve_matrix_source(
     Returns:
         A :class:`MatrixSource`. ``path`` is ``None`` when no candidate exists.
     """
-    filename = f"{name}.yaml"
+    validate_matrix_name(name)
+    stems = (name, SOURCE_ALIASES[name]) if name in SOURCE_ALIASES else (name,)
 
     def _key(path: Path) -> Path:
         try:
@@ -111,14 +139,16 @@ def resolve_matrix_source(
 
     bundle_key = _key(bundle_routing_dir)
 
-    candidates: list[tuple[Path, str]] = [
-        (
-            Path(d) / filename,
-            BUNDLE_SOURCE if _key(Path(d)) == bundle_key else USER_SOURCE,
+    # Requested filename first across custom/bundle dirs, then mapped stem.
+    # A malformed winner never permits a lower-precedence fallback.
+    candidates: list[tuple[Path, str]] = []
+    for stem in stems:
+        candidates.extend(
+            (Path(d) / f"{stem}.yaml",
+             BUNDLE_SOURCE if _key(Path(d)) == bundle_key else USER_SOURCE)
+            for d in custom_routing_dirs
         )
-        for d in custom_routing_dirs
-    ]
-    candidates.append((bundle_routing_dir / filename, BUNDLE_SOURCE))
+        candidates.append((bundle_routing_dir / f"{stem}.yaml", BUNDLE_SOURCE))
 
     searched: list[Path] = []
     present: list[tuple[Path, str]] = []
@@ -167,6 +197,7 @@ def load_matrix(path: str | Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"Matrix file must contain a YAML mapping: {path}")
 
+    provider_module_allowlist(data)
     return data
 
 
@@ -241,6 +272,10 @@ def validate_matrix(matrix: dict[str, Any]) -> list[str]:
         List of error strings. Empty list means valid.
     """
     errors: list[str] = []
+    try:
+        provider_module_allowlist(matrix)
+    except ValueError as error:
+        errors.append(str(error))
     roles = matrix.get("roles", {})
 
     for required_role in ("general", "fast"):
@@ -276,6 +311,7 @@ def validate_matrix_config(
     matrix: dict[str, Any],
     providers: dict[str, Any] | None = None,
     coordinator: Any = None,
+    provider_module_allowlist: tuple[str, ...] | None = None,
 ) -> list[str]:
     """Validate candidate ``config:`` values against installed provider fields.
 
@@ -330,7 +366,8 @@ def validate_matrix_config(
             # config against a DIFFERENT instance than the one that will
             # serve it would judge the wrong provider's config_fields.
             match = find_provider_by_type(
-                providers, provider, coordinator, model_pattern=model
+                providers, provider, coordinator, model_pattern=model,
+                provider_module_allowlist=provider_module_allowlist,
             )
             if match is None:
                 # Provider not installed -- we cannot and must not judge it.
@@ -753,3 +790,33 @@ def strip_inert_config(
                 if inert_config_rule(provider, model, key) is not None:
                     cfg.pop(key, None)
     return cleaned, errors
+
+
+def compose_effective_matrix(
+    base: dict[str, Any],
+    config_overrides: dict[str, Any] | None = None,
+    capability_overrides: dict[str, Any] | None = None,
+    disable_delegation_preset: bool = False,
+) -> tuple[dict[str, Any], Any, list[str]]:
+    """Shared mount/catalog composition. Overrides change roles, not constraints.
+
+    Returns (effective full matrix, parsed preset, stripped-inert diagnostics).
+    Provider choice validation stays at the caller's evidence boundary.
+    """
+    from .knob_consistency import parse_preset, validate_preset
+
+    provider_module_allowlist(base)
+    effective = copy.deepcopy(base)
+    roles = compose_matrix(base.get("roles", {}), config_overrides or {}) if base else {}
+    if capability_overrides and base:
+        roles = compose_matrix(roles, capability_overrides)
+    effective["roles"] = roles
+    preset = parse_preset(base)
+    if disable_delegation_preset:
+        preset = None
+    if preset is not None:
+        errors = validate_preset(base)
+        if errors:
+            raise ValueError("Invalid preset: block:\n  " + "\n  ".join(errors))
+    effective, errors = strip_inert_config(effective)
+    return effective, preset, errors

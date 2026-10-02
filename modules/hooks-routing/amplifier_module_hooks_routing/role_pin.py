@@ -112,10 +112,12 @@ import logging
 from typing import Any
 
 from .resolver import (
+    NoScopedRouteError,
     _get_provider_specs,
     _instance_serves_model,
     _module_type_of,
     _spec_for_instance,
+    filter_provider_modules,
 )
 
 logger = logging.getLogger(__name__)
@@ -551,7 +553,9 @@ def _select_preference(
     )
 
 
-def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
+def reassert_own_role_pin(
+    coordinator: Any, provider_module_allowlist: tuple[str, ...] | None = None,
+) -> dict[str, Any] | None:
     """Restore this session's role pin if the live mount state has drifted.
 
     Returns a record describing what was corrected (for event emission), or
@@ -566,8 +570,11 @@ def reassert_own_role_pin(coordinator: Any) -> dict[str, Any] | None:
     if not isinstance(providers, dict) or not providers:
         return None
 
-    pin, target, resolution, failure = _select_preference(providers, pins, coordinator)
+    eligible = filter_provider_modules(providers, coordinator, provider_module_allowlist)
+    pin, target, resolution, failure = _select_preference(eligible, pins, coordinator)
     if pin is None or target is None:
+        if provider_module_allowlist is not None:
+            raise NoScopedRouteError("Declared role pin has no target within module constraint")
         return failure
 
     ranked = sorted(providers.items(), key=lambda item: _priority_of(item[1]))

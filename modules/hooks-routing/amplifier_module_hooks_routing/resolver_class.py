@@ -98,9 +98,13 @@ class MatrixModelRoleResolver:
         on_clamp: Any = None,
         escalations: Any = None,
         matrix_origin: Any = None,
+        provider_module_allowlist: tuple[str, ...] | None = None,
     ) -> None:
         self._matrix_roles = matrix_roles
         self._providers = providers
+        self.provider_module_allowlist = (
+            tuple(provider_module_allowlist) if provider_module_allowlist is not None else None
+        )
         self.name = matrix_name
         # --- Effective source (shadowing observability) ---------------------
         # `self.name` is the matrix's DECLARED name, which says nothing about
@@ -233,6 +237,7 @@ class MatrixModelRoleResolver:
             preset=self._preset if knob_active else None,
             escalations=self._escalations if knob_active else None,
             on_clamp=self._record_clamp if knob_active else None,
+            provider_module_allowlist=self.provider_module_allowlist,
         )
         return [
             ProviderPreference(
