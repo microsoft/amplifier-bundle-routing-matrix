@@ -5,7 +5,7 @@
 #
 # BOTH OPENAI BACKENDS, ONE CANDIDATE. `provider: openai` matches EITHER the
 # pay-per-use API-key backend (module `openai`) or the ChatGPT-subscription/
-# OAuth backend (module `openai-chatgpt`). Same gpt-5.6 family, same model
+# OAuth backend (module `openai-chatgpt`). Same GPT-6 family, same model
 # ids, same `reasoning_effort` key -- the only difference is which account
 # pays. The resolver's `PROVIDER_FAMILY_ALIASES` (resolver.py) tries the API
 # key across all mounts first, then the subscription, so a user with both
@@ -20,18 +20,16 @@
 # bridge in the provider (mirroring provider-openai __init__.py:1046) -- and
 # the twins were removed. One candidate, one glob vocabulary, one knob.
 #
-# TIER STATUS (2026-09-07): the flagship `gpt-?.?-sol*` tier is PAUSED pending
-# further evals. No role selects sol. Roles that previously did now use
-# `gpt-?.?-terra*` one effort notch higher, clamped at xhigh.
+# TIER STATUS (2026-10-02): interim, opportunistic GPT-6 update. The prior
+# Sol pause is superseded by the approved Terra -> exact gpt-6.1-sol migration.
+# Existing role effort settings remain; comparative quality/cost evals follow.
 #
 # `luna` is used for exactly two roles: `fast` (cheap utility work) and
 # `ui-coding`, the latter at `max` effort -- cheapest tier, maximum thinking.
 #
-# TWO GLOBS, NO FALLBACKS, NO TRAILING `*`. Every candidate in this file is
-# either `gpt-?.?-terra` or `gpt-?.?-luna`. The `gpt-[0-9].[0-9]` base-alias
-# twin (a pre-5.6 migration fallback) and the `gpt-?.?-mini*` rung are both
-# gone -- gpt-5.6 terra and luna are live on both backends, so neither
-# fallback bought anything.
+# Sol is an exact gpt-6.1-sol pin; Luna uses suffix-free gpt-[6-9]*-luna.
+# No legacy-generation fallback is added. Catalog CI validates exact Sol
+# membership separately because runtime pins do not call list_models().
 #
 # THE MISSING `*` IS LOAD-BEARING. The ChatGPT backend serves a `-fast`
 # sibling for every model (`gpt-5.6-terra` AND `gpt-5.6-terra-fast`). A
@@ -42,21 +40,11 @@
 # `gpt-5.6-sol-fast` "Internal only" trap on GitHub Copilot.) It also stops
 # matching dated snapshots, which is wanted: the clean alias is the target.
 #
-# CONSEQUENCE, STATED PLAINLY: each role offers one candidate per backend and
-# nothing else, and neither openai provider has a static model-list fallback
-# (provider-openai's `list_models()` docstring: "no fallback; caller handles
-# empty lists"). If that call fails, the glob resolves to nothing and the role
-# yields no preference -- the agent falls back to the session's default
-# provider rather than erroring. If that degradation is not acceptable, add a
-# pinned exact name (e.g. `gpt-5.6-terra`) as a further candidate: an exact
-# name never calls list_models(), the same glob+pin shape copilot.yaml uses.
-#
-# NOTE: `gpt-?.?-sol*` is deliberately RETAINED on the preset tier ladder
-# below even though nothing routes to it. The ladder describes the provider
-# family for knob-consistent tier comparison; removing the rung would
-# misclassify a sol model that a user pins by hand. With the base alias gone
-# from the roles, nothing resolves onto the sol rung any more, so a terra-tier
-# caller can no longer be clamped by a fallback sitting a rung above it.
+# Luna still requires a usable catalog; Sol exact pins retain offline name
+# resolution. Availability failures keep the declared fallback semantics.
+# The preset retains legacy Terra classification for explicitly pinned callers:
+# strict inheritance must not escalate an existing caller merely because the
+# stock matrix moved to Sol.
 #
 # Knob-consistent delegation is ON by default for this matrix (measured win on
 # OpenAI roots: `gpt-5.6-sol` call share 27.8% -> 0.0%, cost -29.7% (S3 median)
@@ -150,7 +138,7 @@
 #      selecting one, so it must still match a hand-pinned suffixed id.
 
 name: openai
-description: "OpenAI routing for BOTH backends -- the pay-per-use API (`openai`) and the ChatGPT subscription (`openai-chatgpt`). Flagship (sol) tier paused pending evals; knob-consistent delegation ON by default -- sub-agents inherit the caller's tier/effort ceiling."
+description: "Interim GPT-6+ routing for both OpenAI backends. Sol 6.1 replaces Terra; Luna tracks current clean IDs. Knob-consistent delegation preserves the caller's tier/effort ceiling."
 updated: "2026-10-02"
 
 # ---------------------------------------------------------------------------
@@ -180,7 +168,7 @@ preset:
   # covers both.
   tier_ladder:
     openai:
-      - ["gpt-[0-9]*-luna", "gpt-[0-9]*-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
+      - ["gpt-[6-9]*-luna", "gpt-[0-9]*-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
       - ["gpt-?.?-terra*"]
       - ["gpt-[0-9]*-sol*", "gpt-[0-9]*-astra*", "gpt-[0-9].[0-9]"]
 
@@ -198,7 +186,7 @@ roles:
     description: "Versatile catch-all, no specialization needed"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
 
@@ -206,7 +194,7 @@ roles:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: openai
-        model: "gpt-[0-9]*-luna"
+        model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: medium
 
@@ -214,7 +202,7 @@ roles:
     description: "Code generation, implementation, debugging"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
 
@@ -222,7 +210,7 @@ roles:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: openai
-        model: "gpt-[0-9]*-luna"
+        model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: max
 
@@ -230,7 +218,7 @@ roles:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
 
@@ -238,7 +226,7 @@ roles:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
 
@@ -246,7 +234,7 @@ roles:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
 
@@ -254,7 +242,7 @@ roles:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
 
@@ -262,7 +250,7 @@ roles:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
 
@@ -270,7 +258,7 @@ roles:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
 
@@ -278,7 +266,7 @@ roles:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
 
@@ -286,7 +274,7 @@ roles:
     description: "Image generation (limited — gpt-image not available via chat API)"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
 
@@ -294,6 +282,6 @@ roles:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh

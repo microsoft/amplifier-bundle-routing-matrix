@@ -104,11 +104,27 @@ def test_copilot_pins_refresh_all_matrices():
     assert vision["model"] == "claude-sonnet-5.5"
 
 
-def test_sol_pause_stays_in_place():
-    for name in ["balanced", "quality", "economy", "openai"]:
-        for role in matrix(name)["roles"].values():
-            assert all("-sol" not in c["model"] and "-astra" not in c["model"]
-                       for c in role["candidates"] if c["provider"] == "openai")
+def test_interim_openai_candidates_are_v6_and_terra_is_no_longer_selected():
+    checked = 0
+    for path in (ROOT / "routing").glob("*.yaml"):
+        for role in yaml.safe_load(path.read_text())["roles"].values():
+            for candidate in role["candidates"]:
+                assert "terra" not in candidate["model"]
+                if candidate["provider"] == "openai":
+                    assert candidate["model"] in {"gpt-6.1-sol", "gpt-[6-9]*-luna"}
+                    checked += 1
+                if candidate["provider"] == "github-copilot" and candidate["model"].startswith("gpt-"):
+                    assert candidate["model"] in {"gpt-6.1-sol", "gpt-6-luna"}
+    assert checked == 49
+
+
+@pytest.mark.asyncio
+async def test_current_luna_selector_does_not_demote_to_pre6_catalog():
+    data = matrix("openai")
+    result = await resolve_model_role(
+        ["fast"], data["roles"], {"openai": provider(["gpt-5.6-luna", "gpt-5.6-luna-fast"])}
+    )
+    assert result == []
 
 
 @pytest.mark.asyncio

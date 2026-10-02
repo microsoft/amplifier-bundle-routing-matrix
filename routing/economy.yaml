@@ -5,9 +5,12 @@
 # that matches an installed provider.
 #
 # Philosophy: budget-first. Prefer cheap tier (Haiku, *-luna, Flash,
-# Flash-Lite) for utility roles. Reserve mid-tier (Sonnet,
-# gpt-?.?-terra*) for quality-sensitive roles like security-audit, critique,
+# Flash-Lite) for utility roles. Reserve Sonnet / Sol 6.1
+# for quality-sensitive roles like security-audit, critique,
 # creative, writing, research.
+#
+# 2026-10-02: approved opportunistic Terra -> Sol 6.1 migration keeps existing
+# role efforts but raises the model tier. Proper quality/cost evals follow.
 #
 # Schema:
 #   provider: Module mount name (e.g., "anthropic", "gemini", "github-copilot")
@@ -129,7 +132,7 @@ roles:
     description: "Versatile catch-all, no specialization needed"
     candidates:
       - provider: openai
-        model: "gpt-[0-9]*-luna"
+        model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -173,7 +176,7 @@ roles:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: openai
-        model: "gpt-[0-9]*-luna"
+        model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -221,7 +224,7 @@ roles:
     description: "Code generation, implementation, debugging"
     candidates:
       - provider: openai
-        model: "gpt-[0-9]*-luna"
+        model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -263,7 +266,7 @@ roles:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
       - provider: openai
-        model: "gpt-[0-9]*-luna"
+        model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: max
       - provider: anthropic
@@ -303,7 +306,7 @@ roles:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: high
       - provider: anthropic
@@ -325,7 +328,7 @@ roles:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -343,7 +346,7 @@ roles:
         config:
           reasoning_effort: medium
       - provider: github-copilot
-        model: gpt-5.6-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
 
@@ -351,7 +354,7 @@ roles:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
       - provider: anthropic
@@ -365,7 +368,7 @@ roles:
             thinking_config:
               thinking_level: high
       - provider: github-copilot
-        model: gpt-5.6-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
 
@@ -373,7 +376,7 @@ roles:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -395,7 +398,7 @@ roles:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -417,7 +420,7 @@ roles:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -458,7 +461,7 @@ roles:
         config:
           thinking_budget_tokens: 32000
       - provider: openai
-        model: "gpt-[0-9]*-luna"
+        model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
@@ -485,7 +488,7 @@ roles:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
       - provider: openai
-        model: gpt-?.?-terra
+        model: gpt-6.1-sol
         config:
           reasoning_effort: medium
       - provider: anthropic

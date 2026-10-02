@@ -19,11 +19,18 @@ def _family(model: str) -> str | None:
     if match:
         return "claude-" + match[1]
     match = re.fullmatch(
-        r"gemini-\d+(?:\.\d+)?-(flash|flash-lite|pro-preview|pro-image|flash-image)", model
+        r"gemini-\d+(?:\.\d+)?-(flash|flash-lite|pro|pro-preview|pro-image|flash-image)", model
     )
     if match:
-        return "gemini-" + match[1]
+        return "gemini-" + ("pro" if match[1] == "pro-preview" else match[1])
     return None
+
+
+def _freshness_key(model: str) -> tuple:
+    """Compare Pro GA/preview as peers; prefer GA on an equal release version."""
+    if _family(model) == "gemini-pro":
+        return (_version_sort_key(model.removesuffix("-preview")), not model.endswith("-preview"))
+    return (_version_sort_key(model), True)
 
 
 async def collect_catalogs(providers: dict[str, Any], timeout: float = 60) -> dict[str, dict]:
@@ -80,8 +87,8 @@ def audit_matrix_catalogs(matrices: dict[str, dict], catalogs: dict[str, dict]) 
                     family = _family(selected)
                     peers = [m for m in names if family and _family(m) == family]
                     if peers:
-                        latest = max(peers, key=_version_sort_key)
-                        if _version_sort_key(latest) > _version_sort_key(selected):
+                        latest = max(peers, key=_freshness_key)
+                        if _freshness_key(latest) > _freshness_key(selected):
                             issues.append({"kind": "stale_model", **context,
                                            "selected": selected, "latest": latest})
                     if role == "vision" and "vision" not in models[selected].get("capabilities", []):

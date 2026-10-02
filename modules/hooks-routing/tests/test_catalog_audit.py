@@ -85,3 +85,27 @@ def test_gemini_standard_class_detects_new_generation_but_not_specialized_ids():
                           "gemini-omni-100-flash", "gemini-100-flash-image")
     })
     assert result["issues"][0]["latest"] == "gemini-10-flash"
+
+
+def test_gemini_ga_pro_successor_is_visible_to_preview_freshness_check():
+    result = audit_matrix_catalogs(matrices("gemini-[3-9]*-pro-preview", "gemini"), {
+        "gemini": catalog("gemini-3.1-pro-preview", "gemini-3.2-pro",
+                          "gemini-9-pro-image", "gemini-9-pro-preview-customtools",
+                          "gemini-omni-9-pro")
+    })
+    assert result["issues"][0]["kind"] == "stale_model"
+    assert result["issues"][0]["latest"] == "gemini-3.2-pro"
+
+
+def test_gemini_ga_only_catalog_does_not_false_pass_preview_selector():
+    result = audit_matrix_catalogs(matrices("gemini-[3-9]*-pro-preview", "gemini"), {
+        "gemini": catalog("gemini-3.2-pro")
+    })
+    assert result["issues"][0]["kind"] == "missing_glob"
+
+
+def test_gemini_ga_is_newer_than_same_version_preview():
+    result = audit_matrix_catalogs(matrices("gemini-[3-9]*-pro-preview", "gemini"), {
+        "gemini": catalog("gemini-3.1-pro-preview", "gemini-3.1-pro")
+    })
+    assert result["issues"][0]["latest"] == "gemini-3.1-pro"

@@ -36,6 +36,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 ROUTING_DIR = REPO_ROOT / "routing"
 
 OPENAI_MODELS = [
+    "gpt-6-luna",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-5.6-luna",
@@ -786,9 +787,8 @@ class TestMountWithPreset:
         `disable_delegation_preset: true` on a terra root restores the
         matrix's own uninherited answer with no matrix edit required.
 
-        That answer is `gpt-5.6-terra`, not `gpt-5.6-sol`: the flagship tier
-        was paused matrix-wide on 2026-09-07 pending further evals, so no
-        role selects sol any more. What this test guards is the OPT-OUT
+        That answer is now `gpt-6.1-sol` after the approved interim migration.
+        What this test guards is the OPT-OUT
         mechanism -- that the flag stops the caller's knobs being inherited
         -- not which model the matrix happens to name."""
         agents = {"explorer": {"model_role": "reasoning"}}
@@ -803,7 +803,7 @@ class TestMountWithPreset:
         )
         await _run_session_start(coordinator)
         assert agents["explorer"]["provider_preferences"][0]["model"] == (
-            "gpt-5.6-terra"
+            "gpt-6.1-sol"
         )
 
 
@@ -830,8 +830,8 @@ class TestShippedKnobConsistentMatrix:
         resolves), the preset is INERT -- cold resolution returns whatever the
         roles block says, untouched.
 
-        The expected model changed from `gpt-5.6-sol` to `gpt-5.6-terra` on
-        2026-09-07 when the flagship tier was paused pending further evals.
+        The expected model changed to `gpt-6.1-sol` on 2026-10-02 during
+        the approved opportunistic refresh.
         That is a matrix change, not a preset change; the invariant under test
         -- "a preset does nothing without a caller" -- is unaffected."""
         import yaml
@@ -839,7 +839,7 @@ class TestShippedKnobConsistentMatrix:
         data = yaml.safe_load((ROUTING_DIR / "openai.yaml").read_text(encoding="utf-8"))
         assert parse_preset(data) is not None
         result = await resolve_model_role(["reasoning"], data["roles"], _providers())
-        assert result[0]["model"] == "gpt-5.6-terra"
+        assert result[0]["model"] == "gpt-6.1-sol"
         assert result[0]["config"][CANONICAL_EFFORT_KEY] == "xhigh"
 
     @pytest.mark.asyncio
@@ -869,7 +869,7 @@ class TestShippedKnobConsistentMatrix:
                 escalations=escalations,
             )
             assert result, f"role {role} resolved to nothing"
-            assert result[0]["model"] != "gpt-5.6-sol", (
+            assert result[0]["model"] not in {"gpt-5.6-sol", "gpt-6.1-sol"}, (
                 f"role {role} still resolves to sol under a terra caller "
                 "-- the default-on preset did not clamp it"
             )
@@ -935,11 +935,8 @@ class TestShippedKnobConsistentMatrix:
         `gpt-5.6-sol` / xhigh caller still gets the matrix's own top candidate
         at full effort, rather than being pulled down a rung.
 
-        Previously this read `openai-knob-consistent.yaml` (deleted
-        2026-09-07) and asserted the result was sol itself, because sol was in
-        the roles block. With the flagship tier paused, the matrix's ceiling
-        for `reasoning` is `gpt-5.6-terra` @ xhigh -- so that is what a sol
-        caller must still receive, undiminished."""
+        The approved October migration selects Sol 6.1 at the top rung;
+        the caller's effort ceiling still applies."""
         import yaml
 
         data = yaml.safe_load((ROUTING_DIR / "openai.yaml").read_text(encoding="utf-8"))
@@ -955,7 +952,7 @@ class TestShippedKnobConsistentMatrix:
             preset=preset,
             escalations=EscalationState(),
         )
-        assert result[0]["model"] == "gpt-5.6-terra"
+        assert result[0]["model"] == "gpt-6.1-sol"
         assert result[0]["config"][CANONICAL_EFFORT_KEY] == "xhigh"
 
     # `test_roles_block_is_identical_to_the_stock_openai_matrix` lived here. It

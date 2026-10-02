@@ -24,8 +24,8 @@ description: "GitHub Copilot-only routing. Strongest model per role across the C
 updated: "2026-10-02"
 
 # October catalog refresh: Claude 5.5, Sol 6.1 and advertised Sonnet vision.
-# The Sol pause applies to OpenAI-family routing, not this existing Copilot
-# security-audit specialist. This refresh does not add Sol to other matrices.
+# This existing specialist is retained. The subsequent approved interim patch
+# also migrates Terra fallbacks in mixed matrices to Sol 6.1.
 
 roles:
   general:

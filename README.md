@@ -15,7 +15,7 @@ Eight curated matrices ship with this bundle, plus one explicit-name alias
 | **quality** | Maximum capability. Uses the strongest models for every role, regardless of cost. |
 | **economy** | Cost-optimized. Prefers free tiers, smaller models, and local providers like Ollama. |
 | **anthropic** | Anthropic Claude models exclusively. No knob-consistent delegation -- no measured win for this family yet (the "Anthropic guardrail"). |
-| **openai** | OpenAI models exclusively. **Ships knob-consistent delegation ON by default** (2026-09-02, a measured win -- see below). Covers **both OpenAI backends** — the pay-per-use API (`openai`) and the ChatGPT subscription (`openai-chatgpt`) — with a single candidate per role: the resolver treats them as one family, API key first. The flagship `sol` tier is PAUSED as of 2026-09-07 pending further evals; roles that used it now run `terra` one effort notch higher, and `ui-coding` runs `luna` at `max`. |
+| **openai** | OpenAI models exclusively, API-first across both backends. Knob-consistent delegation is ON by default. The interim October 2 update selects Sol 6.1 instead of Terra and current Luna for fast/UI roles; `ui-coding` keeps `max` effort. Comparative selection evals follow separately. |
 | **gemini** | Google Gemini models exclusively. |
 | **copilot** | Strongest model per role across the Claude, GPT and Gemini families Copilot serves, through a single provider. |
 | **ollama** | A **template**, deliberately minimal: only the two required roles (`general`, `fast`), both `model: "*"`. Every Ollama user has pulled a different set of models, so there is no useful curation to ship -- copy it and pin what you actually have. |
@@ -28,8 +28,12 @@ Browse the matrix files directly in the [`routing/`](routing/) directory.
 
 Copilot pins use Sonnet/Opus 5.5, Luna 6 and Sol 6.1; Copilot vision uses
 advertised Sonnet 5.5 instead of the unadvertised Gemini 3.5 Flash pin. OpenAI
-Luna globs now accept both dotted and whole-generation IDs without `-fast`
-siblings. Terra remains the mid-tier selection; the OpenAI Sol pause remains.
+Luna globs now accept both dotted and whole-generation GPT-6+ IDs without `-fast`
+siblings. The subsequent approved interim patch replaces every shipped Terra
+candidate (including mixed-matrix Copilot fallbacks) with exact `gpt-6.1-sol`.
+This supersedes the September Sol pause. Role ordering and efforts are retained;
+this is an opportunistic model refresh, not evidence of a comparative eval win.
+Legacy Terra remains only in caller classification and historical examples.
 
 The `openai` preset canonicalizes the ChatGPT backend through the same provider
 family aliases as model selection. When no curated candidate fits the caller's
@@ -52,7 +56,7 @@ python scripts/check_model_catalogs.py --provider openai --provider anthropic \
 
 It fails on missing pins/glob matches, newer same-family standard IDs, or vision
 without advertised support. It checks lower-priority candidates too, preserves
-the Sol/Terra policy boundary, disables Copilot disk fallback, and never generates
+same-family comparisons, disables Copilot disk fallback, and never generates
 content or edits model settings. Missing/empty/failed catalogs are failures, not
 freshness success. Output contains coverage counts and repo-declared patterns,
 not credentials, exception bodies or account-specific inventories.
@@ -178,9 +182,9 @@ Levels 1 and 2 stay strictly above level 3, so an author who deliberately pinned
 preset:
   tier_ladder:                       # cheapest -> most expensive, declared
     openai:
-      - ["gpt-?.?-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
+      - ["gpt-[6-9]*-luna", "gpt-[0-9]*-luna*", "gpt-?.?-mini*", "gpt-?.?-nano*"]
       - ["gpt-?.?-terra*"]
-      - ["gpt-?.?-sol*", "gpt-[0-9].[0-9]"]
+      - ["gpt-[0-9]*-sol*", "gpt-[0-9]*-astra*", "gpt-[0-9].[0-9]"]
   delegation:
     inherit: strict                  # none | effort | tier-and-effort | strict
     report_unhonored: true
