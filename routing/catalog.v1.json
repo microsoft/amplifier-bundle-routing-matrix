@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "strategies": [
+    {"matrix_id": "balanced", "semantic_generation": 1, "source_stem": "balanced", "aliases": [], "label": "Balanced", "display_order": 10, "strategy_note": "Mixed-provider quality and resource tradeoffs."},
+    {"matrix_id": "quality", "semantic_generation": 1, "source_stem": "quality", "aliases": [], "label": "Quality", "display_order": 20, "strategy_note": "Capability-first candidate ordering."},
+    {"matrix_id": "economy", "semantic_generation": 1, "source_stem": "economy", "aliases": [], "label": "Economy", "display_order": 30, "strategy_note": "Resource-conscious candidate ordering."},
+    {"matrix_id": "anthropic", "semantic_generation": 1, "source_stem": "anthropic", "aliases": [], "label": "Anthropic", "display_order": 40},
+    {"matrix_id": "openai", "semantic_generation": 1, "source_stem": "openai", "aliases": [], "label": "OpenAI (legacy API-first family)", "display_order": 50, "strategy_note": "API then ChatGPT; not API-only."},
+    {"matrix_id": "openai-api", "semantic_generation": 1, "source_stem": "openai-api", "aliases": [], "label": "OpenAI API", "display_order": 51, "strategy_note": "Exact module selection only; account approval is separate."},
+    {"matrix_id": "openai-chatgpt", "semantic_generation": 1, "source_stem": "openai-chatgpt", "aliases": [], "label": "OpenAI ChatGPT", "display_order": 52, "strategy_note": "Exact module selection only; account approval is separate."},
+    {"matrix_id": "gemini", "semantic_generation": 1, "source_stem": "gemini", "aliases": [], "label": "Gemini", "display_order": 60},
+    {"matrix_id": "github-copilot", "semantic_generation": 1, "source_stem": "copilot", "aliases": ["copilot"], "label": "GitHub Copilot", "display_order": 70},
+    {"matrix_id": "ollama", "semantic_generation": 1, "source_stem": "ollama", "aliases": [], "label": "Ollama template", "display_order": 80, "strategy_note": "Requires an instance-bound installed inventory; wildcard alone proves nothing."}
+  ]
+}

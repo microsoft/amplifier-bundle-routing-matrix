@@ -171,10 +171,10 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     reassert_role_pin: bool = config.get("reassert_role_pin", True)
 
     from .matrix_loader import (
-        compose_matrix,
+        compose_effective_matrix,
         load_matrix,
+        provider_module_allowlist,
         resolve_matrix_source,
-        strip_inert_config,
         validate_matrix_config,
     )
 
@@ -279,50 +279,22 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     if routing_capability and isinstance(routing_capability, dict):
         capability_overrides = routing_capability.get("overrides", {})
 
-    # --- Compose effective matrix ---
-    # Config overrides first, then capability overrides on top
-    effective_matrix: dict[str, Any] = {}
-    if base_matrix:
-        effective_matrix = compose_matrix(
-            base_matrix.get("roles", {}), config_overrides
-        )
-        if capability_overrides:
-            effective_matrix = compose_matrix(effective_matrix, capability_overrides)
+    # Same effective composition used by the inert catalog API.
+    from .knob_consistency import EscalationState
 
-    # --- Knob-consistent routing: parse the optional `preset:` block ---
-    # A matrix with no `preset:` key yields None here, and None is the
-    # default-off signal every downstream branch checks. Every shipped matrix
-    # in routing/ except `openai.yaml` (default ON, measured win -- see
-    # README "Knob-consistent delegation") has no `preset:` key, so this is
-    # None for all of them. (`openai-knob-consistent.yaml` carried the same
-    # block and was deleted on 2026-09-07, having become a second name for
-    # `openai.yaml`.)
-    from .knob_consistency import EscalationState, parse_preset, validate_preset
-
-    preset = parse_preset(base_matrix)
-
-    # Explicit opt-out: restores legacy (pre-knob-consistent) behaviour for
-    # ANY matrix, including one that ships a `preset:` block by default
-    # (`openai.yaml`). Treated identically to the matrix having no `preset:`
-    # key at all -- no validation runs, no escalation budget is created, and
-    # every downstream branch takes its `preset is None` path.
     disable_delegation_preset = bool(config.get("disable_delegation_preset", False))
-    if disable_delegation_preset and preset is not None:
+    if disable_delegation_preset and base_matrix.get("preset") is not None:
         logger.info(
             "[ROUTING] disable_delegation_preset=true: ignoring preset: "
             "block in matrix %s -- resolving as if it were absent (legacy "
             "behaviour restored).",
             matrix_path,
         )
-        preset = None
-
-    if preset is not None:
-        preset_errors = validate_preset(base_matrix)
-        if preset_errors:
-            raise ValueError(
-                f"Invalid preset: block in matrix {matrix_path}:\n  "
-                + "\n  ".join(preset_errors)
-            )
+    composed, preset, inert_errors = compose_effective_matrix(
+        base_matrix, config_overrides, capability_overrides, disable_delegation_preset
+    )
+    effective_matrix = composed.get("roles", {})
+    module_allowlist = provider_module_allowlist(base_matrix)
     escalations = (
         EscalationState(max_uses=preset.escalate_max_uses)
         if preset is not None and preset.active
@@ -361,10 +333,6 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     # session down, and the offending key is dead data either way -- removing
     # it changes no wire behaviour, it only stops the lie.
     if effective_matrix:
-        effective_matrix, inert_errors = strip_inert_config(
-            {"roles": effective_matrix}
-        )
-        effective_matrix = effective_matrix.get("roles", {})
         if inert_errors:
             logger.error("[ROUTING] Inert config in matrix %s:", matrix_path)
             for err in inert_errors:
@@ -382,7 +350,8 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
     if effective_matrix:
         _validation_providers = coordinator.get("providers") or {}
         config_errors = validate_matrix_config(
-            {"roles": effective_matrix}, _validation_providers, coordinator
+            {"roles": effective_matrix}, _validation_providers, coordinator,
+            provider_module_allowlist=module_allowlist,
         )
         if config_errors:
             # "Fail loud on an unknown effort value" (ROUTING-PROPOSAL.md
@@ -447,6 +416,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
             on_clamp=_emit_clamp,
             escalations=escalations,
             matrix_origin=matrix_origin,
+            provider_module_allowlist=module_allowlist,
         )
         coordinator.register_capability("model_role_resolver", _resolver)
 
@@ -540,7 +510,9 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
         if reassert_role_pin:
             from .role_pin import reassert_own_role_pin
 
-            pin_record = reassert_own_role_pin(coordinator)
+            pin_record = reassert_own_role_pin(
+                coordinator, provider_module_allowlist=module_allowlist
+            )
             if pin_record is not None:
                 # Same emit shape as _emit_clamp above: resolve the bus from the
                 # coordinator and duck-type it, so a session without a hooks bus
@@ -673,6 +645,7 @@ async def mount(coordinator: Any, config: dict[str, Any] | None = None) -> None:
                     preset=preset if agent_caller_context is not None else None,
                     escalations=escalations,
                     on_clamp=_emit_clamp,
+                    provider_module_allowlist=module_allowlist,
                 )
             if resolved:
                 # Preserve the per-candidate `config` block (e.g. reasoning_effort)

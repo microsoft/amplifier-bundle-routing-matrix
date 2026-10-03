@@ -6,8 +6,9 @@ The routing hook tries candidates top-to-bottom and uses the first that matches 
 
 ## Matrices
 
-Eight curated matrices ship with this bundle, plus one explicit-name alias
-([knob-consistent delegation](#knob-consistent-delegation)):
+Ten matrices ship with this bundle. The original eight retain their policy;
+two additive profiles restrict OpenAI module selection without changing models
+or efforts:
 
 | Matrix | When to use |
 |--------|-------------|
@@ -16,13 +17,39 @@ Eight curated matrices ship with this bundle, plus one explicit-name alias
 | **economy** | Cost-optimized. Prefers free tiers, smaller models, and local providers like Ollama. |
 | **anthropic** | Anthropic Claude models exclusively. No knob-consistent delegation -- no measured win for this family yet (the "Anthropic guardrail"). |
 | **openai** | OpenAI models exclusively, API-first across both backends. Knob-consistent delegation is ON by default. The interim October 2 update selects Sol 6.1 instead of Terra and current Luna for fast/UI roles; `ui-coding` keeps `max` effort. Comparative selection evals follow separately. |
+| **openai-api** | Same OpenAI roles/preset, constrained to exact `provider-openai` mount provenance. Not account consent or universal dispatch containment. |
+| **openai-chatgpt** | Same OpenAI roles/preset, constrained to exact `provider-openai-chatgpt` mount provenance. Not account consent or universal dispatch containment. |
 | **gemini** | Google Gemini models exclusively. |
-| **copilot** | Strongest model per role across the Claude, GPT and Gemini families Copilot serves, through a single provider. |
+| **github-copilot** (alias **copilot**) | Strongest model per role across the Claude, GPT and Gemini families Copilot serves, through a single provider. The existing `copilot.yaml` policy is unchanged. |
 | **ollama** | A **template**, deliberately minimal: only the two required roles (`general`, `fast`), both `model: "*"`. Every Ollama user has pulled a different set of models, so there is no useful curation to ship -- copy it and pin what you actually have. |
 
 > `openai-knob-consistent` was **removed on 2026-09-07**. Once the `preset:` block became `openai`'s default on 2026-09-02, the two files were the same matrix under two names. Select **`openai`** instead -- it is byte-for-byte what `openai-knob-consistent` used to give you.
 
 Browse the matrix files directly in the [`routing/`](routing/) directory.
+
+### Bounded catalog library
+
+[`docs/catalog-api.md`](docs/catalog-api.md) documents the implemented Python v1
+`prepare_catalog_sources`, `RoutingCatalogV1.list`, `describe`, async `assess`
+and async `discover_provider_only` interfaces, with a runnable synthetic example.
+Preparation reads only explicitly supplied directories; subsequent operations
+use immutable policy and caller-supplied connection/catalog snapshots, never
+provider transport or model inference. Assessment reuses the runtime role
+resolution loop with isolated initial planning state.
+
+Exact profile constraints filter providers **before** family aliases, instance
+priority, overrides and caller substitution. Unknown mount provenance cannot
+satisfy a constraint; exhausted constrained routes raise `NoScopedRouteError`
+instead of permitting default inheritance. Hosts must propagate that failure.
+The constraint applies to this bundle's routed paths, not all root/direct/foreign
+calls. Exact approved bindings are assessed only in the catalog API; they are
+not a newly enforced runtime account boundary.
+
+Every catalog operation reports `enforcement.status: not_enforced` and
+`execution_ready: false`, even for compatible contained plans. Explicit-preference
+assessment and `next_dispatch` prediction are explicitly unsupported. Contract
+and vision remain **DRAFT**; full-stack qualification, mandatory admission,
+principal attestation and consumer adoption are not supplied by this slice.
 
 ### October 2026 catalog refresh
 
@@ -69,6 +96,36 @@ provisioned (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
 ChatGPT OAuth and local Ollama are outside this hosted workflow; their omission
 is coverage not provided, not proof of freshness. Ordinary PR tests remain
 secret-free. Fresh catalogs do not replace inference smoke tests or quality evals.
+
+## Routing evaluation program
+
+[`evals/`](evals/README.md) is this bundle's maintained routing-specific evaluation
+tooling, not a generic evaluation-library example or a live-results archive.
+The reusable `evidence.py` library and thin Click wrapper support offline
+`plan`, `readiness`, and `analyze` only. Routing owns its evaluation configurations,
+scenarios, graders, reuse rules and promotion decisions; generic execution bricks
+remain in the separate evaluation library as optional development dependencies.
+Nothing here adds evaluator imports to the runtime hook or changes model policy.
+
+From the routing repository root, with Click/PyYAML already available and an
+explicit tasks path from the pinned public evaluation checkout:
+
+```sh
+export ROUTING_EVAL_BENCHMARK_ROOT=/path/to/pinned/amplifier-benchmark/tasks
+python evals/cli.py plan evals/sample_manifest.json \
+  --benchmark-root "$ROUTING_EVAL_BENCHMARK_ROOT"
+```
+
+See [`evals/README.md`](evals/README.md) for the public revision, library usage,
+all commands and the independent offline test job. CI acquires those pinned
+public in-repo task assets automatically, without running benchmark scripts,
+installing the evaluator runtime, using secrets, or uploading result artifacts.
+The sample remains historical and explicitly synthetic/exploratory; its source
+and grader locks are not updated to claim current-policy evidence. Readiness is
+always execution-unsupported, and existing rubric defects remain visible.
+The broader method in [`docs/EVALUATION-PROGRAM.md`](docs/EVALUATION-PROGRAM.md)
+is still DRAFT: no live quality result, paid recurrence, frozen contract or
+automatic promotion is supplied.
 
 ## Including the Bundle
 
@@ -175,7 +232,7 @@ Per-delegate `model_role` overrides (e.g. `delegate(agent="...", model_role="res
 
 Levels 1 and 2 stay strictly above level 3, so an author who deliberately pinned a specialist model still gets one. Inheritance is a default, never a ceiling on explicit intent.
 
-**Scoped by matrix, off unless the resolver can determine the caller's own model.** A matrix must carry a `preset:` block *and* the resolution must be able to determine the caller's own model. Only `openai.yaml` carries one. Every OTHER matrix shipped with this bundle still has no `preset:` key and resolves byte-identically — asserted, not asserted-to, by `tests/test_default_resolution_unchanged.py`, which replays a recording taken from the commit immediately before the feature landed, plus `modules/hooks-routing/tests/test_knob_consistent_routing.py::TestDefaultBehaviourUnchanged::test_anthropic_matrix_has_no_preset_block` and `::test_anthropic_root_resolution_unchanged_vs_pre_50_matrix` naming the Anthropic guardrail directly.
+**Scoped by matrix, off unless the resolver can determine the caller's own model.** A matrix must carry a `preset:` block *and* the resolution must be able to determine the caller's own model. `openai.yaml` and its two additive exact-module profiles carry the same block. Every other pre-existing matrix still has no `preset:` key and resolves byte-identically — asserted by `tests/test_default_resolution_unchanged.py`, plus `modules/hooks-routing/tests/test_knob_consistent_routing.py::TestDefaultBehaviourUnchanged::test_anthropic_matrix_has_no_preset_block` and `::test_anthropic_root_resolution_unchanged_vs_pre_50_matrix` naming the Anthropic guardrail directly. New profile policy equivalence and constraint behavior are separately checked in `tests/test_catalog_v1.py`; the old eight golden entries are not regenerated.
 
 ```yaml
 # routing/openai.yaml -- shipped, DEFAULT ON
@@ -309,6 +366,7 @@ roles:
 | `description` | Yes | Human-readable description |
 | `updated` | Yes | Last update date (YYYY-MM-DD) |
 | `roles` | Yes | Map of role name to role definition |
+| `provider_module_allowlist` | No | Nonempty list of exact full module IDs, e.g. `[provider-openai]`. Optional legacy behavior when absent; module selection constraint, not account approval. Role overrides cannot remove it. |
 
 **Role definition:**
 
@@ -335,6 +393,14 @@ Place custom matrix files in `routing/` within this bundle, or reference them fr
 2. this bundle's own `routing/` dir
 
 First hit wins; nothing is merged. A user file therefore **shadows** a shipped matrix of the same name — deliberately, so a local override beats the default — which also means **every change shipped in this bundle's copy of that matrix has no effect on that host.** `amplifier routing create` / `edit` write into `~/.amplifier/routing/`, so this is easy to end up in without noticing.
+
+`github-copilot` first searches that requested filename across custom/bundle
+directories, then falls back to `copilot.yaml` across the same directories.
+Custom `copilot.yaml` and `github-copilot.yaml` are not silently declared
+equivalent: catalog descriptors preserve requested, canonical, declared and
+source-stem lineage and mark custom alias equivalence unverified. A malformed
+winning file fails rather than trying a lower-precedence file. The deleted
+`openai-knob-consistent` name has no shipped fallback mapping.
 
 Because that outcome used to be invisible, the loader now reports it:
 
