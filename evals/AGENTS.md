@@ -122,3 +122,8 @@ Native counts and missing external receivers refuse before wire. Parent owns
 credential-free solver isolation, independently enforced egress/controller authority,
 assessor control execution and DTU/live qualification. Receiver injection is a
 supported seam, not proof that those boundaries exist.
+
+Bubblewrap qualification must exercise the actual launcher and projected runtime,
+not command construction alone. Use explicit `--unshare-user` with
+`--disable-userns`; merged-/usr loader/shell aliases belong in the immutable
+sandbox specification and may target only projected system directories.

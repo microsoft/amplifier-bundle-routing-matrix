@@ -124,6 +124,7 @@ class SandboxSpec:
     process_count: int = 64
     log_bytes: int = 16_384
     tmpfs_bytes: int = 134_217_728
+    system_aliases: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self):
         require(self.purpose in {"solver", "assessor"}, "sandbox_purpose")
@@ -177,6 +178,23 @@ class SandboxSpec:
             (self.tmpfs_bytes, 268_435_456),
         ):
             require(type(value) is int and 0 < value <= maximum, "sandbox_limits")
+        allowed_aliases = {
+            "/bin": "/usr/bin",
+            "/sbin": "/usr/sbin",
+            "/lib": "/usr/lib",
+            "/lib64": "/usr/lib64",
+        }
+        require(type(self.system_aliases) is tuple, "sandbox_aliases")
+        require(
+            len(dict(self.system_aliases)) == len(self.system_aliases),
+            "sandbox_aliases",
+        )
+        for alias, target in self.system_aliases:
+            require(
+                allowed_aliases.get(alias) == target
+                and any(Path(target).is_relative_to(Path(p)) for p in self.readonly),
+                "sandbox_alias_outside_projection",
+            )
 
     @property
     def lock(self):
@@ -260,9 +278,11 @@ class BubblewrapSandbox:
         args = [
             spec.executable,
             "--unshare-all",
+            "--unshare-user",
             "--die-with-parent",
             "--new-session",
             "--disable-userns",
+            "--assert-userns-disabled",
             "--uid",
             "65534",
             "--gid",
@@ -287,6 +307,8 @@ class BubblewrapSandbox:
         ]
         for path in spec.readonly:
             args.extend(["--ro-bind", path, path])
+        for alias, target in spec.system_aliases:
+            args.extend(["--symlink", target, alias])
         if socket_path is not None:
             require(spec.purpose == "solver", "assessor_no_ipc")
             args.extend(["--ro-bind", str(socket_path), "/ipc/controller.sock"])

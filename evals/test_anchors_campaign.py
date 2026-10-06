@@ -109,6 +109,37 @@ def sandbox(purpose):
     )
 
 
+def test_explicit_user_namespace_flags_and_projected_system_aliases():
+    # Command construction is not OS qualification.
+    runner = object.__new__(BubblewrapSandbox)
+    runner.spec = SimpleNamespace(
+        executable="/usr/bin/bwrap",
+        tmpfs_bytes=1024,
+        readonly=("/usr",),
+        system_aliases=(("/bin", "/usr/bin"), ("/lib", "/usr/lib")),
+        purpose="assessor",
+    )
+    args = runner.command(["/usr/bin/python3", "-B", "-c", "pass"])
+    assert "--unshare-user" in args
+    assert "--disable-userns" in args
+    assert "--assert-userns-disabled" in args
+    assert args[args.index("--symlink") : args.index("--symlink") + 3] == [
+        "--symlink",
+        "/usr/bin",
+        "/bin",
+    ]
+
+
+def test_system_aliases_cannot_expose_unprojected_paths():
+    from dataclasses import replace
+
+    spec = sandbox_spec("assessor")
+    with pytest.raises(SmokeBlocked, match="sandbox_alias"):
+        replace(spec, system_aliases=(("/bin", "/usr/bin"),))
+    with pytest.raises(SmokeBlocked, match="sandbox_alias"):
+        replace(spec, system_aliases=(("/home", "/usr/bin"),))
+
+
 def artifact():
     return Artifact(
         (
