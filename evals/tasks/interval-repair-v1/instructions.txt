@@ -1,0 +1,31 @@
+Task: interval-repair-v1
+
+Repair coalesce(ranges) in the existing intervals.py repository file. Do not
+submit just an explanation or detached replacement snippet.
+
+Contract:
+- ranges is a list or tuple of pairs; each pair is a list or tuple of length 2.
+- Each endpoint is an integer, but bool is not an accepted integer.
+- A pair with start > end is invalid. Every invalid structure or endpoint must
+  raise ValueError, including an invalid outer container.
+- Return a new list of integer tuples sorted by start, merging all overlapping
+  AND touching intervals. Touching means next_start <= current_end, not adjacency
+  of distinct integer endpoints. Equal endpoints and empty input are valid.
+- Never mutate the input outer container or any input pair, even on invalid input.
+
+The initial implementation validates and sorts but does not merge. Public tests
+are intentionally limited. Do not edit or remove test_public.py or this file.
+
+Retain a new test_regression.py using only Python's standard-library unittest.
+It must select at least one test, pass with your repaired intervals.py, and fail
+by an assertion when only intervals.py is restored to its original version.
+The assessor retains the exact same regression file in both runs. Syntax/import
+errors, skipped tests, expected failures and empty selections do not establish a
+red/green regression. Use ordinary test methods and assertions.
+
+Only intervals.py and test_regression.py may change. Use no external packages.
+Do not write additional files or rely on network, credentials, assessor files,
+environment-dependent answers or hidden cases. Assessment copies your files to
+a separate credential-free, network-disabled runtime. Objective cases remain
+assessor-side. Arbitrary Python is not executed in the controller; there is no
+restricted AST dialect imposed on the repaired code.

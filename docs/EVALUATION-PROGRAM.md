@@ -134,3 +134,35 @@ Exports need schema allowlists, private-shape/secret scans, locally derived iden
 No runner, archive, adapters or recurring paid jobs are implemented by this proposal. The maintained routing [`evals/`](../evals/README.md) tooling verifies an offline contract only; it rejects preset-bearing and non-primary OpenAI leaf treatments. Its historical synthetic sample and task/grader locks are preserved, including known rubric defects. Every CLI command requires an explicit `--benchmark-root`; the independent offline CI job checks out public evaluation assets at the sample's pinned revision without executing upstream scripts or installing its runtime. A recommendation consumer contract is deferred until a real result consumer and discriminating fixtures exist; this program must not create a fake pass ledger.
 
 Next acceptance: independently authored hard synthetic task/grader pairs; approved external acquisition/license manifests; versioned normalized telemetry and reuse comparisons; instrumented isolated baseline and paired calibration; measurable budget/cleanup behavior. Then approve the targeted cycle or deeper study. Evidence packets propose policy diffs; they do not silently edit defaults.
+
+### Separate Anchors development slice (2026-10-06)
+
+The executable [Anchors interval-repair adapter](../evals/README.md#foundation-hosted-anchors-interval-repair)
+is separate from offline v1 and the original restricted smoke. It loads/pins
+real Anchors before an explicit task/tool/telemetry ablation, uses stock delegate
+and a real nonrecursive builder, and preserves configured endpoint and native
+settings under intercepted transport. Its controller code reuses the existing
+append-only ledger, quote/usage semantics, injection mount and transport custody.
+Observe-only cost has no dollar stop by default; missing prices remain unknown.
+Finite request/token/body/time limits remain mandatory.
+
+The new mathematical repair family and public controls have no private-source
+mapping. The grader is objective, separately supplied private cases are never
+solver inputs, and retained regression must be assertion-red on original code
+and green on repaired code with nonempty selection. Controller receipt tests
+are not executed-assessor qualification or hostile-code tamper resistance.
+
+Discovery accesses the selected provider instance, snapshots exact latest
+bounded family/tier/modality IDs with explicit live/fallback/manual/failed
+provenance, and makes no historic sweep or matrix edit. Versioned reuse compares
+assigned source/task/grader/runtime/root/tools/settings/budgets and delivered
+model/binding identity, never favorable outcomes. A contemporaneous incumbent
+anchor remains mandatory; changed candidates receive fresh cells. One family
+and deterministic two-cycle tests do not establish promotion or service stability.
+
+Parent-owned remaining gates: tester-provisioned isolated source installation;
+external credential authority and independently enforced solver egress;
+actual good/bad/malformed/hanging assessor runs with cleanup; configured catalog
+discovery followed by the live current-model pair. Source/mock proofs are not
+those checks. No DTUs, paid calls, credentials, generic platform, shipping
+matrix changes or user-local evaluation product are supplied by this slice.

@@ -44,6 +44,33 @@ class UnavailableProvider:
 
 async def mount(coordinator, config=None):
     config = dict(config or {})
+    # Separate versioned Anchors host qualification. No ambient fallback.
+    anchors_factory = coordinator.get_capability("anchors.provider_factory")
+    if anchors_factory is not None:
+        if not callable(anchors_factory):
+            raise RuntimeError("anchors_factory_invalid")
+        from amplifier_module_provider_openai import OpenAIProvider
+
+        provider = anchors_factory(coordinator, config)
+        if type(provider) is not OpenAIProvider:
+            raise RuntimeError("anchors_provider_identity")
+        await coordinator.mount("providers", provider, name="openai")
+
+        async def anchors_cleanup():
+            await provider.close()
+
+        return anchors_cleanup
+    # A validation-only Anchors mount uses the same permanently dormant state.
+    if config.get("eval_profile") == "routing-anchors-repair/v1":
+        if set(config) - (SAFE_CONFIG | {"eval_profile"}):
+            raise RuntimeError("anchors_provider_config")
+        provider = UnavailableProvider()
+        await coordinator.mount("providers", provider, name="openai")
+
+        async def anchors_dormant_cleanup():
+            pass
+
+        return anchors_dormant_cleanup
     if (
         set(config) - SAFE_CONFIG
         or config.get("default_model") not in {"gpt-6.1-sol", "gpt-6-astra"}
