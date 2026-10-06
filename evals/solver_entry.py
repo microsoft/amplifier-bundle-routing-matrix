@@ -11,7 +11,7 @@ from pathlib import Path
 
 from anchors_adapter import AnchorsRun
 from anchors_bridge import receiver_factory
-from anchors_campaign import VERSION, load_sources
+from anchors_campaign import VERSION, failure_code, load_sources
 from anchors_transport import AnchorsLedger, Authority, Limits
 from live_transport import canonical, require
 from repair_assessor import strict_json
@@ -77,10 +77,24 @@ async def solve(
         spec["worker_effort"],
         receiver_factory(socket_path, spec["campaign_id"], capability),
     )
+    failure = None
     try:
         artifact = await run.run()
+    except Exception as error:
+        failure = {
+            "code": failure_code(error),
+            "journey": {
+                "delegated": bool(run.called),
+                "completed": bool(run.completed),
+                "two_sessions": len(run.sessions) == 2,
+                "protocol_error": bool(run.protocol_error),
+            },
+        }
     finally:
         cleanup = await run.close()
+    if failure is not None:
+        failure["cleanup"] = cleanup
+        return {"version": VERSION, "failure": failure}
     return {
         "version": VERSION,
         "artifact": {
@@ -107,7 +121,7 @@ def main():
         raw = canonical(result)
         require(len(raw) <= 400_000, "solver_output")
         sys.stdout.buffer.write(raw)
-        return 0
+        return 1 if "failure" in result else 0
     except BaseException:
         sys.stderr.write('{"error":"solver_refused"}\n')
         return 1

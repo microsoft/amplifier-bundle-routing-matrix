@@ -130,3 +130,8 @@ Bubblewrap qualification must exercise the actual launcher and projected runtime
 not command construction alone. Use explicit `--unshare-user` with
 `--disable-userns`; merged-/usr loader/shell aliases belong in the immutable
 sandbox specification and may target only projected system directories.
+
+Failure paths must retain closed diagnostic codes, the execution stage and
+observed process cleanup. Generic cell refusal is not enough to diagnose a live
+run, and a default cleanup field is not proof that cleanup failed. Never retain
+arbitrary exception text or framework logs as a substitute for safe diagnostics.

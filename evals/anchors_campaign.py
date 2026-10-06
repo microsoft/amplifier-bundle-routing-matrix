@@ -30,7 +30,7 @@ from anchors_transport import AnchorsLedger, Authority, Limits
 from candidates import Snapshot, discover, plan_refresh
 from interval_repair import Artifact, source_binding
 from source_locks import SourceLock
-from live_transport import canonical, fingerprint, require
+from live_transport import SmokeBlocked, canonical, fingerprint, require
 from repair_assessor import (
     DRIVER_SOURCE,
     AssessmentRequest,
@@ -40,6 +40,72 @@ from repair_assessor import (
 )
 
 VERSION = "anchors-campaign/v1"
+FAILURE_CODES = frozenset(
+    {
+        "journey_incomplete",
+        "snapshot_paths",
+        "snapshot_protected",
+        "snapshot_unsafe",
+        "solver_execution",
+        "solver_result",
+        "resolved_treatment",
+        "wire_incomplete",
+        "solver_cleanup",
+        "assessment_invalid",
+        "sandbox_output_limit",
+        "timeout",
+        "cancelled",
+        "unclassified",
+    }
+)
+
+
+def failure_code(error):
+    """Closed diagnostics only; never serialize arbitrary exception text."""
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    if isinstance(error, asyncio.CancelledError):
+        return "cancelled"
+    if type(error) is SmokeBlocked and str(error) in FAILURE_CODES:
+        return str(error)
+    if type(error) is ValueError:
+        return {
+            "missing or unknown task path": "snapshot_paths",
+            "protected public file changed": "snapshot_protected",
+            "unsafe or unreadable task tree": "snapshot_unsafe",
+        }.get(str(error), "unclassified")
+    return "unclassified"
+
+
+def read_solver_failure(raw):
+    """Accept bounded typed diagnostics, never arbitrary solver log content."""
+    try:
+        value = strict_json(raw, 8192)
+        require(
+            type(value) is dict
+            and set(value) == {"version", "failure"}
+            and value["version"] == VERSION,
+            "solver_failure",
+        )
+        result = value["failure"]
+        require(
+            type(result) is dict
+            and set(result) == {"code", "journey", "cleanup"}
+            and result["code"] in FAILURE_CODES
+            and type(result["cleanup"]) is bool,
+            "solver_failure",
+        )
+        journey = result["journey"]
+        require(
+            type(journey) is dict
+            and set(journey)
+            == {"delegated", "completed", "two_sessions", "protocol_error"}
+            and all(type(v) is bool for v in journey.values()),
+            "solver_failure",
+        )
+        return result
+    except Exception:
+        return None
 
 
 def load_sources(value):
@@ -707,6 +773,7 @@ async def run_campaign(
                     "delivered_revision": None,
                 }
                 reports.append(row)
+                stage = "solver_launch"
                 try:
                     ledger.start_cell(cell)
                     result = await solver_sandbox.run(
@@ -731,7 +798,12 @@ async def run_campaign(
                         output_bytes=400_000,
                         socket_path=socket_path,
                     )
+                    row["process_returncode"] = result.returncode
+                    row["cleanup"] = result.cleanup
+                    if result.returncode != 0:
+                        row["solver_failure"] = read_solver_failure(result.stdout)
                     require(result.returncode == 0, "solver_execution")
+                    stage = "solver_result"
                     artifact, returned = read_solver_result(result.stdout)
                     expected = [
                         {
@@ -744,6 +816,7 @@ async def run_campaign(
                     row["cleanup"] = result.cleanup and returned["cleanup"]
                     # Private immutable snapshot is retained before assessment.
                     (output / (cell + "-artifact.json")).write_bytes(result.stdout)
+                    stage = "assessment"
                     request = make_request(artifact, private_cases)
                     assessment = await asyncio.wait_for(
                         assessor.run(request),
@@ -775,10 +848,12 @@ async def run_campaign(
                     )
                     ledger.finish_cell(cell, {"instrumentation": "valid"})
                     row["instrumentation"] = "valid"
-                except Exception:
+                except Exception as error:
                     ledger.abort_cell(cell, "campaign_cell_blocked")
                     row["instrumentation"] = "invalid"
                     row["reason"] = "campaign_cell_blocked"
+                    row["failure_stage"] = stage
+                    row["failure_code"] = failure_code(error)
                     break
                 finally:
                     row["elapsed_s"] = time.monotonic() - started

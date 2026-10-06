@@ -14,6 +14,8 @@ from click.testing import CliRunner
 sys.path.insert(0, str(Path(__file__).parent))
 from anchors_campaign import (
     VERSION,
+    failure_code,
+    read_solver_failure,
     BubblewrapSandbox,
     Campaign,
     IsolationAcceptance,
@@ -380,7 +382,90 @@ def test_solver_result_allowlist_and_public_binding():
         read_solver_result(canonical(corrupted))
 
 
-def test_two_arm_campaign_intercepted_wire_grade_and_report(tmp_path, monkeypatch):
+def test_failure_diagnostics_are_closed_and_never_echo_exception_text():
+    assert failure_code(SmokeBlocked("journey_incomplete")) == "journey_incomplete"
+    assert failure_code(ValueError("missing or unknown task path")) == "snapshot_paths"
+    assert failure_code(RuntimeError("synthetic-private-canary")) == "unclassified"
+    diagnostic = {
+        "code": "journey_incomplete",
+        "journey": {
+            "delegated": True,
+            "completed": False,
+            "two_sessions": True,
+            "protocol_error": False,
+        },
+        "cleanup": True,
+    }
+    envelope = {"version": VERSION, "failure": diagnostic}
+    assert read_solver_failure(canonical(envelope)) == diagnostic
+    diagnostic["code"] = "synthetic-private-canary"
+    assert read_solver_failure(canonical(envelope)) is None
+    diagnostic["code"] = "journey_incomplete"
+    diagnostic["journey"]["completed"] = "synthetic-private-canary"
+    assert read_solver_failure(canonical(envelope)) is None
+
+
+def test_solver_failure_preserves_cleanup_and_journey_without_artifacts(
+    tmp_path, monkeypatch
+):
+    import solver_entry
+    from dataclasses import asdict
+    from anchors_transport import Limits
+
+    class Run:
+        called, completed, protocol_error = True, False, False
+        sessions = [None, None]
+
+        def __init__(self, *args):
+            pass
+
+        async def run(self):
+            raise SmokeBlocked("journey_incomplete")
+
+        async def close(self):
+            return True
+
+    monkeypatch.setattr(solver_entry, "AnchorsRun", Run)
+    monkeypatch.setattr(
+        solver_entry,
+        "load_sources",
+        lambda _: SimpleNamespace(validate=lambda: None, validate_runtime=lambda: None),
+    )
+    monkeypatch.chdir(tmp_path)
+    for key in list(os.environ):
+        monkeypatch.delenv(key)
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    monkeypatch.setenv("PWD", str(tmp_path))
+    spec = {
+        "version": VERSION,
+        "campaign_id": "synthetic",
+        "cell_id": "A0",
+        "sources": {},
+        "root_model": ROOT,
+        "worker_model": ROOT,
+        "root_effort": "high",
+        "worker_effort": "high",
+        "endpoint": ENDPOINT,
+        "limits": asdict(Limits()),
+    }
+    result = asyncio.run(solver_entry.solve(spec, "a" * 32, root=tmp_path))
+    assert read_solver_failure(canonical(result)) == {
+        "code": "journey_incomplete",
+        "journey": {
+            "delegated": True,
+            "completed": False,
+            "two_sessions": True,
+            "protocol_error": False,
+        },
+        "cleanup": True,
+    }
+    assert "artifact" not in result
+
+
+@pytest.mark.parametrize("solver_fails", [False, True])
+def test_two_arm_campaign_intercepted_wire_grade_and_report(
+    tmp_path, monkeypatch, solver_fails
+):
     async def check():
         # Test source mapper exposes no runtime packages; this is orchestration,
         # not actual Anchors qualification. Real-stack command is documented.
@@ -450,6 +535,26 @@ def test_two_arm_campaign_intercepted_wire_grade_and_report(tmp_path, monkeypatc
                     await receiver.handle_async_request(request)
                 finally:
                     await receiver.aclose()
+            if solver_fails:
+                return ProcessResult(
+                    1,
+                    canonical(
+                        {
+                            "version": VERSION,
+                            "failure": {
+                                "code": "snapshot_paths",
+                                "journey": {
+                                    "delegated": True,
+                                    "completed": True,
+                                    "two_sessions": True,
+                                    "protocol_error": False,
+                                },
+                                "cleanup": True,
+                            },
+                        }
+                    ),
+                    True,
+                )
             return ProcessResult(0, solver_output(spec["worker_model"]), True)
 
         assessor = IsolatedAssessor(sandbox("assessor"))
@@ -469,6 +574,19 @@ def test_two_arm_campaign_intercepted_wire_grade_and_report(tmp_path, monkeypatc
             private_cases(),
             upstream=httpx.MockTransport(upstream),
         )
+        if solver_fails:
+            first, second = report["cells"]
+            assert first["failure_stage"] == "solver_launch"
+            assert first["failure_code"] == "solver_execution"
+            assert first["process_returncode"] == 1
+            assert first["solver_failure"]["code"] == "snapshot_paths"
+            assert first["cleanup"] and first["grade"] is None
+            assert second["completion"] == "not_run"
+            assert report["cost"]["requests"] == 2
+            assert report["cost"]["unresolved_requests"] == 0
+            assert not list((output / campaign.campaign_id).glob("*-artifact.json"))
+            assert not list(output.glob("ipc-*"))
+            return
         assert counts == [ROOT, ROOT, ROOT, WORKER]
         assert [c["completion"] for c in report["cells"]] == ["success", "success"]
         assert all(c["instrumentation"] == "valid" for c in report["cells"])
