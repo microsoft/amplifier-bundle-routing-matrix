@@ -13,6 +13,34 @@ results of a new evaluation campaign. Current offline usage is documented in
 [evals/README](../evals/README.md); historical model-policy decisions are indexed
 in [evals/REVIEW](../evals/REVIEW.md#historical-routing-decisions).
 
+## Additive strategy choices (2026-10-06)
+
+The catalog now lists twelve strategies, including four mixed choices:
+`quality`, `speed`, `economy`, `balanced`. `speed` is provisional time-to-success
+policy subject to quality floors, **not** a measured speed win, token-throughput
+ranking or cheapest-tier policy. Quality/economy/balanced role-policy bytes
+remain unchanged. Speed retains all 13 roles and balanced's coding/UI/security/
+critical-ops/image-generation choices while reducing selected routine-work
+dials; [the curator guide](MATRIX_CURATOR_GUIDE.md#strategy-objectives-and-provisional-speed-policy)
+records exact deltas and the missing live qualification.
+
+`custom-template` supplies only the two required roles and visibly replace-me
+configured-instance IDs. Copy/customize for an actual Ollama or
+vLLM/OpenAI-compatible adapter mount; no universal `local`/`vllm` provider is
+invented. Untouched placeholders are not usable configured routes. `ollama`
+stays separately listed with unchanged saved-selection semantics. No new
+compatibility aliases, visibility filters or runtime resolver changes were
+needed; the existing Copilot alias remains.
+
+New synthetic tests cover single-backend speed resolution and runtime/snapshot
+parity, both template identities, exact customized-instance selection,
+requested-filename custom precedence and malformed winning files. Historical
+golden/sample/library bytes are retained; the additive matrices are explicitly
+outside the historical recording, with their own checks. Current unit results
+do not establish live model quality, provider entitlement, calibrated floors,
+app-cli adoption or full-stack qualification. Isolated full-stack qualification
+remains a separately owned integration gate.
+
 ## Read in this order
 
 1. `AGENTS.md`, `README.md`, `docs/PROVIDER_AVAILABILITY.md` and applicable module/test conventions.
@@ -42,7 +70,7 @@ are source facts, not live adoption claims:
 
 | Area | Current evidence | Consequence |
 | --- | --- | --- |
-| Strategies | Ten matrices; `routing/catalog.v1.json` describes ten canonical strategies and the `copilot` alias | Versioned descriptor API exists; custom alias equivalence remains source-qualified |
+| Strategies | Twelve matrices: four mixed strategies, provider choices and distinct generic/Ollama templates; only the existing `copilot` alias | Versioned descriptor API exists; custom alias equivalence remains source-qualified |
 | Legacy OpenAI | README and `resolver.py` family alias prefer API then ChatGPT | Bare `openai` is not API-only; do not change silently |
 | Composition/provenance | `matrix_loader.py` first custom-file hit wins; requested filename differs from declared name | Preview must share composition and show the actual winner/override lineage |
 | Role resolution | Resolver capability, lifecycle and immutable catalog assessment reuse `resolve_model_role` | New-run roles use independent initial planning state; next-dispatch is unsupported |

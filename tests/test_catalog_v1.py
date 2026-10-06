@@ -129,12 +129,15 @@ def test_additive_profiles_clone_policy_without_family_or_effort_changes(name, m
     assert "provider_module_allowlist" not in base
 
 
-def test_catalog_has_ten_canonical_strategies_and_explicit_alias(catalog):
+def test_catalog_has_twelve_canonical_strategies_and_only_existing_alias(catalog):
     descriptors = catalog.list()["strategies"]
-    assert len(descriptors) == 10
+    assert len(descriptors) == 12
     assert {d["matrix_id"] for d in descriptors} == {
         "balanced", "quality", "economy", "anthropic", "openai", "openai-api",
-        "openai-chatgpt", "gemini", "github-copilot", "ollama",
+        "openai-chatgpt", "gemini", "github-copilot", "ollama", "speed", "custom-template",
+    }
+    assert {d["matrix_id"]: d["aliases"] for d in descriptors if d["aliases"]} == {
+        "github-copilot": ["copilot"],
     }
     canonical = catalog.describe(Selection("github-copilot"))
     alias = catalog.describe(Selection("copilot"))
@@ -143,6 +146,133 @@ def test_catalog_has_ten_canonical_strategies_and_explicit_alias(catalog):
     assert alias["requested_id"] == alias["declared_name"] == "copilot"
     assert canonical["source"]["source_stem"] == "copilot"
     assert canonical["aliases"] == ["copilot"]
+
+
+def test_four_mixed_strategies_and_two_distinct_templates(catalog):
+    for name in ("quality", "speed", "economy", "balanced"):
+        description = catalog.describe(Selection(name))
+        assert description["kind"] == "shared"
+        assert description["matrix_id"] == description["requested_id"] == name
+    generic = catalog.describe(Selection("custom-template"))
+    assert generic["kind"] == "template"
+    assert generic["possible_provider_modules"] == []
+    assert generic["provider_domain_complete"] is False
+    assert set(generic["effective_policy"]["roles"]) == {"general", "fast"}
+    for definition in generic["effective_policy"]["roles"].values():
+        assert definition["candidates"] == [
+            {"provider": "replace-me-provider-instance", "model": "*"},
+        ]
+    legacy = catalog.describe(Selection("ollama"))
+    assert legacy["kind"] == "template"
+    assert legacy["matrix_id"] == "ollama"
+    assert legacy["possible_provider_modules"] == ["provider-ollama"]
+    for name in ("good", "cheap", "fast", "local", "vllm"):
+        assert resolve_matrix_source(name, (), ROUTING).path is None
+        with pytest.raises(KeyError):
+            catalog.describe(Selection(name))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("backend", [
+    "provider-openai", "provider-openai-chatgpt", "provider-anthropic",
+    "provider-gemini", "provider-github-copilot",
+])
+async def test_speed_resolves_all_supported_roles_against_single_backend(catalog, backend):
+    choices = {"reasoning_effort": ["low", "medium", "high", "xhigh", "max"]}
+    p = provider(backend, "synthetic-speed-mount", config_choices=choices)
+    models = (
+        "gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-6-luna", "gpt-6-luna-fast",
+        "claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-4-5",
+        "claude-sonnet-5.5", "claude-opus-5.5", "claude-haiku-4.5",
+        "gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-3-pro-image",
+    )
+    policy = load_matrix(ROUTING / "speed.yaml")
+    assert set(policy["roles"]) == set(load_matrix(ROUTING / "balanced.yaml")["roles"])
+    coord, mounted, _, _ = runtime([p])
+    mounted[p.instance_id].list_models.return_value = list(models)
+    report = await catalog.assess(Selection("speed"), inputs(
+        [p], [inventory(p, models=models, state="fresh_complete")],
+        required_roles=tuple(policy["roles"]),
+    ))
+    for name in policy["roles"]:
+        actual = await resolve_model_role([name], policy["roles"], mounted, coordinator=coord)
+        planned = role(report, name)["selection"]
+        if name == "image-gen" and backend != "provider-gemini":
+            assert actual == []
+            assert planned is None
+            continue
+        assert actual
+        assert planned["provider"] == actual[0]["provider"] == p.instance_id
+        assert planned["model"] == actual[0]["model"]
+        assert planned["config"] == actual[0]["config"]
+        assert not planned["model"].endswith("-fast")
+    assert report["execution_ready"] is False
+
+
+def test_speed_retains_high_stakes_policy_and_bounded_utility_dials():
+    speed = load_matrix(ROUTING / "speed.yaml")
+    balanced = load_matrix(ROUTING / "balanced.yaml")
+    assert "preset" not in speed
+    for name in ("coding", "ui-coding", "security-audit", "critical-ops", "image-gen"):
+        assert speed["roles"][name] == balanced["roles"][name]
+    general = speed["roles"]["general"]["candidates"][0]
+    assert general["model"] == "gpt-6.1-sol"
+    assert general["config"] == {"reasoning_effort": "low"}
+    fast = speed["roles"]["fast"]["candidates"]
+    assert fast[0]["config"] == {"reasoning_effort": "low"}
+    assert fast[1]["config"] == {"thinking_budget_tokens": 4096}
+    assert all(c["provider"] != "ollama" for c in fast)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("backend", ["provider-ollama", "provider-openai", "provider-synthetic"])
+async def test_generic_template_requires_customization_then_exact_instance(catalog, tmp_path, backend):
+    p = provider(backend, "synthetic-custom-mount")
+    data = inputs([p], [inventory(p, models=("synthetic-model-1",), state="fresh_complete")],
+                  required_roles=("general", "fast"))
+    untouched = await catalog.assess(Selection("custom-template"), data)
+    assert untouched["compatibility"] == "incompatible"
+    assert untouched["execution_ready"] is False
+    assert all(r["selection"] is None for r in untouched["roles"])
+    policy = load_matrix(ROUTING / "custom-template.yaml")
+    policy["name"] = "synthetic-customized"
+    for definition in policy["roles"].values():
+        definition["candidates"] = [{"provider": p.instance_id, "model": "synthetic-model-1"}]
+    cat = custom_catalog(tmp_path, policy, stem="synthetic-customized")
+    customized = await cat.assess(Selection("synthetic-customized"), data)
+    assert customized["compatibility"] == "verified"
+    assert customized["execution_ready"] is False  # Still no dispatch enforcement.
+    coord, mounted, _, _ = runtime([p, provider(backend, "synthetic-other", priority=-100)])
+    for r in customized["roles"]:
+        actual = await resolve_model_role([r["role"]], policy["roles"], mounted, coordinator=coord)
+        assert r["selection"]["provider"] == actual[0]["provider"] == p.instance_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", ["speed", "custom-template", "ollama"])
+async def test_new_and_legacy_ids_preserve_requested_custom_filename(catalog, tmp_path, name):
+    cat = custom_catalog(tmp_path, synthetic_policy(name="synthetic-declared"), stem=name)
+    description = cat.describe(Selection(name))
+    origin = resolve_matrix_source(name, (tmp_path,), ROUTING)
+    assert origin.path == tmp_path / f"{name}.yaml"
+    assert description["requested_id"] == description["matrix_id"] == name
+    assert description["declared_name"] == "synthetic-declared"
+    assert description["source"]["source_stem"] == name
+    assert description["source_disposition"] == "source_qualified_custom"
+    assert description["aliases"] == []
+    assert name in {d["matrix_id"] for d in cat.list()["strategies"]}
+    assessment = await cat.assess(Selection(name), inputs(
+        catalogs=[inventory(provider(), models=("synthetic-model",), state="fresh_complete")],
+    ))
+    assert role(assessment)["selection"]["model"] == "synthetic-model"
+    assert catalog.describe(Selection(name))["source_disposition"] == "bundle_policy"
+
+
+@pytest.mark.parametrize("name", ["speed", "custom-template", "ollama"])
+def test_new_and_legacy_malformed_winner_never_falls_back(tmp_path, name):
+    (tmp_path / f"{name}.yaml").write_text("not-a-mapping", encoding="utf-8")
+    with pytest.raises(ValueError):
+        prepare_catalog_sources(ROUTING, [tmp_path])
 
 
 @pytest.mark.parametrize("allowlist", [[], "", ["openai"], ["provider-*"], [None], ["provider-openai", "provider-openai"]])
@@ -812,7 +942,7 @@ async def test_native_adapter_negative_evidence_not_softened_by_stale_catalog(ca
     assert "required_native_capability_unsupported" in role(report, "image-gen")["reasons"]
 
 
-def test_custom_canonical_with_bundled_alias_keeps_both_winning_sources(tmp_path):
+def test_custom_canonical_with_bundled_alias_keeps_both_winning_sources(tmp_path, catalog):
     cat = custom_catalog(tmp_path, synthetic_policy(name="custom-openai"), stem="github-copilot")
     canonical = cat.describe(Selection("github-copilot"))
     alias = cat.describe(Selection("copilot"))
@@ -826,20 +956,20 @@ def test_custom_canonical_with_bundled_alias_keeps_both_winning_sources(tmp_path
     assert canonical["aliases"] == alias["aliases"] == []
     assert canonical["alias_equivalence"] == alias["alias_equivalence"] == "unverified"
     listed = {item["matrix_id"]: item for item in cat.list()["strategies"]}
-    assert len(listed) == 11
+    assert len(listed) == len(catalog.list()["strategies"]) + 1
     assert listed["github-copilot"]["requested_id"] == "github-copilot"
     assert listed["copilot"]["requested_id"] == "copilot"
 
 
 @pytest.mark.asyncio
-async def test_custom_canonical_with_bundled_alias_discovery_retains_both(tmp_path):
+async def test_custom_canonical_with_bundled_alias_discovery_retains_both(tmp_path, catalog):
     cat = custom_catalog(tmp_path, synthetic_policy(name="custom-openai"), stem="github-copilot")
     p = provider("provider-github-copilot", "synthetic-copilot")
     discovered = await cat.discover_provider_only("provider-github-copilot", inputs(
         [p], [inventory(p, models=("claude-sonnet-5.5",), state="fresh_complete")],
     ))
     candidates = {item["matrix_id"]: item for item in discovered["candidates"]}
-    assert len(candidates) == 11
+    assert len(candidates) == len(catalog.list()["strategies"]) + 1
     assert {"github-copilot", "copilot"}.issubset(candidates)
     assert candidates["github-copilot"]["assessment"]["matrix_id"] == "github-copilot"
     assert candidates["copilot"]["assessment"]["matrix_id"] == "copilot"

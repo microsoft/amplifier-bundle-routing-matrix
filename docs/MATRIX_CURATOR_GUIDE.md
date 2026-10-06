@@ -347,6 +347,65 @@ roles:
 
 4. The matrix becomes available immediately via `amplifier routing list` and `amplifier routing use <name>`.
 
+For a shipped catalog choice, add explicit metadata in `routing/catalog.v1.json`
+and tests for list/describe/assess, runtime resolution and custom-file precedence.
+Additive matrices need a named exclusion from the *historical* golden recording
+plus their own checks; never regenerate old golden bytes just to admit a new file.
+Update any deliberately counted inventory assertions without weakening their
+policy checks.
+
+### Generic custom-provider starter
+
+Copy [`custom-template.yaml`](../routing/custom-template.yaml) to your configured
+custom routing directory under a new filename. Set `name` to that stem and
+replace **both** `replace-me-provider-instance` values with the exact configured
+instance ID. Use your Ollama mount, or the actual adapter mount serving a
+vLLM/OpenAI-compatible endpoint. Neither `local` nor `vllm` is a universal
+provider registration, and the starter does not create a provider connection.
+
+Pin models your instance actually serves; add optional roles only when their
+capabilities and quality are known. `model: "*"` is an inventory convenience,
+not capability or execution-readiness evidence. The shipped placeholder is not
+a usable provider selection. `ollama.yaml` remains a distinct, unchanged
+Ollama-only saved selection; it is not an alias for this broader starter.
+
+### Strategy objectives and provisional speed policy
+
+| Strategy | Optimization quantity | Current evidence boundary |
+| --- | --- | --- |
+| `quality` | Successful-task quality and critical-defect avoidance before time/cost | Existing capability-first policy unchanged; no universal winner claim |
+| `speed` | Time to successful completion, subject to role-specific quality and critical-defect floors | New provisional policy; neither a latency win nor calibrated floors established |
+| `economy` | Resource cost per successful task | Existing policy unchanged; cheaper tokens or local execution need not lower whole-task cost |
+| `balanced` | Quality, time and cost tradeoff for the selected workload | Existing policy unchanged; workload weights and measured optimum not supplied |
+
+`speed.yaml` starts from balanced's **current** Sol/Luna, Sonnet/Opus/Haiku,
+Gemini Pro/Flash and Copilot choices. The model families are source-supported
+candidates, not newly discovered or benchmark-promoted models. Exact deltas:
+
+1. OpenAI `general`: Sol 6.1 `medium` → `low`, also used in current quality.
+2. Utility `fast`: Luna `medium` → `low`; Haiku's native thinking budget
+   `32000` → `4096` (the documented low-budget dial), including Copilot.
+   Gemini remains Flash at `low`, not economy's Flash-Lite.
+3. OpenAI `reasoning`, `critique`, `research`: `xhigh` → `high`; critique's
+   Anthropic/Copilot dials likewise become `high`. Strong families stay.
+4. OpenAI `creative` and `writing`: `high` → `medium`, as in current quality.
+5. Remove unknown Ollama wildcard fallback from `general`/`fast`; retain the
+   other balanced candidate ordering. Coding, UI (`Luna @ max`), security,
+   critical operations and native image generation remain exactly balanced.
+
+Lower effort is a hypothesis about total time, not proof of faster success.
+There is no new inheritance preset, runtime retry, timeout or budget control.
+The retained coding wildcard and exact pins keep existing resolver semantics:
+they do not establish model fitness, entitlement or transport fallback.
+
+Promotion needs workload-defined, preregistered quality/critical-defect floors
+and paired end-to-end completion-time observations including retries, failures
+and missingness. Floors are not assigned invented numerical values here.
+Token throughput, a cheap tier, unit tests and catalog freshness cannot
+substitute for that evidence. All 13 roles are covered structurally, not
+calibrated by a live trial. No current strategy gains `good`/`cheap`/`fast`
+aliases. Historical samples and policy evidence remain unchanged.
+
 ---
 
 ## Testing Your Matrix
@@ -420,7 +479,7 @@ Model selection is informed by three complementary data sources, combined with h
 [Artificial Analysis](https://artificialanalysis.ai/) provides standardized benchmarks across providers. Use their leaderboard to compare:
 
 - **Quality scores** (MMLU, HumanEval, GPQA) for capability assessment
-- **Speed** (tokens/second) for latency-sensitive roles like `fast`
+- **Throughput** (tokens/second) as a screening signal, not the `speed` strategy's time-to-success objective
 - **Cost** (per million tokens) for budget-conscious matrix variants
 - **Context window** sizes for roles like `research` that benefit from long context
 
@@ -664,7 +723,7 @@ If a blacklisted model appears in a PR, reject and request replacement with a va
 
 ### Required Roles
 
-Every matrix **must** define `general` and `fast`. All 13 roles should be present in multi-provider matrices (`balanced.yaml`, `quality.yaml`, `economy.yaml`). Single-provider matrices may omit roles that the provider cannot fill.
+Every matrix **must** define `general` and `fast`. All 13 roles should be present in multi-provider matrices (`balanced.yaml`, `quality.yaml`, `speed.yaml`, `economy.yaml`). Single-provider matrices may omit roles that the provider cannot fill.
 
 ### balanced.yaml as Reference
 
