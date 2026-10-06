@@ -20,7 +20,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from anchors_transport import Policy, Transport, VERSION
 from interval_repair import stage_task, snapshot_artifact
-from live_smoke import SourceLock
+from source_locks import SourceLock
 from live_transport import canonical, fingerprint, httpx, require
 
 TOOLS = ("tool-filesystem", "tool-search", "tool-bash")

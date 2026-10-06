@@ -114,6 +114,7 @@ def test_explicit_user_namespace_flags_and_projected_system_aliases():
     runner = object.__new__(BubblewrapSandbox)
     runner.spec = SimpleNamespace(
         executable="/usr/bin/bwrap",
+        python="/qualified/env/bin/python",
         tmpfs_bytes=1024,
         readonly=("/usr",),
         system_aliases=(("/bin", "/usr/bin"), ("/lib", "/usr/lib")),
@@ -123,6 +124,7 @@ def test_explicit_user_namespace_flags_and_projected_system_aliases():
     assert "--unshare-user" in args
     assert "--disable-userns" in args
     assert "--assert-userns-disabled" in args
+    assert "/qualified/env/bin:/usr/bin:/bin" in args
     assert args[args.index("--symlink") : args.index("--symlink") + 3] == [
         "--symlink",
         "/usr/bin",

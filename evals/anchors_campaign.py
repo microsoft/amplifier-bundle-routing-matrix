@@ -29,7 +29,7 @@ from anchors_bridge import (
 from anchors_transport import AnchorsLedger, Authority, Limits
 from candidates import Snapshot, discover, plan_refresh
 from interval_repair import Artifact, source_binding
-from live_smoke import SourceLock
+from source_locks import SourceLock
 from live_transport import canonical, fingerprint, require
 from repair_assessor import (
     DRIVER_SOURCE,
@@ -316,7 +316,7 @@ class BubblewrapSandbox:
             [
                 "--setenv",
                 "PATH",
-                "/usr/bin:/bin",
+                f"{Path(spec.python).parent}:/usr/bin:/bin",
                 "--setenv",
                 "HOME",
                 "/work",

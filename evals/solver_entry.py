@@ -42,9 +42,13 @@ async def solve(
     # This exact fresh env is also enforced by the parent's sandbox launcher.
     require(
         set(os.environ)
-        <= {"PATH", "HOME", "TMPDIR", "PYTHONDONTWRITEBYTECODE", "LC_ALL"}
+        <= {"PATH", "HOME", "PWD", "TMPDIR", "PYTHONDONTWRITEBYTECODE", "LC_ALL"}
         and os.environ.get("LC_ALL") == "C.UTF-8",
         "solver_environment",
+    )
+    require(
+        os.environ.get("PWD") == str(root) and Path.cwd() == root,
+        "solver_working_directory",
     )
     sources = load_sources(spec["sources"])
     sources.validate()
