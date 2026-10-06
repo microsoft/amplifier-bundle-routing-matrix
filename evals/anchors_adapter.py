@@ -49,6 +49,7 @@ def repository_digest(path):
     ignored = {
         ".git",
         ".anchors-venv",
+        ".anchors-offline-venv",
         ".venv",
         "__pycache__",
         ".pytest_cache",
@@ -324,6 +325,7 @@ class AnchorsRun:
         self.logical, self.policies = {}, {}
         self.called = self.completed = False
         self.protocol_error = False
+        self.delegate_attempts = 0
         self.resolution = None
         self.wire = {}
 
@@ -396,12 +398,15 @@ class AnchorsRun:
             return HookResult()
 
         async def guard_delegate(event, data):
-            if not child and (
-                data.get("tool_name") != "delegate"
-                or data.get("tool_input") != DELEGATE_ARGUMENTS
-            ):
-                self.protocol_error = True
-                return HookResult(action="deny", reason="fixed_root_protocol")
+            if not child:
+                self.delegate_attempts += 1
+                if (
+                    self.delegate_attempts != 1
+                    or data.get("tool_name") != "delegate"
+                    or data.get("tool_input") != DELEGATE_ARGUMENTS
+                ):
+                    self.protocol_error = True
+                    return HookResult(action="deny", reason="fixed_root_protocol")
             return HookResult()
 
         def factory(coordinator, mounted_config):
@@ -492,14 +497,16 @@ class AnchorsRun:
         provider_preferences=None,
         **kwargs,
     ):
-        require(
+        permitted = (
             agent_name == "anchors:builder"
             and parent_session is self.sessions[0]
             and not self.called
             and provider_preferences is None
-            and instruction == TASK_INSTRUCTION,
-            "delegate_protocol",
+            and instruction == TASK_INSTRUCTION
         )
+        if not permitted:
+            self.protocol_error = True
+        require(permitted, "delegate_protocol")
         self.called = True
         resolver = parent_session.coordinator.get_capability("model_role_resolver")
         result = await resolver.resolve(["coding", "general"])

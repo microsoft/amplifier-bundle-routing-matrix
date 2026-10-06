@@ -444,7 +444,7 @@ The public library seams are:
    `await run.close()` in `finally`. The parent owns cell finish/abort, assessor,
    private receipt retention and overall cleanup.
 4. `repair_assessor.make_request(artifact, private_cases)` and
-   `repair_assessor.assess(artifact, private_cases, runner=qualified_runner)`.
+   `repair_assessor.assess(artifact, private_cases, isolated_runner=qualified_runner)`.
    The runner contract is documented in that module; absence refuses. Its emitted
    standalone driver can execute arbitrary repair code **only in the assessor**.
 5. `candidates.discover(selected_provider, binding_ref, family_masks,
@@ -543,3 +543,14 @@ exact gateway preservation, effective effort, usage and cleanup. Latest catalog
 discovery, tester DTU adoption, external credential/egress authority, actual
 assessor controls and the paid pair remain parent-owned qualification. The one
 synthetic family is provisional plumbing evidence, not a model preference.
+
+Source checks for this increment: Python **3.13.11**, actual native Core and
+Foundation pre-imported in the same pytest process, **1826 passed, zero skips**
+(189 root, 669 routing-module, 938 evaluation-controller, 17 retained smoke-stack
+and 13 Anchors-stack cases), plus four subtests. A fresh dependency-light Python
+**3.11.14** env with pytest/Click/PyYAML only passed **891 controller cases**,
+zero skips; the 77 real-runtime/optional HTTPX cases were not selected there,
+not claimed passed. Ruff **0.15.11** lint/88-column scoped formatting and bundle
+structure passed. No live discovery/inference, solver bash execution, DTU or
+assessor execution occurred. Independent source/security/privacy review cleared
+limited implementation publication, not the parent-owned execution gates above.

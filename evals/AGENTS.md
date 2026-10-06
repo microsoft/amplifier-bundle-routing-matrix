@@ -111,7 +111,9 @@ Real-stack tests require explicit private `ANCHORS_SOURCE_ROOTS` JSON and
 Core/Foundation pre-imported in the same process. Ordinary controller CI ignores
 `tasks/`: solver repo tests execute only through their own subject/assessor path.
 Use `python -B` for solver validation; snapshots refuse incidental extra files.
-Private cases and all generated code execute only in the parent-qualified assessor.
+The controller never executes solver artifacts. Solver-local verification needs
+the qualified subject environment; private grading executes only in the
+parent-qualified assessor.
 Controller receipt tests do not prove execution or hostile-code tamper resistance.
 
 The Anchors profile has observe-only cost by default, not a giant dollar cap.
