@@ -124,6 +124,7 @@ def response(model, output):
         "wrong_model",
         "changed_instruction",
         "inherited_context",
+        "repeat_delegate",
     ],
 )
 def test_stock_anchors_builder_repairs_real_repo(tmp_path, worker, fault):
@@ -135,7 +136,11 @@ def test_stock_anchors_builder_repairs_real_repo(tmp_path, worker, fault):
     locked = sources()
     matrix = tmp_path / "matrix"
     matrix.mkdir()
-    ledger = AnchorsLedger(tmp_path / "ledger", "synthetic-anchors", Limits())
+    ledger = AnchorsLedger(
+        tmp_path / "ledger",
+        "synthetic-anchors",
+        Limits(output_max=2048) if worker == "gpt-6-luna" else Limits(),
+    )
     ledger.start_cell("A0")
     seen, root_calls, child_calls = [], [], []
 
@@ -155,6 +160,10 @@ def test_stock_anchors_builder_repairs_real_repo(tmp_path, worker, fault):
                     if len(root_calls) == 1
                     else output_text("Done.")
                 )
+                if fault == "repeat_delegate" and len(root_calls) == 1:
+                    repeated = function("delegate", arguments)
+                    repeated[0]["call_id"] = "synthetic-repeat"
+                    output += repeated
             else:
                 child_calls.append(body)
                 n = len(child_calls)
@@ -200,7 +209,14 @@ def test_stock_anchors_builder_repairs_real_repo(tmp_path, worker, fault):
 
     run = Run(
         locked,
-        Authority(ledger, None, "https://gateway.example/v1", True, True),
+        Authority(
+            ledger,
+            None,
+            "https://gateway.example/v1",
+            True,
+            True,
+            timeout_s=30 if worker == "gpt-6-luna" else 60,
+        ),
         tmp_path / "repo",
         matrix,
         "A0",
@@ -216,7 +232,11 @@ def test_stock_anchors_builder_repairs_real_repo(tmp_path, worker, fault):
             if fault:
                 with pytest.raises(Exception):
                     await run.run()
-                assert not child_calls
+                if fault == "repeat_delegate":
+                    assert len(child_calls) == 4
+                    assert len(run.sessions) == 2
+                else:
+                    assert not child_calls
                 return
             artifact = await run.run()
             assert dict(artifact.files)["intervals.py"] == GOOD_SOURCE

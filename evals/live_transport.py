@@ -480,7 +480,9 @@ class Ledger:
                     fcntl.flock(stream, fcntl.LOCK_UN)
 
     def _append(self, record: dict) -> dict:
-        record = copy.deepcopy({"version": self.version, "id": uuid.uuid4().hex, **record})
+        record = copy.deepcopy(
+            {"version": self.version, "id": uuid.uuid4().hex, **record}
+        )
         require(self._stream is not None, "ledger_transaction")
         self._stream.seek(0, os.SEEK_END)
         self._stream.write(canonical(record) + b"\n")
