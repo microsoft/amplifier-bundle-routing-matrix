@@ -40,7 +40,7 @@ Current `openai` is **API-first across OpenAI API and ChatGPT subscription backe
 
 ### Bounded implementation disposition
 
-Implemented: ten public descriptors plus explicit Copilot lineage; immutable
+Implemented: twelve public descriptors plus explicit Copilot lineage; immutable
 explicit-source preparation; shared effective composition and runtime role
 resolution using snapshot providers; exact approved-binding filtering; evidence
 states and required/optional role reports; ranked provider-only discovery.
@@ -55,6 +55,31 @@ universal alias equivalence. Host capability application, live-state capture,
 mandatory portable admission/revision fencing, consumer persistence/adoption and
 principal attestation remain gaps. The normative contract/vision remain DRAFT;
 unit parity is not full-stack or dispatch qualification.
+
+### Current strategy choices (2026-10-06)
+
+The mixed strategies are `quality`, `speed`, `economy` and `balanced`. Names
+describe objectives: successful-task quality/critical defects, time to successful
+completion subject to quality floors, resource cost per successful task, and a
+tradeoff across those quantities. They are not measured optimum claims.
+`speed` is explicitly provisional; its dials and qualification limits are in
+[MATRIX_CURATOR_GUIDE](MATRIX_CURATOR_GUIDE.md#strategy-objectives-and-provisional-speed-policy).
+No `good`, `cheap` or `fast` compatibility aliases were added. The existing
+`copilot` alias is unrelated and retained.
+
+`custom-template` is a generic starter with only `general` and `fast`, both
+using `replace-me-provider-instance` and `model: "*"`. Its effective descriptor
+is `kind: template`, with an unknown provider domain, not an invented universal
+`local`/`vllm` provider. Copy to a new filename, change `name`, replace both
+provider fields with actual configured instance IDs and pin served models.
+Untouched placeholders do not match ordinary configured mounts; assessment
+reports uncovered required routes, never execution readiness. A wildcard alone
+does not prove compatibility; a customized policy needs instance-bound evidence.
+
+`ollama` remains separately listed and executable under its original saved ID
+and Ollama-only policy. No visibility filter or identity rewrite was introduced.
+All choices retain custom-file precedence and requested-filename lineage;
+malformed winners still fail rather than selecting bundled policy.
 
 ## 2. Proposed operation boundary
 

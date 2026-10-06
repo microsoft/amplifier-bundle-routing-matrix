@@ -90,3 +90,53 @@ exact name and independently verify absence. Never sweep other claimed resources
 Raw control journals stay private/ignored; the parent owns publication review.
 
 Do not auto-run paid recurrence or mutate shipping matrix policy. If sources/tasks/grader/runtime change, use the reuse disposition in `RESULT-REUSE.md`; never relabel old scores as fresh execution. Capture tested commands, remaining gaps and agreed decisions here or in the document that owns them, without importing private project context.
+
+## Separate Anchors repair profile
+
+`anchors_adapter.py`/`anchors_transport.py` use `routing-anchors-repair/v2`.
+Load the real pinned Anchors closure before applying the declared tool/telemetry
+ablation. The root has stock delegate only; builder retains stock filesystem,
+search and bash. Its instruction/context are fixed at the tool boundary.
+The worker has no delegate or spawn capability. Do not label this app-cli-qualified
+or qualification of the unmodified full Anchors UX/telemetry roster.
+
+Use editable, source-selected module installs in a fresh workspace-local env.
+A wheel fixture's `package.__file__.parents[1]` may be shared site-packages, not
+its source root, causing Core to select an unrelated conventional package.
+Keep the evaluation shim as the sole `provider-openai` distribution entry point;
+the stock implementation is an explicit import-only source with its dependencies
+installed. Never bypass Core validation to fix source selection.
+
+Real-stack tests require explicit private `ANCHORS_SOURCE_ROOTS` JSON and
+Core/Foundation pre-imported in the same process. Ordinary controller CI ignores
+`tasks/`: solver repo tests execute only through their own subject/assessor path.
+Use `python -B` for solver validation; snapshots refuse incidental extra files.
+The controller never executes solver artifacts. Solver-local verification needs
+the qualified subject environment; private grading executes only in the
+parent-qualified assessor.
+Controller receipt tests do not prove execution or hostile-code tamper resistance.
+
+The Anchors profile has observe-only cost by default, not a giant dollar cap.
+Missing price stays null; finite request/context-token/body/time controls remain.
+Complete unpriced usage may report cache writes. Preserve those counts without
+inferring read/write overlap or pricing them under a no-write quote. Historical
+v1 qualification is not v2 qualification; retain refused live attempts separately.
+Native counts and missing external receivers refuse before wire. Parent owns
+credential-free solver isolation, independently enforced egress/controller authority,
+assessor control execution and DTU/live qualification. Receiver injection is a
+supported seam, not proof that those boundaries exist.
+
+Bubblewrap qualification must exercise the actual launcher and projected runtime,
+not command construction alone. Use explicit `--unshare-user` with
+`--disable-userns`; merged-/usr loader/shell aliases belong in the immutable
+sandbox specification and may target only projected system directories.
+
+Failure paths must retain closed diagnostic codes, the execution stage and
+observed process cleanup. Generic cell refusal is not enough to diagnose a live
+run, and a default cleanup field is not proof that cleanup failed. Never retain
+arbitrary exception text or framework logs as a substitute for safe diagnostics.
+
+Qualify admission against the real provider's assistant-text history as well as
+tool-only history. Canonical assistant message IDs and completed status are wire
+metadata, not model identity or dispatch authority; keep their role/shape bounded
+and reject unknown fields rather than stripping the provider's serialized input.

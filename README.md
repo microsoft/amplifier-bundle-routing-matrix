@@ -6,15 +6,16 @@ The routing hook tries candidates top-to-bottom and uses the first that matches 
 
 ## Matrices
 
-Ten matrices ship with this bundle. The original eight retain their policy;
-two additive profiles restrict OpenAI module selection without changing models
-or efforts:
+Twelve matrices ship with this bundle: four mixed strategies, provider choices,
+and two distinct templates. `speed` and `custom-template` are additive; existing
+quality/economy/balanced and Ollama policy bytes are unchanged.
 
 | Matrix | When to use |
 |--------|-------------|
-| **balanced** (default) | Mixed workloads. Good quality/cost tradeoff for everyday development. |
-| **quality** | Maximum capability. Uses the strongest models for every role, regardless of cost. |
-| **economy** | Cost-optimized. Prefers free tiers, smaller models, and local providers like Ollama. |
+| **balanced** (default) | Trade off successful-task quality, completion time and resource cost for mixed workloads. Existing policy, not a new measured optimum. |
+| **quality** | Prioritize successful-task quality and critical-defect avoidance over time/cost. Existing capability-first policy, not a universal best-model claim. |
+| **speed** | **Provisional:** minimize time to successful completion subject to role quality floors, not tokens/second or cheapest-model tier. No measured speed win or calibrated floor is claimed. |
+| **economy** | Prioritize resource cost per successful task. Existing policy prefers smaller models and user-managed providers; free/local is not zero whole-workflow cost. |
 | **anthropic** | Anthropic Claude models exclusively. No knob-consistent delegation -- no measured win for this family yet (the "Anthropic guardrail"). |
 | **openai** | OpenAI models exclusively, API-first across both backends. Knob-consistent delegation is ON by default. The interim October 2 update selects Sol 6.1 instead of Terra and current Luna for fast/UI roles; `ui-coding` keeps `max` effort. Comparative selection evals follow separately. |
 | **openai-api** | Same OpenAI roles/preset, constrained to exact `provider-openai` mount provenance. Not account consent or universal dispatch containment. |
@@ -24,6 +25,22 @@ or efforts:
 | **ollama** | A **template**, deliberately minimal: only the two required roles (`general`, `fast`), both `model: "*"`. Every Ollama user has pulled a different set of models, so there is no useful curation to ship -- copy it and pin what you actually have. |
 
 > `openai-knob-consistent` was **removed on 2026-09-07**. Once the `preset:` block became `openai`'s default on 2026-09-02, the two files were the same matrix under two names. Select **`openai`** instead -- it is byte-for-byte what `openai-knob-consistent` used to give you.
+
+`custom-template` is a generic two-role **starter**, not a ready profile. Copy
+[`routing/custom-template.yaml`](routing/custom-template.yaml), replace both
+`replace-me-provider-instance` values with your actual configured mount ID,
+and pin served models. The pattern supports customization for Ollama, vLLM
+and OpenAI-compatible mounts; it installs/configures no provider. There is no
+universal `local` or `vllm` provider. Saved `ollama` selections retain their
+Ollama-only meaning and remain listed, not aliased or silently hidden.
+
+Speed's initial dials reuse current family choices and provider-native knobs.
+Coding, UI, security, critical operations and image-generation policies stay
+equal to balanced; routine work uses less thinking. These are hypotheses, not
+measured quality floors or latency results. See the
+[curator guide](docs/MATRIX_CURATOR_GUIDE.md#strategy-objectives-and-provisional-speed-policy)
+for exact deltas and evidence requirements. No new compatibility aliases are
+shipped: `good`, `cheap` and `fast` are not strategy IDs.
 
 Browse the matrix files directly in the [`routing/`](routing/) directory.
 
@@ -216,9 +233,17 @@ Per-delegate `model_role` overrides (e.g. `delegate(agent="...", model_role="res
 
 ## Knob-consistent delegation
 
-**Status (2026-09-02): PROVEN WIN on OpenAI roots, and now DEFAULT ON for the `openai` matrix.** Measured (lane `l1-knob-consistent-routing`, `DONE.json` + `ai-notes/w2-s3-three-knob-presets/ROUTING-PROPOSAL.md`; S3 n=3/arm): `gpt-5.6-sol` call share **27.8% → 0.0%**, cost **−29.7%** (S3 median) / **−55.9%** (S1), wall **−16.2%**, quality flat. This is scoped to **OpenAI-family roots**: every other shipped matrix (`anthropic`, `balanced`, `quality`, `economy`, `gemini`, `copilot`, `ollama`) is untouched and resolves byte-identically to before — there is no equivalent measurement yet for other provider families (the **Anthropic guardrail**: no evidence, no default change).
+**Current policy:** knob-consistent delegation is default-on in `openai` and its
+two exact-module profiles. Other matrices do not inherit this preset. The
+September 2026 measurements justified this scoped policy change, not today's
+model rankings or equivalent changes for other provider families (the
+**Anthropic guardrail**: no evidence, no default change). Historical results and
+their limitations are retained in [the review record](evals/REVIEW.md#historical-routing-decisions).
 
-**The problem this solves.** A session pins its model and effort for the **root only**. Sub-agents are routed by the matrix, so the dial you chose governs only the root's own work. Measured on real runs: a `gpt-5.6-terra` tree sent **85–96%** of its LLM calls to `gpt-5.6-sol`; a `claude-haiku-4-5` cell billed **$2.225** with 26 of 49 calls on sol; `gpt-5.6-luna` costs **$1.5** when it delegates to sol versus **$0.48–0.78** when it does not. Choosing a cheap tier does not buy a cheap tree.
+**The problem this solves.** Without a delegation preset, the model and effort
+chosen for the root do not constrain matrix-routed sub-agents. A cheaper root
+can still delegate to more expensive models. The preset preserves inherited
+caller intent without overriding deliberate specialist pins.
 
 **The fix.** An optional top-level `preset:` block adds one step to resolution — *inherited caller intent* — between the agent's explicit pin and the matrix candidate:
 
@@ -290,7 +315,7 @@ This is a no-op on any matrix that never carried a `preset:` block in the first 
 **Via CLI command:**
 
 ```bash
-amplifier routing use balanced   # or: quality, economy
+amplifier routing use balanced   # or: quality, speed (provisional), economy
 amplifier routing list           # show available matrices
 amplifier routing show           # show resolved roles for current matrix
 ```
@@ -379,7 +404,7 @@ roles:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `provider` | Yes | Module type name (e.g., `anthropic`, `openai`, `ollama`) |
+| `provider` | Yes | Mounted type name (e.g., `anthropic`, `openai`, `ollama`) or exact configured provider instance ID |
 | `model` | Yes | Exact model name or glob pattern (e.g., `claude-sonnet-*`, `*`) |
 | `config` | No | Model parameters passed to provider (e.g., `reasoning_effort: high`) |
 

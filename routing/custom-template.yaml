@@ -1,0 +1,22 @@
+# Copy this starter to a new filename and change name to match that filename.
+# Replace BOTH provider placeholders with the exact configured mount instance ID.
+# For Ollama use your Ollama mount; for vLLM/OpenAI-compatible servers use the
+# actual adapter mount ID. "local" and "vllm" are not universal provider names.
+# Pin models your instance actually serves, then add any needed optional roles.
+# The wildcard is discovery convenience, not quality/capability/readiness proof.
+# This file does not configure a provider, endpoint, credentials or account scope.
+name: custom-template
+description: "Copy and customize for your configured Ollama, vLLM or OpenAI-compatible provider instance; replace the provider placeholders and pin your served models."
+updated: "2026-10-06"
+
+roles:
+  general:
+    description: "Required catch-all; replace provider with your configured instance ID"
+    candidates:
+      - provider: replace-me-provider-instance
+        model: "*"
+  fast:
+    description: "Required utility role; replace provider and choose a suitable served model"
+    candidates:
+      - provider: replace-me-provider-instance
+        model: "*"

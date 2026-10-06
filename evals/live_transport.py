@@ -439,6 +439,8 @@ class Ledger:
     replay a cell/proof or turn a crashed request into refunded capacity.
     """
 
+    version = VERSION
+
     def __init__(self, path: Path, campaign_lock: str, limits: SmokeLimits):
         self.path = Path(path)
         self.campaign_lock = campaign_lock
@@ -468,7 +470,7 @@ class Ledger:
                     require(len(raw) <= 4 * 1024 * 1024, "ledger_size")
                     events = [strict_json(line) for line in raw.splitlines()]
                     require(
-                        all(e.get("version") == VERSION for e in events),
+                        all(e.get("version") == self.version for e in events),
                         "ledger_version",
                     )
                     self._stream = stream
@@ -478,7 +480,9 @@ class Ledger:
                     fcntl.flock(stream, fcntl.LOCK_UN)
 
     def _append(self, record: dict) -> dict:
-        record = copy.deepcopy({"version": VERSION, "id": uuid.uuid4().hex, **record})
+        record = copy.deepcopy(
+            {"version": self.version, "id": uuid.uuid4().hex, **record}
+        )
         require(self._stream is not None, "ledger_transaction")
         self._stream.seek(0, os.SEEK_END)
         self._stream.write(canonical(record) + b"\n")
@@ -863,6 +867,21 @@ class AdmissionAuthority:
 
 
 class AdmittedTransport(httpx.AsyncBaseTransport if httpx else object):
+    count_path = COUNT_PATH
+
+    def endpoint_matches(self, request):
+        url = request.url
+        return (
+            request.method == "POST"
+            and url.scheme == "https"
+            and url.host == "api.openai.com"
+            and url.port in {None, 443}
+            and not url.query
+            and not url.fragment
+            and not url.userinfo
+            and url.path == GENERATION_PATH
+        )
+
     def __init__(
         self,
         authority: AdmissionAuthority,
@@ -886,21 +905,14 @@ class AdmittedTransport(httpx.AsyncBaseTransport if httpx else object):
         try:
             require(not self.closed, "transport_closed")
             url = request.url
-            if request.method == "POST" and url.path == COUNT_PATH:
+            if request.method == "POST" and url.path == self.count_path:
                 self.verify_session()
                 self.authority.ledger.denied(
                     self.policy, "count", "count_billing_unqualified"
                 )
                 raise RuntimeError("smoke.count_billing_unqualified")
             require(
-                request.method == "POST"
-                and url.scheme == "https"
-                and url.host == "api.openai.com"
-                and url.port in {None, 443}
-                and not url.query
-                and not url.fragment
-                and not url.userinfo
-                and url.path == GENERATION_PATH,
+                self.endpoint_matches(request),
                 "wire_endpoint",
             )
             timeout = request.extensions.get("timeout")
@@ -919,7 +931,7 @@ class AdmittedTransport(httpx.AsyncBaseTransport if httpx else object):
             body = strict_json(
                 request.content, self.authority.ledger.limits.body_bytes_max
             )
-            kind = "count" if url.path == COUNT_PATH else "generation"
+            kind = "count" if url.path == self.count_path else "generation"
             reservation = self.authority.ledger.reserve(
                 self.policy,
                 body,

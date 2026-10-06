@@ -1,11 +1,45 @@
-# Routing catalog and evidence handoff — 2026-10-02
+# Routing catalog and evidence handoff — updated 2026-10-06
 
-**Bounded first catalog slice, independently verified; awaiting PR adoption.** The vision
-and catalog contract remain DRAFT, not ratified or frozen. The routing library
-now implements the subset in [catalog-api](catalog-api.md), plus two additive
-exact-module OpenAI profiles. The original eight policies/golden entries are
-unchanged. No mandatory dispatch containment, consumer adoption, paid evaluation
-or merge is established by this implementation.
+**Current main contains the bounded catalog and maintained offline evaluation
+program**, delivered in `f8bd250`. The vision and catalog contract remain DRAFT,
+not ratified or frozen. The implemented API is documented in
+[catalog-api](catalog-api.md), including two additive exact-module OpenAI
+profiles. Repository delivery is not consumer adoption, mandatory dispatch
+containment or live model-quality evidence.
+
+The remainder of the design-review and continuation record below preserves the
+October 2 implementation history. Its verification counts are historical, not
+results of a new evaluation campaign. Current offline usage is documented in
+[evals/README](../evals/README.md); historical model-policy decisions are indexed
+in [evals/REVIEW](../evals/REVIEW.md#historical-routing-decisions).
+
+## Additive strategy choices (2026-10-06)
+
+The catalog now lists twelve strategies, including four mixed choices:
+`quality`, `speed`, `economy`, `balanced`. `speed` is provisional time-to-success
+policy subject to quality floors, **not** a measured speed win, token-throughput
+ranking or cheapest-tier policy. Quality/economy/balanced role-policy bytes
+remain unchanged. Speed retains all 13 roles and balanced's coding/UI/security/
+critical-ops/image-generation choices while reducing selected routine-work
+dials; [the curator guide](MATRIX_CURATOR_GUIDE.md#strategy-objectives-and-provisional-speed-policy)
+records exact deltas and the missing live qualification.
+
+`custom-template` supplies only the two required roles and visibly replace-me
+configured-instance IDs. Copy/customize for an actual Ollama or
+vLLM/OpenAI-compatible adapter mount; no universal `local`/`vllm` provider is
+invented. Untouched placeholders are not usable configured routes. `ollama`
+stays separately listed with unchanged saved-selection semantics. No new
+compatibility aliases, visibility filters or runtime resolver changes were
+needed; the existing Copilot alias remains.
+
+New synthetic tests cover single-backend speed resolution and runtime/snapshot
+parity, both template identities, exact customized-instance selection,
+requested-filename custom precedence and malformed winning files. Historical
+golden/sample/library bytes are retained; the additive matrices are explicitly
+outside the historical recording, with their own checks. Current unit results
+do not establish live model quality, provider entitlement, calibrated floors,
+app-cli adoption or full-stack qualification. Isolated full-stack qualification
+remains a separately owned integration gate.
 
 ## Read in this order
 
@@ -27,13 +61,16 @@ This page is a labeled interpretation, not a verbatim quote or grant of further
 implementation/publication authority. The bounded scope and distinct-ID Option A
 were accepted for this slice; protected input is not reproduced in public documents.
 
-## Source-inspected state
+## Delivered catalog scope
 
-Baseline [public routing revision](https://github.com/microsoft/amplifier-bundle-routing-matrix/tree/183b453c5674fa9c4d51c24cd68e79bce34b28ea): `183b453c5674fa9c4d51c24cd68e79bce34b28ea`. These are source observations, not live adoption claims:
+The first slice used [routing revision
+183b453](https://github.com/microsoft/amplifier-bundle-routing-matrix/tree/183b453c5674fa9c4d51c24cd68e79bce34b28ea)
+as its baseline. The following catalog scope was delivered in `f8bd250`; these
+are source facts, not live adoption claims:
 
 | Area | Current evidence | Consequence |
 | --- | --- | --- |
-| Strategies | Ten matrices; `routing/catalog.v1.json` describes ten canonical strategies and the `copilot` alias | Versioned descriptor API exists; custom alias equivalence remains source-qualified |
+| Strategies | Twelve matrices: four mixed strategies, provider choices and distinct generic/Ollama templates; only the existing `copilot` alias | Versioned descriptor API exists; custom alias equivalence remains source-qualified |
 | Legacy OpenAI | README and `resolver.py` family alias prefer API then ChatGPT | Bare `openai` is not API-only; do not change silently |
 | Composition/provenance | `matrix_loader.py` first custom-file hit wins; requested filename differs from declared name | Preview must share composition and show the actual winner/override lineage |
 | Role resolution | Resolver capability, lifecycle and immutable catalog assessment reuse `resolve_model_role` | New-run roles use independent initial planning state; next-dispatch is unsupported |
@@ -77,11 +114,14 @@ Every command requires an explicit local `--benchmark-root`; tests require `ROUT
 
 Public synthetic proposals and benchmark pins are in EVALUATION-PROGRAM; no raw protected inputs or source maps belong here. Related mechanisms must not be counted as independent trials. Provisional seeds lack executed/live qualification; writing/creative/image-gen gaps remain. No current model is proven better by these proposals.
 
-## Decisions still needed
+### Unmerged live instrumentation
+
+As observed on 2026-10-06, [PR #82](https://github.com/microsoft/amplifier-bundle-routing-matrix/pull/82) at `cdaa9fd26121f1eaea42e1d723d869481f4ed009` proposes evaluation-only admission, request accounting and a restricted interval-union task. It is not included in the main revision above. Its miniature-bundle checks do not qualify a real Anchors or app-cli journey; the corrected paid campaign is not claimed. Inspect its current source and qualification limits before extending it instead of duplicating its transport machinery.
+
+## Decisions and unresolved dependencies
 
 | Decision | Recommendation | Why it matters |
 | --- | --- | --- |
-| OpenAI identity collision — accepted Option A | Retain legacy `openai`; additive `openai-api` and `openai-chatgpt` with explicit suffix exception | No old bare ID is reinterpreted; contract remains DRAFT |
 | Scope/binding and admission | Host binding authority plus mandatory portable dispatch/credential boundary; no child-launch-only enforcement claim | Caller consent must survive every supported execution path |
 | First hard calibration families | Independently authored geometry, stateful handoff, non-vacuous proof, observation limits and quantitative/privacy tasks as role-appropriate | Real observed mistakes need reproducible graders and modern difficulty calibration |
 | Reuse/promotion policy | Private comparability validation; public weak class; holdout confirmation and explicit workload/margins | Prevent stale evidence, privacy leakage and automatic ranking |
@@ -145,7 +185,7 @@ failed before their fixes; follow-up review cleared the corrections. CI now
 pre-imports real dependencies in the pytest process and catalog reporting is
 isolated without changing runtime logging.
 
-Remaining gates: hosted PR checks/adoption and owner-qualified dispatch
+Remaining gates: consumer adoption and owner-qualified dispatch
 prevention. No unit count or synthetic integration establishes account
 containment or live model quality. Every operation reports
 `not_enforced` and `execution_ready: false`; explicit preferences and

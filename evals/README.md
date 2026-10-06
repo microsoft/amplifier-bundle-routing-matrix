@@ -408,3 +408,154 @@ python evals/smoke_cli.py report --spec "$PRIVATE_SPEC" --output-dir "$PRIVATE_O
 Malformed input exits 2, readiness/measurement/protocol blockers exit 1,
 valid offline reporting exits 0. No live trial, broad model-quality conclusion,
 promotion or automatic publication is established by these mock/control checks.
+
+## Foundation-hosted Anchors interval repair
+
+This separate executable library uses **`routing-anchors-repair/v2`**. Offline
+v1 and the restricted smoke profile above retain their contracts. It is not a
+generic eval runner, an app-cli qualification, or promotion evidence.
+
+V2 preserves complete reported cache-write usage under unpriced observe-only
+accounting. It does not infer category overlap or apply a no-write quote to
+writes. V1 source/qualification and refused trials remain historical; changes to
+the accounting profile require fresh source-bound qualification.
+
+`anchors_adapter.load_anchors` loads the complete real
+Foundation `bundles/anchors.md` closure through a private nonpersistent registry.
+Every declared Git source resolves to an explicit content-locked local repository;
+missing roots fail before fetch. It loads actual agent metadata, then applies a
+declared evaluation ablation: stock delegate only at the root; real
+`anchors:builder` `[coding, general]` with filesystem/search/bash in the child;
+no unrelated UX, logging or Context Intelligence hooks/tools. Instructions and
+namespaced context remain real Anchors content. Stock tool-delegate reaches a
+thin `session.spawn` adapter forwarding Foundation's `before_initialize` callback.
+Child composition is complete/nonrecursive (`compose=False`), not parent-tool
+inheritance. The role resolver selects the worker; direct preferences are refused.
+The fixed instruction and `context_depth=none` are checked before delegate execution.
+
+### Controller API and parent-owned isolation
+
+The public library seams are:
+
+1. `Sources(repositories, runtime)` with `RepositoryLock` and existing `SourceLock`
+   inventories: private paths/content locks for complete declared closure and
+   actually imported Core/native artifact, Foundation, modules, provider/SDK/HTTP.
+2. `AnchorsLedger(path, campaign_lock, Limits())`, `start_cell("A0")`, and
+   `Authority(ledger, quote_or_none, exact_configured_endpoint, True, True)`.
+   Qualification flags are **parent assertions**, not authenticated proof.
+3. `AnchorsRun(sources, authority, new_repo_path, private_matrix_dir, cell_id,
+   root_model, worker_model, root_effort, worker_effort, receiver_factory)`.
+   `await run.run()` returns immutable artifact bytes; always
+   `await run.close()` in `finally`. The parent owns cell finish/abort, assessor,
+   private receipt retention and overall cleanup.
+4. `repair_assessor.make_request(artifact, private_cases)` and
+   `repair_assessor.assess(artifact, private_cases, isolated_runner=qualified_runner)`.
+   The runner contract is documented in that module; absence refuses. Its emitted
+   standalone driver can execute arbitrary repair code **only in the assessor**.
+5. `candidates.discover(selected_provider, binding_ref, family_masks,
+   required_capabilities, provenance=...)`, saved exact snapshots, and
+   `plan_refresh(...)`. `candidates_cli.py subset` is a saved-JSON Click wrapper,
+   not a discovery client, scheduler, credential reader or matrix editor.
+
+**No live-safe external controller is provisioned here.** `receiver_factory(policy)`
+must return an HTTPX-compatible receiver (`handle_async_request`, `aclose`).
+It receives the already admitted finalized SDK request and returns the complete
+vendor JSON response. A missing receiver cannot fall back to direct HTTP.
+The SDK uses only an inert auth placeholder and preserves the exact configured
+gateway URL. The parent must wire that receiver to a separately credentialed
+controller, which independently enforces exact session/binding/request admission.
+The solver must have no upstream key in environment, home, settings, mounted
+files or accessible controller storage. Independently deny direct/unmetered
+network from bash and generated applications; a DTU `allow_external` setting
+or a substituted dummy key does not establish this. Direct SDK endpoint/schema
+negative tests do **not** establish OS/network containment. An arbitrary callable
+receiver is not an authenticated external authority. These missing parent
+boundaries are blockers to live execution, not reasons to simulate auth.
+
+Before admission, discover the selected configured binding's actual catalog and
+freeze candidate IDs. Fix one root configuration across the pair. Resolve both
+assigned arms under the same source/root/context policy and call
+`require_distinct_arms` on their post-resolver model/config projections. This
+bounded adapter constructs a preset-free coding slice; it does not qualify an
+arbitrary preset experiment. Inherited/erased arms must not be relabeled a model
+comparison. Run only the changed subset plus a fresh incumbent anchor, not a
+historic sweep. Actual delivered service revision may remain unknown even with
+an exact catalog ID; such receipts cannot be exact-comparable reuse.
+
+### Limits and accounting
+
+Proposed tiny pilot maximum: **24 generations per cell**, at most two root
+generations, **4096 output tokens per generation**, **131072 UTF-8 body bytes**,
+**1200 seconds** for subject loading/preparation/execution, and a conservative
+**25298304 reserved context+output tokens** across all attempts. The native
+context upper bound (default 1050000) needs independent parent/provider evidence;
+body bytes are not input tokens. All limits can be lowered, not raised.
+Assessment and cleanup have separate finite allowances and need an outer parent
+lifecycle deadline. Cancellation preserves unresolved remote/accounting state.
+
+`Limits(dollar_ceiling=None)` is explicit observe-only cost. Complete generation
+usage is metered even without prices; missing cost stays `total_usd: null`, with
+known priced lower bound and missing-request count separately. An optional
+externally sourced `Quote` reuses the smoke USD/cache/reasoning-token semantics;
+no live prices are shipped. A requested dollar ceiling requires a valid quote.
+Native count requests refuse before receiver, retries are disabled and repeated
+logical/payload/usage receipts refuse. Unknown/partial generation usage retains
+unresolved custody and prevents another generation. Invalid supplied quotes
+are explicit accounting qualification errors; the parent can run an approved
+observe-only trial with `quote=None` rather than a guessed price or giant cap.
+
+### Repair and objective assessment
+
+`tasks/interval-repair-v1` is newly authored, MIT-covered mathematical development
+input: validating but buggy union code, public tests and instructions. It is an
+actual repo repair, not a restricted snippet-generation task. The builder must
+retain `test_regression.py`; byte snapshots protect public inputs and exclude
+symlinks/hardlinks/unexpected files. Use `python -B` for local tests.
+
+The assessor receives private cases separately (overlap, touching, order,
+invalid-input policy, observed input immutability). It checks immutable copied
+artifacts, public tests, repaired-code regression green and identical retained
+regression assertion-red on restored original code, with nonempty equal
+selections. Missing/malformed/hanging/control/cleanup failures remain invalid or
+failed, never fake zero awards. Public good/bad/malformed/hang controls are in
+`test_interval_repair.py`; they are **not hidden benchmark answers**. Ordinary
+tests validate receipts without executing solver code. Parent must execute those
+controls in its qualified assessor and retain cleanup proof before accepting
+grader qualification. Separate processes do not make the emitted checker
+tamper-proof against actively malicious arbitrary Python; that boundary is not
+claimed.
+
+### Qualification command (intercepted, no live requests)
+
+Prepare a **new local env or parent tester DTU**, with actual Core/Foundation and
+stock runtime/tool dependencies. Source-select the local shim, avoiding the
+shared-site-packages ambiguity described in AGENTS. `ANCHORS_SOURCE_ROOTS` is
+private JSON mapping exact repository names to pinned local roots; pass it
+explicitly. The complete required map is determined by the stock closure and
+fails when a transitive source is missing, never falling back to `@main`.
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+python -c "import amplifier_core, amplifier_core.models, amplifier_foundation, pytest; \
+raise SystemExit(pytest.main(['evals/live_tests', 'evals/test_anchors_transport.py', \
+'-q', '-p', 'no:cacheprovider', '--import-mode=importlib']))"
+```
+
+Check selected counts, not a dependency-induced skip. The real-stack positives
+use synthetic Sol/Luna IDs only as intercepted configurations, not discovery or
+quality evidence. They exercise actual stock delegation and filesystem repair,
+exact gateway preservation, effective effort, usage and cleanup. Latest catalog
+discovery, tester DTU adoption, external credential/egress authority, actual
+assessor controls and the paid pair remain parent-owned qualification. The one
+synthetic family is provisional plumbing evidence, not a model preference.
+
+Source checks for this increment: Python **3.13.11**, actual native Core and
+Foundation pre-imported in the same pytest process, **1826 passed, zero skips**
+(189 root, 669 routing-module, 938 evaluation-controller, 17 retained smoke-stack
+and 13 Anchors-stack cases), plus four subtests. A fresh dependency-light Python
+**3.11.14** env with pytest/Click/PyYAML only passed **891 controller cases**,
+zero skips; the 77 real-runtime/optional HTTPX cases were not selected there,
+not claimed passed. Ruff **0.15.11** lint/88-column scoped formatting and bundle
+structure passed. No live discovery/inference, solver bash execution, DTU or
+assessor execution occurred. Independent source/security/privacy review cleared
+limited implementation publication, not the parent-owned execution gates above.

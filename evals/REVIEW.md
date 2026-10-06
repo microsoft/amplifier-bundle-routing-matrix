@@ -37,7 +37,7 @@ A separate source review identified two scoring defects. Both were reproduced an
 
 Before correction, the added cases produced three failures and one passing control. All passed afterward. The correction re-review supports the bounded offline contract, not adapter authenticity or live readiness.
 
-## Original pre-relocation verification
+## Historical verification: original pre-relocation
 
 - **93 offline tests passed**, with plugin autoload and pytest caching disabled.
 - Ruff lint and formatting checks passed.
@@ -48,7 +48,7 @@ Before correction, the added cases produced three failures and one passing contr
 
 Publication review is separate from semantic and unit verification. Private reviewer configurations/receipts, raw captures and author-specific workspace layouts are excluded from this source record. The normalizer is not a general-purpose secret scrubber; production inputs require allowlisted redaction and private storage.
 
-## Relocation verification
+## Historical verification: relocation
 
 - **104 offline evaluation tests passed**, retaining the 93 original cases and
   adding 11 path/dependency/import/error regressions. They passed with all
@@ -64,6 +64,24 @@ Publication review is separate from semantic and unit verification. Private revi
   `--benchmark-root` failed with exit 2, without implicit sibling discovery.
 - Independent source/stranger review found no material relocation or publication
   blocker. These checks used no model calls or subject benchmark execution.
+
+## Historical routing decisions
+
+These records explain earlier policy decisions. They are not a qualified
+current-model baseline, a substitute for new calibration, or permission to
+spend. Preserve the original revisions and limitations instead of relabeling
+old results as fresh execution.
+
+| Decision | Public evidence | Scope and limitations |
+| --- | --- | --- |
+| OpenAI knob-consistent delegation, September 2, 2026 | [PR #55](https://github.com/microsoft/amplifier-bundle-routing-matrix/pull/55): S3, three trials per arm, median cost −29.7%, wall time −16.2%, all six grades 70/100; S1, one trial per arm, cost −55.9%. S3 flagship-call share fell from 27.8% to 0.0%. | Evidence for an OpenAI-family inheritance-policy change on the tested configurations, not current model rankings, statistical equivalence, or other-family default changes. |
+| Anthropic Opus 5 review, August–September 2026 | [PR #45](https://github.com/microsoft/amplifier-bundle-routing-matrix/pull/45): two DTU waves; rebaseline tied task passes with slightly lower cost. | Earlier superiority signals did not fully reproduce. Existing `claude-opus-*` selection needed no candidate edit; this is a historical review, not proof each future release is better. |
+| Withdrawn cheap-fast experiment, September 2026 | [Closed PR #56](https://github.com/microsoft/amplifier-bundle-routing-matrix/pull/56) preserves the experimental history. | Not shipped. Failed preregistered gates and an accounting overrun are reasons to retain the negative record, not resurrect the candidate or use it as current quality evidence. |
+
+The sample manifest and synthetic receipts remain regression fixtures. Their
+five-task, two-arm, three-repeat schedule describes planned cells, not an
+archive of 30 executed trials. No source, task, grader or golden lock is changed
+by this documentation cleanup.
 
 ## Boundaries
 
