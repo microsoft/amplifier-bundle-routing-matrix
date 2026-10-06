@@ -1,11 +1,17 @@
-# Routing catalog and evidence handoff — 2026-10-02
+# Routing catalog and evidence handoff — updated 2026-10-06
 
-**Bounded first catalog slice, independently verified; awaiting PR adoption.** The vision
-and catalog contract remain DRAFT, not ratified or frozen. The routing library
-now implements the subset in [catalog-api](catalog-api.md), plus two additive
-exact-module OpenAI profiles. The original eight policies/golden entries are
-unchanged. No mandatory dispatch containment, consumer adoption, paid evaluation
-or merge is established by this implementation.
+**Current main contains the bounded catalog and maintained offline evaluation
+program**, delivered in `f8bd250`. The vision and catalog contract remain DRAFT,
+not ratified or frozen. The implemented API is documented in
+[catalog-api](catalog-api.md), including two additive exact-module OpenAI
+profiles. Repository delivery is not consumer adoption, mandatory dispatch
+containment or live model-quality evidence.
+
+The remainder of the design-review and continuation record below preserves the
+October 2 implementation history. Its verification counts are historical, not
+results of a new evaluation campaign. Current offline usage is documented in
+[evals/README](../evals/README.md); historical model-policy decisions are indexed
+in [evals/REVIEW](../evals/REVIEW.md#historical-routing-decisions).
 
 ## Read in this order
 
@@ -27,9 +33,12 @@ This page is a labeled interpretation, not a verbatim quote or grant of further
 implementation/publication authority. The bounded scope and distinct-ID Option A
 were accepted for this slice; protected input is not reproduced in public documents.
 
-## Source-inspected state
+## Delivered catalog scope
 
-Baseline [public routing revision](https://github.com/microsoft/amplifier-bundle-routing-matrix/tree/183b453c5674fa9c4d51c24cd68e79bce34b28ea): `183b453c5674fa9c4d51c24cd68e79bce34b28ea`. These are source observations, not live adoption claims:
+The first slice used [routing revision
+183b453](https://github.com/microsoft/amplifier-bundle-routing-matrix/tree/183b453c5674fa9c4d51c24cd68e79bce34b28ea)
+as its baseline. The following catalog scope was delivered in `f8bd250`; these
+are source facts, not live adoption claims:
 
 | Area | Current evidence | Consequence |
 | --- | --- | --- |
@@ -77,11 +86,14 @@ Every command requires an explicit local `--benchmark-root`; tests require `ROUT
 
 Public synthetic proposals and benchmark pins are in EVALUATION-PROGRAM; no raw protected inputs or source maps belong here. Related mechanisms must not be counted as independent trials. Provisional seeds lack executed/live qualification; writing/creative/image-gen gaps remain. No current model is proven better by these proposals.
 
-## Decisions still needed
+### Unmerged live instrumentation
+
+As observed on 2026-10-06, [PR #82](https://github.com/microsoft/amplifier-bundle-routing-matrix/pull/82) at `cdaa9fd26121f1eaea42e1d723d869481f4ed009` proposes evaluation-only admission, request accounting and a restricted interval-union task. It is not included in the main revision above. Its miniature-bundle checks do not qualify a real Anchors or app-cli journey; the corrected paid campaign is not claimed. Inspect its current source and qualification limits before extending it instead of duplicating its transport machinery.
+
+## Decisions and unresolved dependencies
 
 | Decision | Recommendation | Why it matters |
 | --- | --- | --- |
-| OpenAI identity collision — accepted Option A | Retain legacy `openai`; additive `openai-api` and `openai-chatgpt` with explicit suffix exception | No old bare ID is reinterpreted; contract remains DRAFT |
 | Scope/binding and admission | Host binding authority plus mandatory portable dispatch/credential boundary; no child-launch-only enforcement claim | Caller consent must survive every supported execution path |
 | First hard calibration families | Independently authored geometry, stateful handoff, non-vacuous proof, observation limits and quantitative/privacy tasks as role-appropriate | Real observed mistakes need reproducible graders and modern difficulty calibration |
 | Reuse/promotion policy | Private comparability validation; public weak class; holdout confirmation and explicit workload/margins | Prevent stale evidence, privacy leakage and automatic ranking |
@@ -145,7 +157,7 @@ failed before their fixes; follow-up review cleared the corrections. CI now
 pre-imports real dependencies in the pytest process and catalog reporting is
 isolated without changing runtime logging.
 
-Remaining gates: hosted PR checks/adoption and owner-qualified dispatch
+Remaining gates: consumer adoption and owner-qualified dispatch
 prevention. No unit count or synthetic integration establishes account
 containment or live model quality. Every operation reports
 `not_enforced` and `execution_ready: false`; explicit preferences and

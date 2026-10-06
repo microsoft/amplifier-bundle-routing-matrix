@@ -216,9 +216,17 @@ Per-delegate `model_role` overrides (e.g. `delegate(agent="...", model_role="res
 
 ## Knob-consistent delegation
 
-**Status (2026-09-02): PROVEN WIN on OpenAI roots, and now DEFAULT ON for the `openai` matrix.** Measured (lane `l1-knob-consistent-routing`, `DONE.json` + `ai-notes/w2-s3-three-knob-presets/ROUTING-PROPOSAL.md`; S3 n=3/arm): `gpt-5.6-sol` call share **27.8% → 0.0%**, cost **−29.7%** (S3 median) / **−55.9%** (S1), wall **−16.2%**, quality flat. This is scoped to **OpenAI-family roots**: every other shipped matrix (`anthropic`, `balanced`, `quality`, `economy`, `gemini`, `copilot`, `ollama`) is untouched and resolves byte-identically to before — there is no equivalent measurement yet for other provider families (the **Anthropic guardrail**: no evidence, no default change).
+**Current policy:** knob-consistent delegation is default-on in `openai` and its
+two exact-module profiles. Other matrices do not inherit this preset. The
+September 2026 measurements justified this scoped policy change, not today's
+model rankings or equivalent changes for other provider families (the
+**Anthropic guardrail**: no evidence, no default change). Historical results and
+their limitations are retained in [the review record](evals/REVIEW.md#historical-routing-decisions).
 
-**The problem this solves.** A session pins its model and effort for the **root only**. Sub-agents are routed by the matrix, so the dial you chose governs only the root's own work. Measured on real runs: a `gpt-5.6-terra` tree sent **85–96%** of its LLM calls to `gpt-5.6-sol`; a `claude-haiku-4-5` cell billed **$2.225** with 26 of 49 calls on sol; `gpt-5.6-luna` costs **$1.5** when it delegates to sol versus **$0.48–0.78** when it does not. Choosing a cheap tier does not buy a cheap tree.
+**The problem this solves.** Without a delegation preset, the model and effort
+chosen for the root do not constrain matrix-routed sub-agents. A cheaper root
+can still delegate to more expensive models. The preset preserves inherited
+caller intent without overriding deliberate specialist pins.
 
 **The fix.** An optional top-level `preset:` block adds one step to resolution — *inherited caller intent* — between the agent's explicit pin and the matrix candidate:
 
