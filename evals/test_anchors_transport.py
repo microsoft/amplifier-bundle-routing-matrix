@@ -420,6 +420,54 @@ def test_token_budget_reserves_native_window_not_estimated_input_and_never_refun
     assert value.events() == before
 
 
+def test_completed_assistant_history_envelope_is_admitted(tmp_path):
+    value = ledger(tmp_path)
+    request = body()
+    request["input"].insert(
+        1,
+        {
+            "type": "message",
+            "id": "msg_synthetic_history",
+            "role": "assistant",
+            "status": "completed",
+            "content": [
+                {"type": "output_text", "text": "Synthetic progress", "annotations": []}
+            ],
+        },
+    )
+    reservation = value.reserve(policy(), request, "generation", None, "history")
+    assert reservation["projection"] == fingerprint(request)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"id": True},
+        {"id": "../synthetic-private"},
+        {"id": "x" * 129},
+        {"role": "user"},
+        {"status": "incomplete"},
+        {"unexpected": "synthetic-private"},
+    ],
+)
+def test_assistant_history_metadata_remains_closed(tmp_path, change):
+    value = ledger(tmp_path)
+    request = body()
+    item = {
+        "type": "message",
+        "id": "msg_synthetic_history",
+        "role": "assistant",
+        "status": "completed",
+        "content": "Synthetic progress",
+    }
+    item.update(change)
+    request["input"].append(item)
+    before = value.events()
+    with pytest.raises(SmokeBlocked, match="input_message"):
+        value.reserve(policy(), request, "generation", None, "history")
+    assert value.events() == before
+
+
 @pytest.mark.parametrize("elapsed,accepted", [(29.999, True), (30, False)])
 def test_whole_cell_deadline_has_exact_boundary(
     tmp_path, monkeypatch, elapsed, accepted

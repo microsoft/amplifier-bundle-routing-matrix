@@ -135,3 +135,8 @@ Failure paths must retain closed diagnostic codes, the execution stage and
 observed process cleanup. Generic cell refusal is not enough to diagnose a live
 run, and a default cleanup field is not proof that cleanup failed. Never retain
 arbitrary exception text or framework logs as a substitute for safe diagnostics.
+
+Qualify admission against the real provider's assistant-text history as well as
+tool-only history. Canonical assistant message IDs and completed status are wire
+metadata, not model identity or dispatch authority; keep their role/shape bounded
+and reject unknown fields rather than stripping the provider's serialized input.

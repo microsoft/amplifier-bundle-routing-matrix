@@ -116,6 +116,7 @@ def response(model, output):
 
 
 @pytest.mark.parametrize("worker", ["gpt-6.1-sol", "gpt-6-luna"])
+@pytest.mark.parametrize("assistant_text", [False, True])
 @pytest.mark.parametrize(
     "fault",
     [
@@ -127,7 +128,9 @@ def response(model, output):
         "repeat_delegate",
     ],
 )
-def test_stock_anchors_builder_repairs_real_repo(tmp_path, worker, fault):
+def test_stock_anchors_builder_repairs_real_repo(
+    tmp_path, worker, fault, assistant_text
+):
     from anchors_adapter import AnchorsRun, DELEGATE_ARGUMENTS
     from anchors_transport import AnchorsLedger, Authority, Limits
     from test_interval_repair import GOOD_SOURCE, REGRESSION_SOURCE
@@ -164,6 +167,8 @@ def test_stock_anchors_builder_repairs_real_repo(tmp_path, worker, fault):
                     repeated = function("delegate", arguments)
                     repeated[0]["call_id"] = "synthetic-repeat"
                     output += repeated
+                if assistant_text and len(root_calls) == 1:
+                    output = output_text("Synthetic delegation progress.") + output
             else:
                 child_calls.append(body)
                 n = len(child_calls)
@@ -187,6 +192,8 @@ def test_stock_anchors_builder_repairs_real_repo(tmp_path, worker, fault):
                         "Repaired; regression retained. NOT RUN: assessor-owned."
                     )
                 )
+                if assistant_text and n == 1:
+                    output = output_text("Synthetic file inspection progress.") + output
             return httpx.Response(
                 200,
                 json=response(

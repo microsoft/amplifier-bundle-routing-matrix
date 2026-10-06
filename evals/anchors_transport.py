@@ -7,6 +7,7 @@ Native count traffic is still refused, not fabricated or sent unmetered.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -188,8 +189,20 @@ def validate(body, policy, limits):
         kind = item.get("type", "message")
         if kind == "message":
             require(
-                set(item) <= {"type", "role", "content"}
+                set(item) <= {"type", "role", "content", "id", "status"}
                 and item.get("role") in {"user", "assistant", "system", "developer"},
+                "input_message",
+            )
+            replay_fields = set(item) & {"id", "status"}
+            require(
+                not replay_fields
+                or (
+                    replay_fields == {"id", "status"}
+                    and item["role"] == "assistant"
+                    and type(item["id"]) is str
+                    and re.fullmatch(r"[A-Za-z0-9_-]{1,128}", item["id"]) is not None
+                    and item["status"] == "completed"
+                ),
                 "input_message",
             )
             content = item.get("content")
