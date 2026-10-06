@@ -105,8 +105,13 @@ PRESET_BEARING = {"openai.yaml"}
 #     invariant asserted directly. `openai.yaml` therefore stays recorded and
 #     stays checked, preset or no preset.
 # Additive exact-module profiles are covered separately in test_catalog_v1.py.
+# The additive speed policy and generic starter also have separate catalog and
+# runtime/snapshot parity coverage there; neither existed in this recording.
 # The eight pre-existing recordings are retained byte-for-byte.
-EXCLUDED_FROM_RECORDING = {"openai.yaml", "openai-api.yaml", "openai-chatgpt.yaml"}
+EXCLUDED_FROM_RECORDING = {
+    "openai.yaml", "openai-api.yaml", "openai-chatgpt.yaml",
+    "speed.yaml", "custom-template.yaml",
+}
 
 # Every matrix present in the recording as it stands. A frozen manifest, so a
 # matrix vanishing from the fixture -- by a bad `--regenerate`, a bad merge, a
