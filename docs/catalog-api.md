@@ -106,7 +106,8 @@ file stems, never paths.
 ## Report interpretation
 
 `list()` returns `strategies`, source revision, warnings and supported prediction
-modes. There are ten canonical public strategies. `github-copilot` retains the
+modes. There are twelve canonical public strategies, including provisional
+`speed` and the `custom-template` starter. `github-copilot` retains the
 bundle-owned `copilot` alias and unchanged policy file. Custom winners receive
 `source_qualified_custom` disposition and unverified alias equivalence; their
 requested and declared identities are not silently normalized. Custom metadata
