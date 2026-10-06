@@ -93,7 +93,7 @@ Do not auto-run paid recurrence or mutate shipping matrix policy. If sources/tas
 
 ## Separate Anchors repair profile
 
-`anchors_adapter.py`/`anchors_transport.py` use `routing-anchors-repair/v1`.
+`anchors_adapter.py`/`anchors_transport.py` use `routing-anchors-repair/v2`.
 Load the real pinned Anchors closure before applying the declared tool/telemetry
 ablation. The root has stock delegate only; builder retains stock filesystem,
 search and bash. Its instruction/context are fixed at the tool boundary.
@@ -118,6 +118,9 @@ Controller receipt tests do not prove execution or hostile-code tamper resistanc
 
 The Anchors profile has observe-only cost by default, not a giant dollar cap.
 Missing price stays null; finite request/context-token/body/time controls remain.
+Complete unpriced usage may report cache writes. Preserve those counts without
+inferring read/write overlap or pricing them under a no-write quote. Historical
+v1 qualification is not v2 qualification; retain refused live attempts separately.
 Native counts and missing external receivers refuse before wire. Parent owns
 credential-free solver isolation, independently enforced egress/controller authority,
 assessor control execution and DTU/live qualification. Receiver injection is a

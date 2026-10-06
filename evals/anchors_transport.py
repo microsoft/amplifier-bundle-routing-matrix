@@ -31,7 +31,7 @@ from live_transport import (
     settle_usage,
 )
 
-VERSION = "routing-anchors-repair/v1"
+VERSION = "routing-anchors-repair/v2"
 
 
 @dataclass(frozen=True)
@@ -358,7 +358,9 @@ class AnchorsLedger(Ledger):
             <= {"cached_tokens", "cache_write_tokens"}
             and integer(usage["input_tokens_details"].get("cached_tokens"))
             and usage["input_tokens_details"]["cached_tokens"] <= usage["input_tokens"]
-            and usage["input_tokens_details"].get("cache_write_tokens", 0) == 0
+            and integer(usage["input_tokens_details"].get("cache_write_tokens", 0))
+            and usage["input_tokens_details"].get("cache_write_tokens", 0)
+            <= usage["input_tokens"]
             and set(usage["output_tokens_details"]) == {"reasoning_tokens"}
             and integer(usage["output_tokens_details"].get("reasoning_tokens"))
             and usage["output_tokens_details"]["reasoning_tokens"]
@@ -369,6 +371,11 @@ class AnchorsLedger(Ledger):
             if quote and valid
             else None
         )
+        # Quotes retain their declared no-write cache semantics. Complete unpriced
+        # gateway usage may include writes; it is never priced as free or ordinary
+        # OpenAI usage, and overlapping read/write categories are not inferred.
+        if quote is not None and usd is None:
+            valid = False
         with self.transaction() as events:
             require(any(e == reservation for e in events), "reservation_changed")
             require(
@@ -389,6 +396,16 @@ class AnchorsLedger(Ledger):
                     "wire_id": reservation["id"],
                     "usage": usage,
                     "valid": bool(valid),
+                    "measurement_checks": {
+                        "http_200": http_status == 200,
+                        "model_match": isinstance(payload, dict)
+                        and payload.get("model") == reservation["expected_model"],
+                        "completed": isinstance(payload, dict)
+                        and payload.get("status") == "completed",
+                        "default_service": isinstance(payload, dict)
+                        and payload.get("service_tier") == "default",
+                        "price_supported": quote is None or usd is not None,
+                    },
                     "priced_usd": str(usd) if usd is not None else None,
                 }
             )

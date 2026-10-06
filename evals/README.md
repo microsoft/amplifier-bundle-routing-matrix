@@ -411,9 +411,14 @@ promotion or automatic publication is established by these mock/control checks.
 
 ## Foundation-hosted Anchors interval repair
 
-This separate executable library uses **`routing-anchors-repair/v1`**. Offline
+This separate executable library uses **`routing-anchors-repair/v2`**. Offline
 v1 and the restricted smoke profile above retain their contracts. It is not a
 generic eval runner, an app-cli qualification, or promotion evidence.
+
+V2 preserves complete reported cache-write usage under unpriced observe-only
+accounting. It does not infer category overlap or apply a no-write quote to
+writes. V1 source/qualification and refused trials remain historical; changes to
+the accounting profile require fresh source-bound qualification.
 
 `anchors_adapter.load_anchors` loads the complete real
 Foundation `bundles/anchors.md` closure through a private nonpersistent registry.

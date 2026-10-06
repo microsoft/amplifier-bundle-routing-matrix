@@ -266,7 +266,9 @@ def test_synthetic_quoted_ceiling_below_reservation_refuses(tmp_path):
         (None, "total_tokens", "140"),
         (None, "unknown_tokens", 0),
         ("input_tokens_details", "cached_tokens", 101),
-        ("input_tokens_details", "cache_write_tokens", 1),
+        ("input_tokens_details", "cache_write_tokens", 101),
+        ("input_tokens_details", "cache_write_tokens", True),
+        ("input_tokens_details", "cache_write_tokens", -1),
         ("input_tokens_details", "unknown_tokens", 0),
         ("output_tokens_details", "reasoning_tokens", 41),
         ("output_tokens_details", "unknown_tokens", 0),
@@ -287,6 +289,31 @@ def test_malformed_usage_never_settles_or_becomes_zero(
     assert value.unresolved(value.events()) == [reservation]
     assert not any(e["event"] == "settle" for e in value.events())
     assert value.accounting()["missing_cost_requests"] == 1
+    assert value.accounting()["total_usd"] is None
+
+
+def test_observed_cache_write_usage_is_retained_without_invented_prices(tmp_path):
+    value = ledger(tmp_path)
+    reservation = value.reserve(policy(), body(), "generation", None, "cache-write")
+    payload = response()
+    payload["usage"]["input_tokens_details"]["cache_write_tokens"] = 80
+    value.response(reservation, payload, None, 200)
+    observed = [e for e in value.events() if e["event"] == "response"][-1]
+    assert observed["usage"] == payload["usage"]
+    assert observed["valid"] and observed["priced_usd"] is None
+    assert value.accounting()["unresolved_requests"] == 0
+    assert value.accounting()["total_usd"] is None
+
+
+def test_no_write_quote_cannot_price_cache_writes_as_zero(tmp_path):
+    value = ledger(tmp_path)
+    quoted = quote()
+    reservation = value.reserve(policy(), body(), "generation", quoted, "cache-write")
+    payload = response()
+    payload["usage"]["input_tokens_details"]["cache_write_tokens"] = 1
+    with pytest.raises(SmokeBlocked, match="generation_measurement_invalid"):
+        value.response(reservation, payload, quoted, 200)
+    assert value.unresolved(value.events()) == [reservation]
     assert value.accounting()["total_usd"] is None
 
 

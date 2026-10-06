@@ -61,7 +61,7 @@ async def mount(coordinator, config=None):
 
         return anchors_cleanup
     # A validation-only Anchors mount uses the same permanently dormant state.
-    if config.get("eval_profile") == "routing-anchors-repair/v1":
+    if config.get("eval_profile") == "routing-anchors-repair/v2":
         if set(config) - (SAFE_CONFIG | {"eval_profile"}):
             raise RuntimeError("anchors_provider_config")
         provider = UnavailableProvider()
