@@ -27,6 +27,23 @@ or efforts:
 
 Browse the matrix files directly in the [`routing/`](routing/) directory.
 
+### Haiku version compatibility
+
+Exact native Anthropic `claude-haiku-5-5` accepts `reasoning_effort` values
+`low`, `medium`, `high`, `xhigh`, `max`; unset effort retains the provider's
+medium/adaptive default. Manual thinking budgets and `between_tools` are refused.
+Native 4.5 still accepts manual budgets and rejects effort. Unknown/future IDs,
+aliases and unqualified backends refuse explicit effort/budgets with
+`HaikuCompatibilityError`, not silent stripping or model fallback.
+
+Budget-bearing stock Anthropic Haiku globs are now pinned to `claude-haiku-4-5`.
+This is an observable compatibility selection change: a catalog containing 5.5
+no longer auto-upgrades those entries with a legacy 32000 budget. Copilot's
+unqualified native-Anthropic budget knobs are removed; its model pins are retained.
+No 5.5 role promotion or quality claim is made. Custom exact 5.5 intent remains
+supported when the selected mount has compatible knobs and an updated provider.
+See the [curator change table](docs/MATRIX_CURATOR_GUIDE.md#haiku-version-and-backend-compatibility).
+
 ### Bounded catalog library
 
 [`docs/catalog-api.md`](docs/catalog-api.md) documents the implemented Python v1
@@ -216,7 +233,7 @@ Per-delegate `model_role` overrides (e.g. `delegate(agent="...", model_role="res
 
 ## Knob-consistent delegation
 
-**Status (2026-09-02): PROVEN WIN on OpenAI roots, and now DEFAULT ON for the `openai` matrix.** Measured (lane `l1-knob-consistent-routing`, `DONE.json` + `ai-notes/w2-s3-three-knob-presets/ROUTING-PROPOSAL.md`; S3 n=3/arm): `gpt-5.6-sol` call share **27.8% → 0.0%**, cost **−29.7%** (S3 median) / **−55.9%** (S1), wall **−16.2%**, quality flat. This is scoped to **OpenAI-family roots**: every other shipped matrix (`anthropic`, `balanced`, `quality`, `economy`, `gemini`, `copilot`, `ollama`) is untouched and resolves byte-identically to before — there is no equivalent measurement yet for other provider families (the **Anthropic guardrail**: no evidence, no default change).
+**Status (2026-09-02): PROVEN WIN on OpenAI roots, and now DEFAULT ON for the `openai` matrix.** Measured (lane `l1-knob-consistent-routing`, `DONE.json` + `ai-notes/w2-s3-three-knob-presets/ROUTING-PROPOSAL.md`; S3 n=3/arm): `gpt-5.6-sol` call share **27.8% → 0.0%**, cost **−29.7%** (S3 median) / **−55.9%** (S1), wall **−16.2%**, quality flat. This treatment is scoped to **OpenAI-family roots**; no equivalent inheritance measurement exists for other families (the **Anthropic guardrail**: no evidence, no default inheritance change). The subsequent Haiku compatibility update above is a separate selection/config change, not an inheritance treatment or comparative model win.
 
 **The problem this solves.** A session pins its model and effort for the **root only**. Sub-agents are routed by the matrix, so the dial you chose governs only the root's own work. Measured on real runs: a `gpt-5.6-terra` tree sent **85–96%** of its LLM calls to `gpt-5.6-sol`; a `claude-haiku-4-5` cell billed **$2.225** with 26 of 49 calls on sol; `gpt-5.6-luna` costs **$1.5** when it delegates to sol versus **$0.48–0.78** when it does not. Choosing a cheap tier does not buy a cheap tree.
 

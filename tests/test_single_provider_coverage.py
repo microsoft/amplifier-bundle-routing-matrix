@@ -42,6 +42,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -182,10 +183,14 @@ def test_provider_alone_routes_every_role_of_the_default_matrix(
     """One provider, mounted alone, must resolve every non-exempt role."""
     roles = _roles(DEFAULT_MATRIX)
     providers = _providers(provider_name)
+    coordinator = SimpleNamespace(config={"providers": [
+        {"module": f"provider-{provider_name}", "instance_id": provider_name, "config": {}}
+    ]})
 
     async def _run() -> dict[str, Any]:
         return {
-            role: await resolve_model_role([role], roles, providers) for role in roles
+            role: await resolve_model_role([role], roles, providers, coordinator=coordinator)
+            for role in roles
         }
 
     resolved = asyncio.run(_run())

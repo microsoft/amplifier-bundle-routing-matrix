@@ -13,6 +13,8 @@ from typing import Any, NamedTuple
 
 import yaml
 
+from .haiku_compatibility import EFFORT_KEYS, haiku_config_errors, may_select_haiku, require_haiku_config
+
 # ---------------------------------------------------------------------------
 # Where a matrix actually came from (shadowing observability)
 # ---------------------------------------------------------------------------
@@ -445,45 +447,9 @@ def validate_matrix_config(
 # "is this value legal for this provider?" but "will this target act on this
 # KEY at all?"
 #
-# WHY THE TABLE IS KEYED ON (provider, model) AND NOT ON MODEL ALONE
-#
-# Two distinct shapes of this defect exist, and they key differently:
-#
-#   * PROVIDER-keyed (gemini): the provider never reads the key from mount
-#     config, so EVERY model it serves is affected. Keying on the model would
-#     need one row per model id and would silently miss the next one Google
-#     ships.
-#   * MODEL-keyed (haiku): the provider DOES read the key, but one model
-#     collapses every level above `low` into one identical request. The
-#     provider is fine; one model is not. Keying on the provider would reject
-#     effort on every Anthropic model, most of which honour it.
-#
-# BOTH shapes are now enforced here, in ONE table. Neither special case
-# generalises to the other -- a model-keyed table cannot express gemini
-# without one row per model id, and a provider-keyed table cannot express
-# haiku at all, since anthropic-the-provider is fine. A single table with a
-# provider field and a model-substring field expresses both, so a third
-# finding is a new ROW rather than a third mechanism. Two mechanisms would
-# mean two places to look, two chances to strip the wrong key, and -- the real
-# hazard -- two possible answers to "is this key live on this candidate?"
-# that can disagree.
-#
-# The per-row `remediation` callable is what makes one table possible without
-# losing precision: haiku's exact replacement is a `thinking_budget_tokens`
-# number, gemini's is an `extra_request_params.thinking_config` block. One
-# shared remediation sentence structurally could not name both.
-#
-# SCOPE, STATED HONESTLY: this table is not a general capability model. It
-# carries only rules backed by a cited provider code path or a named
-# measurement. A (provider, model) pair absent from it is NOT asserted to
-# honour anything -- it is simply a pair this guard has no evidence about.
-
-# Both spellings a matrix candidate can use for the portable effort knob.
-# provider-anthropic consumes the canonical `reasoning_effort` and the legacy
-# `effort` alias (provider-anthropic __init__.py:892-897, :3452-3455), so a
-# curator can reasonably write either; a guard covering only one spelling
-# leaves the other silently dropping.
-EFFORT_KEYS: tuple[str, ...] = ("effort", "reasoning_effort")
+# Haiku's former family-wide inert-key row is replaced by concrete compatibility
+# in haiku_compatibility.py. Only the provider-wide Gemini inert rule remains;
+# incompatible Haiku intent is a refusal, not an automatically removed key.
 
 # provider-gemini's effort -> thinking_level ladder, mirrored here so the
 # remediation can name the EXACT level a given effort value targets rather
@@ -564,69 +530,6 @@ def _gemini_effort_remediation(model: str, value: Any) -> str:
 # what they had before any of this, so nothing regresses; it simply does not
 # improve until they update the provider.
 
-# --- MODEL-keyed row: anthropic haiku ---------------------------------
-#
-# Carried over VERBATIM from the haiku guard this table subsumes (PR #48,
-# commit 68bba65). That lane made the wire measurement; this one only
-# re-homes the rule into the generic table, so the reason string and the
-# per-value remediation are unchanged from the measurement that earned
-# them.
-#
-# `provider="*"` deliberately, NOT `provider="anthropic"`: the guard on
-# main matched the model substring under ANY provider name, and narrowing
-# it here would silently stop rejecting an inert effort key on a haiku
-# model served under some other provider id. The wildcard preserves the
-# shipped matching semantics exactly.
-_HAIKU_REASON = (
-    "Anthropic Haiku collapses every effort level above 'low' into one "
-    "identical request, so the knob measures nothing. MEASURED on the wire "
-    "(20260901-threeknob capture root, effort attributed per request by "
-    "joining to that request's own `model` field): across 1,438 "
-    "claude-haiku-4-5 requests the effort parameter was ABSENT and "
-    "thinking.budget_tokens was pinned at 32000 regardless of the effort the "
-    "cell asked for -- anth-haiku-high (n=702) and anth-haiku-medium (n=736) "
-    "were byte-identical configurations, making two of sixteen cells "
-    "duplicates. MECHANISM: haiku has supports_output_config=False and "
-    "supports_adaptive_thinking=False (provider-anthropic "
-    "__init__.py:1541-1550), so the effort ladder resolves medium/high/xhigh/"
-    "max to the same default_thinking_budget=32000 and the adaptive branch "
-    "falls back to type='enabled' (provider-anthropic __init__.py:3024-3046)."
-)
-
-# The exact `thinking_budget_tokens` value that reproduces each effort level on
-# an affected model, so the error can name a lossless replacement rather than
-# generic advice. Haiku's ladder: 'low' -> 4096, everything above -> the model
-# default 32000 (provider-anthropic __init__.py:3026-3046).
-_HAIKU_BUDGETS: dict[str, int] = {
-    "low": 4096,
-    "medium": 32000,
-    "high": 32000,
-    "xhigh": 32000,
-    "max": 32000,
-}
-_HAIKU_DEFAULT_BUDGET = 32000
-
-
-def _haiku_remediation(model: str, value: Any) -> str:
-    """Return the exact replacement setting for an inert haiku effort value.
-
-    Naming the replacement knob without its value is not actionable; naming
-    the WRONG value silently changes behaviour. On Haiku ``low`` and the
-    collapsed tiers have genuinely different equivalents, so the remediation
-    is resolved per value rather than as one fixed sentence.
-
-    This is PR #48's ``effort_remediation`` unchanged apart from its name:
-    its ``(model, value) -> str`` signature already matches this table's
-    ``remediation`` field.
-    """
-    normalized = str(value).strip().lower()
-    budget = _HAIKU_BUDGETS.get(normalized, _HAIKU_DEFAULT_BUDGET)
-    return (
-        f"Use `thinking_budget_tokens: {budget}` instead -- that is the exact "
-        f"request this effort level already resolves to, made explicit."
-    )
-
-
 class InertKeyRule(NamedTuple):
     """One (provider, model) -> inert-keys rule.
 
@@ -650,11 +553,8 @@ class InertKeyRule(NamedTuple):
     remediation: Callable[[str, Any], str]
 
 
-# The enforced rules. One row per (provider, model) pair with evidence.
-#
-# ORDER MATTERS: the first matching row wins. The provider-specific gemini row
-# is listed before the `provider="*"` haiku row so a wildcard row can never
-# shadow a narrower one.
+# Provider-wide inert keys only. Haiku uses shared concrete compatibility;
+# explicit effort/manual budget intent is refused, never silently stripped.
 INERT_CONFIG_RULES: tuple[InertKeyRule, ...] = (
     InertKeyRule(
         provider="gemini",
@@ -662,13 +562,6 @@ INERT_CONFIG_RULES: tuple[InertKeyRule, ...] = (
         keys=EFFORT_KEYS,
         reason=_GEMINI_EFFORT_REASON,
         remediation=_gemini_effort_remediation,
-    ),
-    InertKeyRule(
-        provider="*",  # matched on the MODEL substring, under any provider
-        model_marker="haiku",
-        keys=EFFORT_KEYS,
-        reason=_HAIKU_REASON,
-        remediation=_haiku_remediation,
     ),
 )
 
@@ -687,6 +580,10 @@ def inert_config_rule(provider: str, model: str, key: str) -> InertKeyRule | Non
         no evidence that the key is inert for this candidate.
     """
     if not isinstance(provider, str) or not isinstance(key, str):
+        return None
+    if may_select_haiku(model):
+        # A policy provider string can be an arbitrary instance ID. Preserve
+        # Haiku intent until its actual model/module compatibility is known.
         return None
     model_needle = model.lower() if isinstance(model, str) else ""
     provider_needle = provider.lower()
@@ -733,6 +630,12 @@ def validate_matrix_inert_config(matrix: dict[str, Any]) -> list[str]:
 
             provider = candidate.get("provider", "")
             model = candidate.get("model", "")
+            errors.extend(
+                f"Role '{role_name}' candidate {i} ({provider}/{model}): {error}"
+                for error in haiku_config_errors(
+                    provider.removeprefix("provider-"), model, cfg, policy=True,
+                )
+            )
             for key in cfg:
                 rule = inert_config_rule(provider, model, key)
                 if rule is None:
@@ -770,6 +673,20 @@ def strip_inert_config(
         is nothing to strip the ORIGINAL object is returned, so a clean matrix
         costs no copy.
     """
+    # Unlike a known-inert Gemini key, Haiku intent is never silently removed.
+    # Patterns/instance IDs are checked later against the actual selected mount.
+    for role_data in (matrix.get("roles") or {}).values():
+        if not isinstance(role_data, dict):
+            continue
+        for candidate in role_data.get("candidates") or []:
+            if not isinstance(candidate, dict):
+                continue
+            cfg = candidate.get("config")
+            if isinstance(cfg, dict):
+                require_haiku_config(
+                    str(candidate.get("provider", "")).removeprefix("provider-"),
+                    candidate.get("model", ""), cfg, policy=True,
+                )
     errors = validate_matrix_inert_config(matrix)
     if not errors:
         return matrix, errors

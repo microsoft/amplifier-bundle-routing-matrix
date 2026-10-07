@@ -81,7 +81,7 @@
 #      now says what it wants; `medium` where nothing more specific was
 #      established. Three exceptions, all enforced by the loader rather than
 #      chosen here (matrix_loader.INERT_CONFIG_RULES):
-#        * claude-haiku-* on ANY provider -- `reasoning_effort` is REJECTED at
+#        * Historical pre-5.5 guard (superseded 2026-10-07): effort rejected at
 #          every value (measured: effort absent on the wire, budget pinned at
 #          32000). Its documented replacement is `thinking_budget_tokens`.
 #        * gemini/* -- `reasoning_effort` is REJECTED; `thinking_level` is the
@@ -96,7 +96,7 @@
 #      is one of exactly two globs -- `gpt-?.?-terra*` (work) or
 #      `gpt-?.?-luna*` (cheap/fast, and `ui-coding` at max effort). There are
 #      no openai fallback rungs left at all.
-#  10. Haiku carries `thinking_budget_tokens: 32000` instead of a blank. The
+#  10. Historical pre-5.5 note, superseded by the curator compatibility table:
 #      loader REJECTS `reasoning_effort` on any model whose name contains
 #      'haiku', under any provider -- it collapses every level above 'low'
 #      into one identical request. 32000 is what `medium` resolves to and what
@@ -125,7 +125,7 @@
 
 name: economy
 description: "Budget-first routing. Cheap tier for utility roles, mid-tier where quality matters."
-updated: "2026-10-02"
+updated: "2026-10-07"
 
 roles:
   general:
@@ -136,16 +136,8 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-haiku-*
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
+        model: claude-haiku-4-5
+        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
         config:
           thinking_budget_tokens: 32000
       - provider: gemini
@@ -158,17 +150,7 @@ roles:
               thinking_level: medium
       - provider: github-copilot
         model: claude-haiku-4.5
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
-        config:
-          thinking_budget_tokens: 32000
+        # Native Anthropic budget settings do not qualify Copilot protocol.
       - provider: ollama
         model: "*"
 
@@ -180,16 +162,8 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-haiku-*
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
+        model: claude-haiku-4-5
+        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
         config:
           thinking_budget_tokens: 32000
       - provider: gemini
@@ -202,17 +176,7 @@ roles:
               thinking_level: low
       - provider: github-copilot
         model: claude-haiku-4.5
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
-        config:
-          thinking_budget_tokens: 32000
+        # Native Anthropic budget settings do not qualify Copilot protocol.
       - provider: github-copilot
         model: gpt-6-luna
         config:
@@ -228,16 +192,8 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-haiku-*
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
+        model: claude-haiku-4-5
+        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
         config:
           thinking_budget_tokens: 32000
       - provider: gemini
@@ -248,17 +204,7 @@ roles:
               thinking_level: medium
       - provider: github-copilot
         model: claude-haiku-4.5
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
-        config:
-          thinking_budget_tokens: 32000
+        # Native Anthropic budget settings do not qualify Copilot protocol.
       - provider: ollama
         model: "*"
 
@@ -270,16 +216,8 @@ roles:
         config:
           reasoning_effort: max
       - provider: anthropic
-        model: claude-haiku-*
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
+        model: claude-haiku-4-5
+        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
         config:
           thinking_budget_tokens: 32000
       - provider: gemini
@@ -290,17 +228,7 @@ roles:
               thinking_level: medium
       - provider: github-copilot
         model: claude-haiku-4.5
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
-        config:
-          thinking_budget_tokens: 32000
+        # Native Anthropic budget settings do not qualify Copilot protocol.
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
@@ -449,32 +377,14 @@ roles:
               thinking_level: low
       - provider: github-copilot
         model: claude-haiku-4.5
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
-        config:
-          thinking_budget_tokens: 32000
+        # Native Anthropic budget settings do not qualify Copilot protocol.
       - provider: openai
         model: "gpt-[6-9]*-luna"
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-haiku-*
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
+        model: claude-haiku-4-5
+        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
         config:
           thinking_budget_tokens: 32000
 

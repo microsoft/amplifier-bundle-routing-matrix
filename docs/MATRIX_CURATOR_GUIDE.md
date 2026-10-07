@@ -233,16 +233,15 @@ Only include `config` when a candidate genuinely needs different parameters from
 > not declare passes silently and is then read by nobody. The loader now
 > rejects known-inert combinations up front (`INERT_CONFIG_RULES` in
 > `modules/hooks-routing/amplifier_module_hooks_routing/matrix_loader.py`),
-> logging an ERROR that names the key, the candidate and the replacement, and
-> removing the key from the effective matrix so nothing downstream reports it
-> as applied.
+> logging an ERROR and removing Gemini's inert key from the effective matrix.
+> Haiku's distinct concrete compatibility guard raises instead of removing intent.
 >
-> **Two rules are enforced today, and they key differently:**
+> **Two checks are enforced today, and they key differently:**
 >
 > | rule | keys on | why |
 > |---|---|---|
 > | `reasoning_effort` / `effort` on any **`gemini`** candidate | the PROVIDER | provider-gemini never reads an effort key from mount config, so *every* model it serves is affected |
-> | `reasoning_effort` / `effort` on any **`claude-haiku-*`** model | the MODEL | provider-anthropic *does* read the key, but Haiku collapses every level above `low` into one identical request |
+> | Haiku effort/manual thinking compatibility | exact MODEL and mounted BACKEND | Native 5.5 accepts effort/adaptive thinking; native 4.5 uses manual budgets. Globs defer to the actual resolved model. |
 >
 > **Gemini.** provider-gemini consumes a closed set of 15 mount-config keys
 > and no effort key is among them, so the setting is inert at *every* value.
@@ -276,12 +275,10 @@ Only include `config` when a candidate genuinely needs different parameters from
 > `minimal | low | medium | high`, and `minimal` is not universal --
 > gemini-3.8-flash errors on it. The shipped matrices use only low/medium/high.
 >
-> **Haiku.** Measured on the wire (20260901-threeknob capture root): across
-> 1,438 `claude-haiku-4-5` requests the effort parameter was absent and
-> `thinking.budget_tokens` was pinned at 32000 regardless of the effort the
-> matrix asked for, making an `high` cell and a `medium` cell byte-identical.
-> Use the dial Haiku actually reads, with the exact value the effort level
-> already resolved to (`low` → 4096, everything above → 32000):
+> **Legacy Haiku 4.5 only.** The previous wire observation (1,438 requests,
+> effort absent, budget 32000) does not establish 5.5 semantics. On qualified
+> native 4.5 use the manual-budget knob (`low` previously mapped to 4096,
+> higher effort labels to 32000), not a native effort claim:
 >
 > ```yaml
 > - provider: anthropic
@@ -299,18 +296,55 @@ Only include `config` when a candidate genuinely needs different parameters from
 > each annotated with the provider constant it was read from. Read them
 > there, and extend them there when providers add keys or values.
 
-> **A legal value is not the same as an honoured one.** Value validation is
-> *closed on values and open on keys*: it can only catch a value the provider
-> declares as invalid. It cannot catch a legal value on a model that will not
-> act on it. `reasoning_effort` on a `claude-haiku-*` candidate is the
-> measured case — Haiku collapses every level above `low` into one identical
-> request, so `anth-haiku-high` and `anth-haiku-medium` were byte-identical
-> configurations for a whole evaluation wave (n=1,438 requests, effort ABSENT
-> on the wire, `thinking.budget_tokens` pinned at 32000). The loader now
-> **rejects** those keys at mount: it logs a named ERROR and **removes the key
-> from the effective matrix**, so nothing downstream can report an effort as
-> applied that the model ignored. To move Haiku's reasoning dial, set
-> `thinking_budget_tokens` directly.
+> **A legal value is not the same as an honoured one.** Provider-wide choice
+> metadata cannot qualify a concrete model/backend. Haiku compatibility now
+> refuses incompatible explicit settings instead of erasing them; Gemini's
+> provider-wide inert-key stripping remains separate.
+
+### Haiku version and backend compatibility
+
+`haiku_compatibility.py` is the shared loader/clamp/resolver/catalog truth:
+
+| Concrete target | Effort | Manual thinking |
+| --- | --- | --- |
+| native Anthropic `claude-haiku-5-5` | `low`, `medium`, `high`, `xhigh`, `max` through provider `output_config` | budget knobs and `between_tools` refused; adaptive on by default |
+| native Anthropic `claude-haiku-4-5` / `claude-haiku-4-5-20251001` | refused; no native effort | legacy budget permitted |
+| unknown/future IDs, aliases, or unqualified backends | explicit effort refused with `haiku_compatibility_unknown` | explicit manual knobs refused with the same unknown code |
+
+An unset effort stays unset in the plan; native 5.5's medium default belongs to
+the updated provider, not routing. Literal `default`, `none` and `minimal` are
+not aliases for unset. Copilot model spelling does not establish Anthropic native
+protocol. These guards do not attest the installed provider's request encoder;
+provider/full-stack qualification is separate.
+
+Globs and arbitrary instance IDs defer loader checks until resolution supplies
+the concrete model and exact mounted-module provenance. The resolver checks the
+selected mount config after applying the same shallow preference overrides as
+Foundation. A stale inherited 32000 budget therefore cannot reach native 5.5.
+`HaikuCompatibilityError` carries a stable `code`, `model`, and `key`; it does not
+permit candidate/role fallback. Remove an incompatible custom setting explicitly
+or pin a qualified target; nothing silently clears expert/caller intent.
+
+#### October 7 shipped selection/config change
+
+With a synthetic catalog containing native 4.5, its dated snapshot and 5.5:
+
+| Matrix / roles | Before | After |
+| --- | --- | --- |
+| `anthropic` / fast | `claude-haiku-*` → 5.5 with budget 32000 | exact `claude-haiku-4-5`, budget 32000 |
+| `balanced` / fast, native fallback | same glob → 5.5 with budget 32000 | exact native 4.5, budget 32000 |
+| `economy` / general, fast, coding, ui-coding, vision, native candidates | same glob → 5.5 with budget 32000 | exact native 4.5, budget 32000 |
+| `balanced` / fast; `economy` / general, fast, coding, ui-coding, vision, Copilot candidates | exact `claude-haiku-4.5`, unqualified native budget 32000 | same exact pin, no manual-budget override |
+| `copilot` / fast | exact `claude-haiku-4.5`, no budget | same pin/config |
+
+This deliberately freezes seven broad native selections to their legacy tier.
+It is **not unchanged resolution**: older dated-only inventories formerly selected
+the snapshot; the new exact alias bypasses listing and remains unverified if absent
+from an authoritative catalog. Role order and unrelated efforts remain unchanged.
+Only the economy vision Copilot-budget entry changes in the existing fixed-roster
+golden recording; the other recorded entries remain byte-identical.
+No automatic fast-role promotion or comparative quality claim follows from the
+5.5 protocol facts. Custom exact 5.5 candidates with valid effort remain intact.
 
 ---
 
@@ -600,7 +634,7 @@ first candidate and nothing else. Real fallback needs a candidate on a
 *different* provider; the caller's `model_role` list falls back across roles,
 not across models.
 
-### `reasoning_effort` Is Validated Per Provider, Not Per Model
+### Provider choice validation is not concrete model compatibility
 
 A matrix `config.reasoning_effort` is an **operator default** — a
 caller-supplied effort wins.
@@ -608,8 +642,9 @@ caller-supplied effort wins.
 `tests/matrix_validation_rules.yaml` checks the value against a **provider-wide**
 vocabulary, keyed on `provider` alone. It cannot see whether the pinned *model*
 advertises that level, so an effort that is legal for the provider but
-unsupported by the model passes validation here and is left to the provider to
-resolve at request time.
+unsupported by the model passes that vocabulary check. The shared Haiku guard
+additionally checks concrete model/backend compatibility before returning a plan;
+other provider-specific request validation remains the provider's responsibility.
 
 That file's header also records which of those lists are provider-derived and
 which are only "the set already in use across the shipped matrices". Read the

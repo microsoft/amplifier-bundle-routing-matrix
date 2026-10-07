@@ -35,6 +35,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -184,18 +185,23 @@ def _fake_providers() -> dict[str, Any]:
 async def _snapshot() -> dict[str, dict[str, Any]]:
     """Resolve every role of every shipped matrix, with NO caller context."""
     snapshot: dict[str, dict[str, Any]] = {}
+    coordinator = SimpleNamespace(config={"providers": [
+        {"module": f"provider-{name}", "instance_id": name, "config": {}}
+        for name in FAKE_MODELS
+    ]})
     for path in sorted(ROUTING_DIR.glob("*.yaml")):
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
         roles = (data or {}).get("roles") or {}
         per_matrix: dict[str, Any] = {}
         for role in roles:
             per_matrix[role] = await resolve_model_role(
-                [role], roles, _fake_providers()
+                [role], roles, _fake_providers(), coordinator=coordinator
             )
         # The ordered-fallback contract, exercised explicitly: an unknown role
         # must fall through to the next one rather than resolve to nothing.
         per_matrix["__fallback__reasoning_then_general"] = await resolve_model_role(
-            ["nonexistent-role", "reasoning", "general"], roles, _fake_providers()
+            ["nonexistent-role", "reasoning", "general"], roles, _fake_providers(),
+            coordinator=coordinator,
         )
         snapshot[path.name] = per_matrix
     return snapshot

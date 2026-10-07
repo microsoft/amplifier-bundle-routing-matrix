@@ -1071,20 +1071,7 @@ class TestPreresolvedModelsFlow:
 
 
 class TestUnsupportedEffortRejection:
-    """mount() must reject an inert effort knob, loudly and structurally.
-
-    THE DEFECT (fail-before): `reasoning_effort: high` on a `claude-haiku-*`
-    candidate is a declared key with a legal value on an installed provider, so
-    `validate_matrix_config`'s "closed on values, OPEN on keys" contract passes
-    it (matrix_loader.py:146-154, :219-221). It then survives all the way into
-    the effective matrix, is handed to the child provider as mount config, and
-    is collapsed to nothing at request-build time because Haiku has
-    supports_output_config=False and supports_adaptive_thinking=False
-    (provider-anthropic __init__.py:1541-1550, :3024-3046). Nothing logs
-    anything. Measured consequence: anth-haiku-high (n=702) and
-    anth-haiku-medium (n=736) were byte-identical configurations for a whole
-    wave -- two of sixteen cells silently duplicated.
-    """
+    """Glob effort remains explicit; incompatible concrete legacy effort refuses."""
 
     @staticmethod
     def _haiku_effort_bundle(tmp_path: Path) -> Path:
@@ -1117,7 +1104,7 @@ class TestUnsupportedEffortRejection:
         return bundle_root
 
     @pytest.mark.asyncio
-    async def test_mount_strips_inert_effort_from_the_effective_matrix(
+    async def test_mount_preserves_glob_effort_until_concrete_resolution(
         self, tmp_path: Path
     ) -> None:
         bundle_root = self._haiku_effort_bundle(tmp_path)
@@ -1131,11 +1118,7 @@ class TestUnsupportedEffortRejection:
 
         stored = _resolver_from(coordinator)._matrix_roles
         haiku_cfg = stored["fast"]["candidates"][0]["config"]
-        assert "reasoning_effort" not in haiku_cfg, (
-            "mount() left an inert reasoning_effort on a claude-haiku-* candidate. "
-            "Haiku collapses every effort above 'low' to the same request, so this "
-            "setting is dead data that downstream consumers will report as applied."
-        )
+        assert haiku_cfg["reasoning_effort"] == "high"
         # A targeted rejection, not a purge: unrelated knobs survive...
         assert haiku_cfg["temperature"] == 1.0
         # ...and a model that DOES honour effort is untouched.
@@ -1144,24 +1127,26 @@ class TestUnsupportedEffortRejection:
         )
 
     @pytest.mark.asyncio
-    async def test_mount_logs_a_named_actionable_error(
+    async def test_mount_raises_a_named_actionable_legacy_error(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """Silent is the bug. The rejection must name key, candidate and fix."""
+        from amplifier_module_hooks_routing.haiku_compatibility import HaikuCompatibilityError
+
         bundle_root = self._haiku_effort_bundle(tmp_path)
+        path = bundle_root / "routing" / "balanced.yaml"
+        path.write_text(path.read_text().replace("claude-haiku-*", "claude-haiku-4-5"))
         coordinator = _make_coordinator(providers={"provider-anthropic": MagicMock()})
         coordinator.register_capability = MagicMock()
 
-        with caplog.at_level(logging.ERROR, logger="amplifier_module_hooks_routing"):
+        with pytest.raises(HaikuCompatibilityError) as error:
             await mount(
                 coordinator,
                 config={"default_matrix": "balanced", "_bundle_root": str(bundle_root)},
             )
 
-        blob = "\n".join(r.getMessage() for r in caplog.records)
+        blob = str(error.value)
         assert "reasoning_effort" in blob
-        assert "claude-haiku-*" in blob
-        assert "fast" in blob
+        assert "claude-haiku-4-5" in blob
         assert "REJECTED" in blob
         # actionable: names the replacement knob AND its exact value
         assert "thinking_budget_tokens" in blob

@@ -255,7 +255,8 @@ class _SnapshotCoordinator:
         self.providers = providers
         self.config = {"providers": [
             {"module": p.snapshot.module, "instance_id": key,
-             "config": {"priority": p.snapshot.priority, "default_model": p.snapshot.default_model}}
+             "config": {**thaw(p.snapshot.compatibility_config),
+                        "priority": p.snapshot.priority, "default_model": p.snapshot.default_model}}
             for key, p in providers.items()
         ]}
 

@@ -94,7 +94,8 @@ def runtime(providers, agents=None, capabilities=None, own_prefs=None):
     caps = dict(capabilities or {})
     handlers = {}
     specs = [{"module": p.module, "instance_id": p.instance_id,
-              "config": {"default_model": p.default_model, "priority": p.priority}}
+              "config": {**dict(p.compatibility_config),
+                         "default_model": p.default_model, "priority": p.priority}}
              for p in providers]
     mounted = {
         p.instance_id: SimpleNamespace(
@@ -945,3 +946,105 @@ async def test_injected_silent_reporting_preserves_glob_failure_semantics(caplog
     assert caplog.records == []
     assert await _resolve_glob("*", failed) is None
     assert any("Failed to list models" in record.getMessage() for record in caplog.records)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model,config,caller_effort,expected_error", [
+    *[("claude-haiku-5-5", {}, level, None)
+      for level in ("low", "medium", "high", "xhigh", "max", None)],
+    ("claude-haiku-5-5", {}, "default", "haiku_effort_invalid"),
+    ("claude-haiku-4-5", {}, "high", "haiku_effort_unsupported"),
+    ("claude-haiku-6-1", {}, "high", "haiku_compatibility_unknown"),
+    ("claude-haiku-latest", {}, "high", "haiku_compatibility_unknown"),
+    ("claude-haiku-5-5", {"thinking_budget_tokens": 32000}, None, "haiku_manual_thinking_forbidden"),
+    ("claude-haiku-4-5", {"thinking_budget_tokens": 32000}, None, None),
+])
+async def test_haiku_runtime_catalog_same_immutable_config_or_error(
+    tmp_path, model, config, caller_effort, expected_error,
+):
+    from amplifier_module_hooks_routing.haiku_compatibility import HaikuCompatibilityError
+
+    policy = synthetic_policy([{"provider": "anthropic", "model": "claude-haiku-*"}],
+                              preset={"delegation": {"inherit": "effort"}})
+    catalog = custom_catalog(tmp_path, policy)
+    p = provider("provider-anthropic", "synthetic-native", compatibility_config=config,
+                 config_choices={"reasoning_effort": ["low", "medium", "high", "xhigh", "max"]})
+    excluded = provider("provider-anthropic", "synthetic-excluded", priority=-100,
+                        default_model=model, compatibility_config={"thinking_budget_tokens": 32000})
+    caller = CallerContext("anthropic", model, caller_effort, p.instance_id)
+    data = inputs([p, excluded], [inventory(p, (model,), state="fresh_complete"),
+                                  inventory(excluded, (model,), state="fresh_complete")],
+                  approved=[ScopeBinding(p.module, p.instance_id, p.binding_id, p.binding_revision)],
+                  caller_context=caller)
+    # Scope admission is host-owned in runtime, so pass the identical filtered roster.
+    coord, mounted, _, _ = runtime([p])
+    mounted[p.instance_id].list_models = AsyncMock(return_value=[model])
+    effective = catalog.describe(Selection("synthetic"))["effective_policy"]
+    async def runtime_call():
+        return await resolve_model_role(
+            ["general"], effective["roles"], mounted, coordinator=coord,
+            caller_context=caller, preset=parse_preset(effective),
+            provider_module_allowlist=("provider-anthropic",),
+        )
+    if expected_error:
+        with pytest.raises(HaikuCompatibilityError) as runtime_error:
+            await runtime_call()
+        with pytest.raises(HaikuCompatibilityError) as catalog_error:
+            await catalog.assess(Selection("synthetic"), data)
+        assert runtime_error.value.code == catalog_error.value.code == expected_error
+        assert str(runtime_error.value) == str(catalog_error.value)
+    else:
+        resolved = await runtime_call()
+        spy = _ReportingSpy(raising=True)
+        logger = logging.getLogger("amplifier_module_hooks_routing.resolver")
+        logger.addHandler(spy)
+        try:
+            first = await catalog.assess(Selection("synthetic"), data)
+            second = await catalog.assess(Selection("synthetic"), data)
+        finally:
+            logger.removeHandler(spy)
+        assert first == second and spy.records == []
+        selected = role(first)["selection"]
+        assert {key: selected[key] for key in ("provider", "model", "config")} == resolved[0]
+        assert selected["instance_id"] == p.instance_id and selected["module"] == p.module
+        assert first["enforcement"]["status"] == "not_enforced" and not first["execution_ready"]
+    assert dict(data.providers[0].compatibility_config) == config
+    assert catalog.describe(Selection("synthetic"))["effective_policy"] == effective
+
+
+def test_compatibility_snapshot_is_frozen_and_rejects_account_options():
+    original = {"thinking": {"type": "enabled", "budget_tokens": 32000}}
+    p = provider("provider-anthropic", compatibility_config=original)
+    original["thinking"]["budget_tokens"] = 1
+    assert p.compatibility_config["thinking"]["budget_tokens"] == 32000
+    with pytest.raises(TypeError):
+        p.compatibility_config["thinking"]["budget_tokens"] = 1
+    with pytest.raises(ValueError, match="only effort/thinking"):
+        provider(compatibility_config={"api_key": "synthetic-not-a-key"})
+    with pytest.raises(ValueError, match="only type/mode/budget_tokens"):
+        provider(compatibility_config={"thinking": {"endpoint": "synthetic"}})
+
+
+@pytest.mark.asyncio
+async def test_custom_canonical_55_does_not_collapse_bundled_legacy_alias(tmp_path):
+    custom = custom_catalog(
+        tmp_path, synthetic_policy([{"provider": "anthropic", "model": "claude-haiku-5-5",
+                                     "config": {"reasoning_effort": "max"}}]),
+        stem="github-copilot",
+    )
+    native = provider("provider-anthropic", "synthetic-native")
+    copilot = provider("provider-github-copilot", "synthetic-copilot")
+    data = inputs([native, copilot],
+                  [inventory(native, ("claude-haiku-5-5",), state="fresh_complete"),
+                   inventory(copilot, ("claude-haiku-4.5",), state="fresh_complete")],
+                  required_roles=("fast",))
+    canonical = await custom.assess(Selection("github-copilot"), data)
+    alias = await custom.assess(Selection("copilot"), data)
+    assert canonical["matrix_id"] == "github-copilot" and alias["matrix_id"] == "copilot"
+    assert role(canonical, "fast")["selection"]["model"] == "claude-haiku-5-5"
+    assert role(canonical, "fast")["selection"]["config"] == {"reasoning_effort": "max"}
+    assert role(alias, "fast")["selection"]["model"] == "claude-haiku-4.5"
+    assert role(alias, "fast")["selection"]["config"] == {}
+    assert not canonical["execution_ready"] and not alias["execution_ready"]
+    assert custom.describe(Selection("github-copilot"))["aliases"] == []
+    assert custom.describe(Selection("copilot"))["aliases"] == []

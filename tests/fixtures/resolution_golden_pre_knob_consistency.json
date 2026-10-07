@@ -490,9 +490,7 @@
     ],
     "vision": [
       {
-        "config": {
-          "thinking_budget_tokens": 32000
-        },
+        "config": {},
         "model": "claude-haiku-4.5",
         "provider": "github-copilot"
       }

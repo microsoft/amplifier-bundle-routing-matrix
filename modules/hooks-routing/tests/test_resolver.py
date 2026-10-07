@@ -1403,6 +1403,14 @@ class TestModelIntentInstanceSelection:
         is what tool-delegate/spawn_utils resolves the child mount against."""
         providers = _tiered_providers()
         coordinator = _make_coordinator_with_provider_specs(_TIERED_ANTHROPIC_SPECS)
+        # The legacy instance must now express its actual manual-budget knob,
+        # not an unsupported effort inherited into the selected child.
+        import copy
+        coordinator.config = copy.deepcopy(coordinator.config)
+        for spec in coordinator.config["providers"]:
+            if spec.get("id") == "haiku":
+                spec["config"].pop("reasoning_effort", None)
+                spec["config"]["thinking_budget_tokens"] = 32000
         roles = {
             "fast": {
                 "description": "Fast tasks",

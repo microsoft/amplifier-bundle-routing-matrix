@@ -257,8 +257,8 @@ class TestValidatePreset:
         )
         assert any("canonical effort key" in e for e in errors)
 
-    def test_effort_on_effortless_model_rejected(self) -> None:
-        """Measured: claude-haiku-4-5 carries no effort field at all."""
+    def test_haiku_glob_effort_deferred_until_concrete_resolution(self) -> None:
+        """A glob can now resolve to native 5.5; it is not an inert key."""
         errors = validate_preset(
             _matrix(
                 {"delegation": {"inherit": "effort"}},
@@ -277,7 +277,7 @@ class TestValidatePreset:
                 },
             )
         )
-        assert any("accepts no effort parameter" in e for e in errors)
+        assert errors == []
 
     def test_session_scoped_allow_list_enforced(self) -> None:
         errors = validate_preset(
@@ -439,7 +439,7 @@ class TestPlanCandidatesEffortMode:
         )
         assert REASONING_CANDIDATES == before
 
-    def test_effort_unsupported_target_drops_the_key_and_says_so(self) -> None:
+    def test_haiku_glob_keeps_effort_for_concrete_validation(self) -> None:
         haiku = [{"provider": "anthropic", "model": "claude-haiku-*"}]
         caller = CallerContext(
             family="anthropic", model="claude-sonnet-5", effort="medium"
@@ -447,7 +447,7 @@ class TestPlanCandidatesEffortMode:
         planned, record = plan_candidates(
             "fast", haiku, caller, _preset(inherit="effort"), None
         )
-        assert CANONICAL_EFFORT_KEY not in (planned[0].get("config") or {})
+        assert planned[0]["config"][CANONICAL_EFFORT_KEY] == "medium"
         assert record is not None
         assert record.honored is False
         assert record.reason == "effort unsupported on target model"

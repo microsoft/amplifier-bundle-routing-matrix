@@ -18,6 +18,16 @@ Routing-specific evaluation configurations, scenarios, graders, reuse rules and 
 
 Preserve custom-file precedence, explicit intent, caller inheritance, exact mounted-instance provenance and failure behavior. The current `openai` matrix is API-first across API and ChatGPT; it is **not API-only**. Do not silently change saved IDs, widen account scope, invent fallback IDs, or label wildcard/template discovery verified. Catalog membership and entitlement are different evidence.
 
+Haiku compatibility is shared in `haiku_compatibility.py`, not a family-wide
+inert-key rule. Exact native Anthropic 5.5 accepts five efforts and rejects
+manual budgets/between_tools; native 4.5 retains manual budgets and rejects
+effort. Validate the concrete selected model against its exact mounted module
+and inherited mount knobs. Globs defer validation; unknown aliases/backends
+refuse explicit effort/budgets rather than stripping them or falling back.
+Shipped budget-bearing Haiku selections are pinned to 4.5, not promoted to 5.5.
+Catalog `compatibility_config` is an allowlisted immutable snapshot, never a
+copy of account config. Full-stack provider support remains a separate gate.
+
 The bounded catalog library is documented in `docs/catalog-api.md`. It reuses effective resolver semantics with snapshots and independent initial state; never pass live escalation state, reporting sinks or mutable caches to assessment. Catalog calls must not reach runtime logger handlers: preserve runtime diagnostics by explicit reporting injection, not global logger disabling. Explicit-preference assessment and next-dispatch prediction remain unsupported; broader specification examples are not executable interfaces.
 
 ## Verification

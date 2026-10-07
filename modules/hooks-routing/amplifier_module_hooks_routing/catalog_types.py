@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import Any
 
 from .knob_consistency import CallerContext
+from .haiku_compatibility import COMPATIBILITY_CONFIG_KEYS
 from .matrix_loader import validate_matrix_name
 
 CATALOG_STATES = (
@@ -124,6 +125,8 @@ class ProviderSnapshot:
     # Choice metadata only, never credentials, endpoints or mount options.
     config_choices: Mapping[str, tuple[str, ...]] | None = None
     native_capabilities: tuple[str, ...] | None = None
+    # Only model/effort/thinking compatibility inputs, never account config.
+    compatibility_config: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         ScopeBinding(self.module, self.instance_id, self.binding_id, self.binding_revision)
@@ -139,6 +142,17 @@ class ProviderSnapshot:
             }))
         if self.native_capabilities is not None:
             object.__setattr__(self, "native_capabilities", _strings(self.native_capabilities))
+        if (
+            not isinstance(self.compatibility_config, Mapping)
+            or set(self.compatibility_config) - set(COMPATIBILITY_CONFIG_KEYS)
+        ):
+            raise ValueError("compatibility_config accepts only effort/thinking keys")
+        thinking = self.compatibility_config.get("thinking")
+        if thinking is not None and (
+            not isinstance(thinking, Mapping) or set(thinking) - {"type", "mode", "budget_tokens"}
+        ):
+            raise ValueError("compatibility_config.thinking accepts only type/mode/budget_tokens")
+        object.__setattr__(self, "compatibility_config", freeze(self.compatibility_config))
 
 
 @dataclass(frozen=True)

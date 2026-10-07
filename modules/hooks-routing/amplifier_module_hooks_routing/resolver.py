@@ -9,6 +9,8 @@ import logging
 import re
 from typing import Any
 
+from .haiku_compatibility import require_haiku_config
+
 logger = logging.getLogger(__name__)
 
 
@@ -575,6 +577,31 @@ async def resolve_model_role(
                 )
             ):
                 raise NoScopedRouteError("Final provider module provenance changed during resolution")
+
+            # Foundation clones the selected mount, then shallow-updates config
+            # overrides. Check that effective config, not just the YAML knobs.
+            # Compatibility refusal is outside availability fallback handling.
+            specs = [
+                s for s in _get_provider_specs(coordinator)
+                if (s.get("instance_id") or s.get("id") or s.get("module")) == matched_name
+            ]
+            spec = specs[0] if len(specs) == 1 else None
+            mounted_config = spec.get("config", {}) if spec else {}
+            effective_config = {**mounted_config, **config}
+            # Protocol qualification is stricter than family-name matching:
+            # unknown modules/aliases cannot impersonate native Anthropic.
+            backend = "anthropic" if spec and spec.get("module") == "provider-anthropic" else None
+            require_haiku_config(backend, resolved_model, effective_config)
+            if clamp_record is not None and "haiku" in resolved_model.lower():
+                clamp_record.granted_model = resolved_model
+                clamp_record.granted_effort = effective_config.get(
+                    "reasoning_effort", effective_config.get("effort")
+                )
+                # Only resolve the effort-mode record's pending compatibility.
+                # Off-ladder/missing caller decisions remain unhonored.
+                if clamp_record.reason == "effort unsupported on target model":
+                    clamp_record.honored = True
+                    clamp_record.reason = "effort inherited; concrete Haiku compatibility checked"
 
             # Report only for the role that actually resolved -- a record for
             # a role that fell through would describe a decision nothing

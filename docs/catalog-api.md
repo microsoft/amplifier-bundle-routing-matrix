@@ -64,7 +64,7 @@ immutable; maps become recursively read-only.
 | `Selection` | `matrix_id: str`; `semantic_generation: int = 1` |
 | `ScopeBinding` | exact `module: str`, `instance_id: str`, `binding_id: str`, `binding_revision: str` |
 | `ApprovedScope` | `approval_revision: str`; `allowed: tuple[ScopeBinding, ...] = ()` |
-| `ProviderSnapshot` | binding fields above; `priority: int = 0`; `default_model: str = ""`; `availability = "unknown"`; `principal_assurance = "unknown"`; `config_choices: mapping[str, tuple[str, ...]] \| None = None`; `native_capabilities: tuple[str, ...] \| None = None` |
+| `ProviderSnapshot` | binding fields above; `priority: int = 0`; `default_model: str = ""`; `availability = "unknown"`; `principal_assurance = "unknown"`; `config_choices: mapping[str, tuple[str, ...]] \| None = None`; `native_capabilities: tuple[str, ...] \| None = None`; `compatibility_config: mapping = {}` |
 | `CatalogSnapshot` | binding fields above; `revision: str`; `state = "unknown"`; `models: tuple[str, ...] = ()`; `model_capabilities: mapping[model_id, tuple[str, ...]] \| None = None` |
 | `AssessmentInputs` | `providers`, `catalogs`, `approved_scope`, `topology_revision: str`, `catalog_revision: str`, **nonempty** `required_roles`; `optional_roles = ()`; `caller_context = None`; `explicit_preferences = None`; `role_capability_needs = {}` |
 
@@ -76,6 +76,21 @@ and catalogs are snapshots **only**, never actual provider/coordinator objects.
 No credentials, endpoints, mount arguments, arbitrary provider options or
 enforcement claims belong in these inputs. `config_choices` is safe choice
 metadata, not configured account values.
+
+`compatibility_config` is a narrow optional snapshot of inherited effort/thinking
+knobs for concrete Haiku checks, **not the account mount config**. Its allowlist is
+`effort`, `reasoning_effort`, `thinking_budget_tokens`, `thinking_budget`,
+`budget_tokens`, `thinking`, `thinking_mode`, `thinking_type`, `between_tools`.
+Nested `thinking` accepts only `type`, `mode`, `budget_tokens`; extra keys refuse.
+Values are copied/frozen and no default is synthesized. Supply the same relevant
+inherited knobs that runtime will clone; omission describes no supplied knobs,
+not proof about a live mount. Never copy credentials or arbitrary account options.
+
+Both preparation (exact known policy targets) and assessment (actual resolved
+target/mounted module) can raise `HaikuCompatibilityError`. Its `code`, `model`,
+and `key` match runtime refusal; it is not converted to a fallback route. Globs
+and arbitrary instance policy IDs defer validation to concrete resolution.
+Assessment never disables global logging or calls a provider transport.
 
 Enums:
 
@@ -227,8 +242,10 @@ ruff check .
 
 `tests/test_catalog_v1.py` covers pure operations, source/custom alias lineage,
 versions, immutability, scope exclusions, snapshot evidence, discovery labels and
-mount/resolver/lifecycle parity. The original eight golden entries and policy
-files remain untouched. Model catalog audit honors exact profiles: an API-only
+mount/resolver/lifecycle parity. The later Haiku compatibility update changes
+seven native selections and removes six unqualified Copilot budgets; only the
+economy vision budget entry changes in the original fixed-roster golden file.
+Model catalog audit honors exact profiles: an API-only
 catalog check does not claim ChatGPT-profile coverage.
 
 Independent isolation verification and source/privacy review are recorded in
