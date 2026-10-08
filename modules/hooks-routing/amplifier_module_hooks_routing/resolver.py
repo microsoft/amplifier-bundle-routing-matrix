@@ -9,7 +9,8 @@ import logging
 import re
 from typing import Any
 
-from .haiku_compatibility import require_haiku_config
+from .haiku_compatibility import effective_haiku_effort, is_haiku, require_haiku_config
+from .matrix_loader import inert_config_rule
 
 logger = logging.getLogger(__name__)
 
@@ -588,20 +589,58 @@ async def resolve_model_role(
             spec = specs[0] if len(specs) == 1 else None
             mounted_config = spec.get("config", {}) if spec else {}
             effective_config = {**mounted_config, **config}
+            if (
+                is_haiku(resolved_model) and clamp_record is not None
+                and not clamp_record.escalated
+                and (clamp_record.honored or clamp_record.reason == "effort unsupported on target model")
+                and caller_context is not None and caller_context.effort is not None
+                and config.get("reasoning_effort") == caller_context.effort
+            ):
+                # Inherited expert settings survive Foundation's shallow clone.
+                # Complete caller clamping on the actual selected model/config,
+                # not a policy pattern. Do not resurrect replaced branches.
+                extra = effective_config.get("extra_request_params")
+                output = extra.get("output_config") if isinstance(extra, dict) else None
+                if isinstance(output, dict) and output.get("effort") is not None:
+                    config = {**config, "extra_request_params": {
+                        **extra, "output_config": {**output, "effort": caller_context.effort},
+                    }}
+                    effective_config = {**mounted_config, **config}
             # Protocol qualification is stricter than family-name matching:
             # unknown modules/aliases cannot impersonate native Anthropic.
             backend = "anthropic" if spec and spec.get("module") == "provider-anthropic" else None
             require_haiku_config(backend, resolved_model, effective_config)
+            # Complete deferred provider-wide guards only with exact module
+            # provenance. Policy keys/globs were not backend evidence.
+            module = spec.get("module", "") if spec else ""
+            qualified_backend = module.removeprefix("provider-") if module.startswith("provider-") else ""
+            for key, value in effective_config.items():
+                rule = inert_config_rule(qualified_backend, resolved_model, key, qualified=True)
+                if rule is None or value is None:
+                    continue
+                config = dict(config)
+                if mounted_config.get(key) is not None:
+                    config[key] = None  # clear the cloned inherited inert knob
+                else:
+                    config.pop(key, None)
+                if report_logs:
+                    logger.error("%s REJECTED — %s %s", key, rule.reason,
+                                 rule.remediation(resolved_model, value))
             if clamp_record is not None and "haiku" in resolved_model.lower():
                 clamp_record.granted_model = resolved_model
-                clamp_record.granted_effort = effective_config.get(
-                    "reasoning_effort", effective_config.get("effort")
-                )
+                clamp_record.granted_effort = effective_haiku_effort(effective_config)
                 # Only resolve the effort-mode record's pending compatibility.
                 # Off-ladder/missing caller decisions remain unhonored.
                 if clamp_record.reason == "effort unsupported on target model":
                     clamp_record.honored = True
                     clamp_record.reason = "effort inherited; concrete Haiku compatibility checked"
+                if (
+                    clamp_record.honored and not clamp_record.escalated
+                    and caller_context is not None and caller_context.effort is not None
+                    and clamp_record.granted_effort != caller_context.effort
+                ):
+                    clamp_record.honored = False
+                    clamp_record.reason = "explicit expert output_config clears inherited effort"
 
             # Report only for the role that actually resolved -- a record for
             # a role that fell through would describe a decision nothing

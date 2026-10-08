@@ -566,7 +566,9 @@ INERT_CONFIG_RULES: tuple[InertKeyRule, ...] = (
 )
 
 
-def inert_config_rule(provider: str, model: str, key: str) -> InertKeyRule | None:
+def inert_config_rule(
+    provider: str, model: str, key: str, *, qualified: bool = False,
+) -> InertKeyRule | None:
     """Return the rule making ``key`` inert for this candidate, or ``None``.
 
     Args:
@@ -581,7 +583,7 @@ def inert_config_rule(provider: str, model: str, key: str) -> InertKeyRule | Non
     """
     if not isinstance(provider, str) or not isinstance(key, str):
         return None
-    if may_select_haiku(model):
+    if not qualified and may_select_haiku(model):
         # A policy provider string can be an arbitrary instance ID. Preserve
         # Haiku intent until its actual model/module compatibility is known.
         return None

@@ -149,9 +149,25 @@ class ProviderSnapshot:
             raise ValueError("compatibility_config accepts only effort/thinking keys")
         thinking = self.compatibility_config.get("thinking")
         if thinking is not None and (
-            not isinstance(thinking, Mapping) or set(thinking) - {"type", "mode", "budget_tokens"}
+            not isinstance(thinking, (str, Mapping))
+            or isinstance(thinking, Mapping) and set(thinking) - {"type", "mode", "budget_tokens"}
         ):
             raise ValueError("compatibility_config.thinking accepts only type/mode/budget_tokens")
+        extra = self.compatibility_config.get("extra_request_params")
+        if extra is not None:
+            if not isinstance(extra, Mapping) or set(extra) - {"thinking", "output_config"}:
+                raise ValueError("compatibility_config.extra_request_params accepts only thinking/output_config")
+            thinking = extra.get("thinking")
+            if thinking is not None and (
+                not isinstance(thinking, (str, Mapping))
+                or isinstance(thinking, Mapping) and set(thinking) - {"type", "mode", "budget_tokens"}
+            ):
+                raise ValueError("extra_request_params.thinking accepts only type/mode/budget_tokens")
+            output = extra.get("output_config")
+            if output is not None and (
+                not isinstance(output, Mapping) or set(output) - {"effort"}
+            ):
+                raise ValueError("extra_request_params.output_config accepts only effort")
         object.__setattr__(self, "compatibility_config", freeze(self.compatibility_config))
 
 

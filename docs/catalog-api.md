@@ -80,8 +80,11 @@ metadata, not configured account values.
 `compatibility_config` is a narrow optional snapshot of inherited effort/thinking
 knobs for concrete Haiku checks, **not the account mount config**. Its allowlist is
 `effort`, `reasoning_effort`, `thinking_budget_tokens`, `thinking_budget`,
-`budget_tokens`, `thinking`, `thinking_mode`, `thinking_type`, `between_tools`.
-Nested `thinking` accepts only `type`, `mode`, `budget_tokens`; extra keys refuse.
+`budget_tokens`, `thinking`, `thinking_mode`, `thinking_type`, `between_tools`,
+`extended_thinking`, `extra_request_params`. `thinking` may be a scalar mode or
+a mapping with only `type`, `mode`, `budget_tokens`. `extra_request_params` accepts
+only `thinking` (the same shape) and `output_config` (only `effort`); extra keys
+refuse at every nested level. `None` retains explicit clear semantics.
 Values are copied/frozen and no default is synthesized. Supply the same relevant
 inherited knobs that runtime will clone; omission describes no supplied knobs,
 not proof about a live mount. Never copy credentials or arbitrary account options.
@@ -91,6 +94,15 @@ target/mounted module) can raise `HaikuCompatibilityError`. Its `code`, `model`,
 and `key` match runtime refusal; it is not converted to a fallback route. Globs
 and arbitrary instance policy IDs defer validation to concrete resolution.
 Assessment never disables global logging or calls a provider transport.
+
+Native-config choice evidence uses supplied inherited knobs after the same
+shallow preference merge as Foundation, not just the returned override map.
+Nested choice metadata uses dotted paths such as
+`extra_request_params.output_config.effort`. Every non-`None` effective value
+needs matching metadata to be verified; absent/empty choice lists stay unknown,
+mismatched choices are incompatible. Empty objects are not verified absence,
+and colliding literal dotted keys cannot conceal a nested value. This is
+snapshot choice evidence, not proof of request encoding or account entitlement.
 
 Enums:
 

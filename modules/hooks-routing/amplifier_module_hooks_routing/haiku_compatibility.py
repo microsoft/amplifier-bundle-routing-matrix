@@ -23,6 +23,8 @@ COMPATIBILITY_CONFIG_KEYS = (
     "thinking_mode",
     "thinking_type",
     "between_tools",
+    "extended_thinking",
+    "extra_request_params",
 )
 
 
@@ -62,6 +64,15 @@ def haiku_effort_support(model: str, backend: str | None) -> bool | None:
     return None
 
 
+def effective_haiku_effort(config: Mapping[str, Any]) -> Any:
+    """Expert output_config replaces computed output_config, including clears."""
+    extra = config.get("extra_request_params")
+    if isinstance(extra, Mapping) and "output_config" in extra:
+        output = extra["output_config"]
+        return output.get("effort") if isinstance(output, Mapping) else None
+    return config.get("reasoning_effort") if config.get("reasoning_effort") is not None else config.get("effort")
+
+
 def haiku_config_errors(
     backend: str | None,
     model: Any,
@@ -81,24 +92,36 @@ def haiku_config_errors(
         or backend not in ("anthropic", "github-copilot", "gemini", "openai")
     ):
         return []
+    if policy:
+        # Policy handles (even "gemini") can name any mounted module. Check
+        # only the bounded native model rules here, not backend qualification.
+        # Actual selection must still qualify the exact mount independently.
+        backend = "anthropic"
 
-    efforts = [key for key in EFFORT_KEYS if config.get(key) is not None]
+    efforts = {key: config[key] for key in EFFORT_KEYS if config.get(key) is not None}
+    extra = config.get("extra_request_params")
+    extra = extra if isinstance(extra, Mapping) else {}
+    output = extra.get("output_config")
+    if isinstance(output, Mapping) and output.get("effort") is not None:
+        efforts["extra_request_params.output_config.effort"] = output["effort"]
     manual = [
         key
         for key in ("thinking_budget_tokens", "thinking_budget", "budget_tokens")
         if config.get(key) is not None
     ]
-    thinking = config.get("thinking")
-    if isinstance(thinking, Mapping) and (
-        thinking.get("budget_tokens") is not None
-        or thinking.get("type") in ("enabled", "between_tools")
-        or thinking.get("mode") == "between_tools"
-    ):
-        manual.append("thinking")
+    for key, thinking in (("thinking", config.get("thinking")),
+                          ("extra_request_params.thinking", extra.get("thinking"))):
+        if isinstance(thinking, Mapping):
+            if (thinking.get("budget_tokens") is not None
+                    or thinking.get("type") in ("enabled", "between_tools")
+                    or thinking.get("mode") == "between_tools"):
+                manual.append(key)
+        elif thinking in ("enabled", "between_tools"):
+            manual.append(key)
     manual.extend(
         key
         for key in ("thinking_mode", "thinking_type", "between_tools")
-        if config.get(key) == "between_tools"
+        if config.get(key) in ("enabled", "between_tools")
         or (key == "between_tools" and config.get(key) is not None)
     )
     if not efforts and not manual:
@@ -106,9 +129,9 @@ def haiku_config_errors(
 
     support = haiku_effort_support(model, backend)
     errors = []
-    for key in efforts:
+    for key, effort in efforts.items():
         if support is False:
-            budget = 4096 if config[key] == "low" else 32000
+            budget = 4096 if effort == "low" else 32000
             advice = (
                 f"Haiku 4.5 has no native effort. Use thinking_budget_tokens: {budget} "
                 "only on qualified native Anthropic 4.5, or explicitly select native 5.5."
@@ -123,7 +146,7 @@ def haiku_config_errors(
                     "Pin a qualified exact model/backend; no future ID or alias support is inferred.",
                 )
             )
-        elif config[key] not in HAIKU_55_EFFORTS:
+        elif effort not in HAIKU_55_EFFORTS:
             errors.append(
                 HaikuCompatibilityError(
                     "haiku_effort_invalid",
@@ -147,6 +170,22 @@ def haiku_config_errors(
                 "adaptive thinking; manual budgets are qualified only for native Anthropic 4.5.",
             )
         )
+    # The transport escape hatch wins over computed thinking/output_config.
+    thinking = extra.get("thinking", config.get("thinking"))
+    disabled = (
+        thinking == "disabled"
+        or isinstance(thinking, Mapping) and thinking.get("type") == "disabled"
+        or config.get("thinking_type") == "disabled"
+        or config.get("thinking_mode") == "disabled"
+        or config.get("extended_thinking") is False
+    )
+    effective_effort = effective_haiku_effort(config)
+    if support is True and disabled and effective_effort in ("xhigh", "max"):
+        errors.append(HaikuCompatibilityError(
+            "haiku_disabled_thinking_effort", model, "thinking",
+            "Remove explicit thinking disable or use low, medium, high; "
+            "xhigh/max require adaptive thinking on native 5.5.",
+        ))
     return errors
 
 

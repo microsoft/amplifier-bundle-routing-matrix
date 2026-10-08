@@ -27,6 +27,11 @@ refuse explicit effort/budgets rather than stripping them or falling back.
 Shipped budget-bearing Haiku selections are pinned to 4.5, not promoted to 5.5.
 Catalog `compatibility_config` is an allowlisted immutable snapshot, never a
 copy of account config. Full-stack provider support remains a separate gate.
+Choice evidence checks inherited plus shallow-overridden knobs, including the
+allowlisted expert thinking/output-effort paths; missing metadata stays unknown.
+Policy instance names are not backend proof. Finish deferred Gemini inert-key
+checks after concrete selection, and clamp inherited expert effort without
+resurrecting branches explicitly replaced or cleared by a preference.
 
 The bounded catalog library is documented in `docs/catalog-api.md`. It reuses effective resolver semantics with snapshots and independent initial state; never pass live escalation state, reporting sinks or mutable caches to assessment. Catalog calls must not reach runtime logger handlers: preserve runtime diagnostics by explicit reporting injection, not global logger disabling. Explicit-preference assessment and next-dispatch prediction remain unsupported; broader specification examples are not executable interfaces.
 

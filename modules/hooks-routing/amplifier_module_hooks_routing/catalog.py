@@ -32,6 +32,20 @@ _UNSUPPORTED_PATHS = (
 )
 
 
+def _choice_values(config: Mapping, prefix: str = "") -> list[tuple[str, Any]]:
+    """Choice evidence for supplied effective knobs; None explicitly clears."""
+    values = []
+    for key, value in config.items():
+        path = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, Mapping) and value:
+            # Keep every structural value, even when a literal dotted key
+            # collides with a nested path. Neither may conceal the other.
+            values.extend(_choice_values(value, path))
+        elif value is not None:
+            values.append((path, value))
+    return values
+
+
 @dataclass(frozen=True)
 class PreparedCatalogSources:
     entries: Mapping[str, Any]
@@ -395,12 +409,14 @@ class RoutingCatalogV1:
                         if compatible != "incompatible":
                             compatible = "unknown"
                         reasons.append("preferred_candidate_uncertain")
-                    config = selected["config"]
+                    config = _choice_values({
+                        **thaw(provider.compatibility_config), **selected["config"],
+                    })
                     choices = provider.config_choices
-                    config_known = all(choices is not None and key in choices and choices[key] for key in config)
+                    config_known = all(choices is not None and key in choices and choices[key] for key, _ in config)
                     invalid_config = any(
                         choices is not None and key in choices and choices[key]
-                        and str(value) not in choices[key] for key, value in config.items()
+                        and str(value) not in choices[key] for key, value in config
                     )
                     report["native_config_evidence"] = "incompatible" if invalid_config else "verified" if config_known else "unknown"
                     if invalid_config:

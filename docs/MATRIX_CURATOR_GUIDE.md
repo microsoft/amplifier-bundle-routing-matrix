@@ -317,10 +317,22 @@ not aliases for unset. Copilot model spelling does not establish Anthropic nativ
 protocol. These guards do not attest the installed provider's request encoder;
 provider/full-stack qualification is separate.
 
+The guard checks scalar thinking modes and the expert
+`extra_request_params.thinking` / `extra_request_params.output_config.effort`
+encoders as well as scalar effort/budget knobs. Explicit thinking disable with
+`xhigh`/`max` is refused on native 5.5; `None` clears remain distinct from literal
+`default`/`none`. Caller inheritance also clones an effective expert effort
+override after concrete selection; it does not deep-merge a branch the preference
+replaced. An explicit expert output-config clear is reported as unhonored effort,
+not a false applied-effort claim.
+
 Globs and arbitrary instance IDs defer loader checks until resolution supplies
 the concrete model and exact mounted-module provenance. The resolver checks the
 selected mount config after applying the same shallow preference overrides as
 Foundation. A stale inherited 32000 budget therefore cannot reach native 5.5.
+Even a policy handle named `gemini` can identify a native Anthropic mount:
+loader model checks are not backend proof. Deferred generic globs finish
+applicable Gemini inert-key stripping after actual module/model resolution.
 `HaikuCompatibilityError` carries a stable `code`, `model`, and `key`; it does not
 permit candidate/role fallback. Remove an incompatible custom setting explicitly
 or pin a qualified target; nothing silently clears expert/caller intent.

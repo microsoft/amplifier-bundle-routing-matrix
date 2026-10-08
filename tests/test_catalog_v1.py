@@ -1025,6 +1025,305 @@ def test_compatibility_snapshot_is_frozen_and_rejects_account_options():
         provider(compatibility_config={"thinking": {"endpoint": "synthetic"}})
 
 
+async def concrete_host(p, config):
+    """Actual Core coordinator, fabricated mount, and no catalog transport."""
+    from amplifier_core import AmplifierSession
+
+    session = AmplifierSession({
+        "session": {"context": {"module": "context-simple"},
+                    "orchestrator": {"module": "loop-streaming"}},
+        "providers": [{"module": p.module, "instance_id": p.instance_id,
+                       "config": copy.deepcopy(config)}],
+    })
+    mounted = SimpleNamespace(list_models=AsyncMock(side_effect=AssertionError("transport")))
+    await session.coordinator.mount("providers", mounted, name=p.instance_id)
+    return session.coordinator, session.coordinator.get("providers")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("choices,overrides,expected", [
+    (None, {}, "unknown"),
+    ({"reasoning_effort": ["low"]}, {}, "incompatible"),
+    ({"reasoning_effort": ["high"]}, {}, "verified"),
+    ({"reasoning_effort": ["low"]}, {"reasoning_effort": "low"}, "verified"),
+    (None, {"reasoning_effort": None}, "verified"),
+])
+async def test_effective_inherited_choice_evidence(tmp_path, choices, overrides, expected):
+    p = provider("provider-anthropic", "synthetic-native",
+                 compatibility_config={"reasoning_effort": "high"}, config_choices=choices)
+    catalog = custom_catalog(tmp_path, synthetic_policy([
+        {"provider": p.instance_id, "model": "claude-haiku-5-5", "config": overrides},
+    ]))
+    data = inputs([p], [inventory(p, ("claude-haiku-5-5",), state="fresh_complete")])
+    coord, mounted = await concrete_host(p, dict(p.compatibility_config))
+    effective = catalog.describe(Selection("synthetic"))["effective_policy"]
+    resolved = await resolve_model_role(["general"], effective["roles"], mounted, coordinator=coord)
+    first = await catalog.assess(Selection("synthetic"), data)
+    assert first == await catalog.assess(Selection("synthetic"), data)
+    assert role(first)["native_config_evidence"] == expected
+    assert first["compatibility"] == expected
+    assert {k: role(first)["selection"][k] for k in resolved[0]} == resolved[0]
+    assert resolved[0]["config"] == overrides
+    assert dict(p.compatibility_config) == {"reasoning_effort": "high"}
+    assert first["enforcement"]["status"] == "not_enforced" and not first["execution_ready"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("pattern", ["*", "claude-*", "claude-haiku-*", "claude-haiku-5-5"])
+@pytest.mark.parametrize("module,model,expected", [
+    ("provider-anthropic", "claude-haiku-5-5", {"reasoning_effort": "high"}),
+    ("provider-gemini", "gemini-3.8-flash", {}),
+    ("provider-gemini", "claude-haiku-5-5", "haiku_compatibility_unknown"),
+])
+async def test_concrete_module_finishes_deferred_policy_checks(tmp_path, pattern, module, model, expected):
+    if module == "provider-gemini" and model == "gemini-3.8-flash" and pattern != "*":
+        pattern = "gemini-3.8-flash"
+    p = provider(module, "gemini", config_choices={"reasoning_effort": ["high"]})
+    raw = synthetic_policy([{"provider": p.instance_id, "model": pattern,
+                             "config": {"reasoning_effort": "high"}}])
+    before = copy.deepcopy(raw)
+    effective, _, _ = compose_effective_matrix(raw)
+    assert raw == before
+    catalog = custom_catalog(tmp_path, raw)
+    coord, mounted = await concrete_host(p, {})
+    coord.register_capability("provider.check_available", lambda _: None)
+    data = inputs([p], [inventory(p, (model,), state="fresh_complete")])
+    async def runtime_call():
+        return await resolve_model_role(
+            ["general"], effective["roles"], mounted, coordinator=coord,
+            preresolved_models={p.instance_id: [model]}, provider_module_allowlist=(module,),
+        )
+    if isinstance(expected, str):
+        from amplifier_module_hooks_routing.haiku_compatibility import HaikuCompatibilityError
+        with pytest.raises(HaikuCompatibilityError) as runtime_error:
+            await runtime_call()
+        with pytest.raises(HaikuCompatibilityError) as catalog_error:
+            await catalog.assess(Selection("synthetic"), data)
+        assert runtime_error.value.code == catalog_error.value.code == expected
+    else:
+        resolved = await runtime_call()
+        report = await catalog.assess(Selection("synthetic"), data)
+        assert resolved[0]["config"] == expected
+        assert {k: role(report)["selection"][k] for k in resolved[0]} == resolved[0]
+    mounted[p.instance_id].list_models.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("override", [False, True])
+@pytest.mark.parametrize("model,knobs,code", [
+    ("claude-haiku-5-5", {"thinking": "enabled"}, "haiku_manual_thinking_forbidden"),
+    ("claude-haiku-5-5", {"thinking": "between_tools"}, "haiku_manual_thinking_forbidden"),
+    ("claude-haiku-5-5", {"thinking_type": "enabled"}, "haiku_manual_thinking_forbidden"),
+    ("claude-haiku-5-5", {"extra_request_params": {
+        "thinking": {"type": "enabled", "budget_tokens": 4096}}},
+     "haiku_manual_thinking_forbidden"),
+    ("claude-haiku-5-5", {"extra_request_params": {"thinking": {"type": "between_tools"}}},
+     "haiku_manual_thinking_forbidden"),
+    ("claude-haiku-5-5", {"extra_request_params": {"output_config": {"effort": "default"}}},
+     "haiku_effort_invalid"),
+    ("claude-haiku-5-5", {"extra_request_params": {
+        "thinking": {"type": "disabled"}, "output_config": {"effort": "max"}}},
+     "haiku_disabled_thinking_effort"),
+    ("claude-haiku-5-5", {"thinking": "disabled", "reasoning_effort": "xhigh"},
+     "haiku_disabled_thinking_effort"),
+    ("claude-haiku-4-5", {"extra_request_params": {"output_config": {"effort": "low"}}},
+     "haiku_effort_unsupported"),
+    ("claude-haiku-4-5", {"extra_request_params": {
+        "thinking": {"type": "enabled", "budget_tokens": 4096}}}, None),
+    ("claude-haiku-5-5", {"extra_request_params": {
+        "thinking": {"type": "adaptive"}, "output_config": {"effort": "high"}}}, None),
+    ("claude-haiku-5-5", {"thinking": None, "reasoning_effort": None}, None),
+])
+async def test_supported_encoders_runtime_catalog_parity(tmp_path, override, model, knobs, code):
+    from amplifier_foundation.spawn_utils import ProviderPreference, apply_provider_preferences
+    from amplifier_module_hooks_routing.haiku_compatibility import HaikuCompatibilityError
+
+    inherited, config = ({}, knobs) if override else (knobs, {})
+    p = provider("provider-anthropic", "synthetic-native", compatibility_config=inherited)
+    # Arbitrary IDs and globs do not pretend to know the concrete backend at load.
+    catalog = custom_catalog(tmp_path, synthetic_policy([
+        {"provider": p.instance_id, "model": "claude-haiku-*", "config": config},
+    ]))
+    coord, mounted = await concrete_host(p, inherited)
+    before = copy.deepcopy(coord.config)
+    effective = catalog.describe(Selection("synthetic"))["effective_policy"]
+    data = inputs([p], [inventory(p, (model,), state="fresh_complete")])
+    async def runtime_call():
+        return await resolve_model_role(
+            ["general"], effective["roles"], mounted, coordinator=coord,
+            preresolved_models={p.instance_id: [model]},
+        )
+    if code:
+        with pytest.raises(HaikuCompatibilityError) as runtime_error:
+            await runtime_call()
+        with pytest.raises(HaikuCompatibilityError) as catalog_error:
+            await catalog.assess(Selection("synthetic"), data)
+        assert runtime_error.value.code == catalog_error.value.code == code
+        assert str(runtime_error.value) == str(catalog_error.value)
+    else:
+        selected = await runtime_call()
+        report = await catalog.assess(Selection("synthetic"), data)
+        assert {k: role(report)["selection"][k] for k in selected[0]} == selected[0]
+        child = apply_provider_preferences(coord.config, [ProviderPreference(**selected[0])])
+        assert child["providers"][0]["config"] == {
+            **inherited, **config, "default_model": model, "priority": 0,
+        }
+        if any(v is not None for v in knobs.values()):
+            assert role(report)["native_config_evidence"] == "unknown"
+    assert coord.config == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("pattern", ["*", "claude-*", "claude-haiku-*", "claude-haiku-5-5"])
+@pytest.mark.parametrize("inherited", [False, True])
+async def test_caller_effort_clones_nested_expert_override(tmp_path, pattern, inherited):
+    from amplifier_foundation.spawn_utils import ProviderPreference, apply_provider_preferences
+
+    knobs = {"extra_request_params": {"output_config": {"effort": "max"},
+                                     "thinking": {"type": "adaptive"}}}
+    raw = synthetic_policy([{"provider": "anthropic", "model": pattern,
+                             "config": {} if inherited else knobs}],
+                           preset={"delegation": {"inherit": "effort"}})
+    catalog = custom_catalog(tmp_path, raw)
+    effective = catalog.describe(Selection("synthetic"))["effective_policy"]
+    before = copy.deepcopy(effective)
+    p = provider("provider-anthropic", "synthetic-native",
+                 compatibility_config=knobs if inherited else {})
+    coord, mounted = await concrete_host(p, knobs if inherited else {})
+    caller = CallerContext("anthropic", "claude-haiku-5-5", "low", p.instance_id)
+    data = inputs([p], [inventory(p, (caller.model,), state="fresh_complete")], caller_context=caller)
+    selected = await resolve_model_role(
+        ["general"], effective["roles"], mounted, coordinator=coord,
+        preresolved_models={p.instance_id: [caller.model]}, caller_context=caller,
+        preset=parse_preset(effective),
+    )
+    report = await catalog.assess(Selection("synthetic"), data)
+    assert {k: role(report)["selection"][k] for k in selected[0]} == selected[0]
+    child = apply_provider_preferences(coord.config, [ProviderPreference(**selected[0])])
+    cfg = child["providers"][0]["config"]
+    assert cfg["reasoning_effort"] == cfg["extra_request_params"]["output_config"]["effort"] == "low"
+    assert effective == before
+    assert raw["roles"]["general"]["candidates"][0]["config"] == ({} if inherited else knobs)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("config,choices,expected", [
+    ({"extra_request_params": {"thinking": {}}}, None, "unknown"),
+    ({"unadvertised-knob": {}}, None, "unknown"),
+    ({"extra_request_params": {"output_config": {"effort": "max"}},
+      "extra_request_params.output_config.effort": "low"},
+     {"extra_request_params.output_config.effort": ["low"]}, "incompatible"),
+])
+async def test_choice_evidence_keeps_empty_objects_and_colliding_paths(tmp_path, config, choices, expected):
+    catalog = custom_catalog(tmp_path, synthetic_policy([
+        {"provider": "anthropic", "model": "claude-haiku-5-5", "config": config},
+    ]))
+    p = provider("provider-anthropic", config_choices=choices)
+    data = inputs([p], [inventory(p, ("claude-haiku-5-5",), state="fresh_complete")])
+    report = await catalog.assess(Selection("synthetic"), data)
+    assert role(report)["native_config_evidence"] == report["compatibility"] == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh", "max", None])
+async def test_nested_effort_choice_requires_actual_matching_metadata(tmp_path, effort):
+    knobs = {"extra_request_params": {"output_config": {"effort": effort}}}
+    p = provider("provider-anthropic", compatibility_config=knobs,
+                 config_choices={"extra_request_params.output_config.effort": ["low"]})
+    catalog = custom_catalog(tmp_path, synthetic_policy([
+        {"provider": p.instance_id, "model": "claude-haiku-5-5"},
+    ]))
+    data = inputs([p], [inventory(p, ("claude-haiku-5-5",), state="fresh_complete")])
+    coord, mounted = await concrete_host(p, knobs)
+    policy = catalog.describe(Selection("synthetic"))["effective_policy"]
+    selected = await resolve_model_role(["general"], policy["roles"], mounted, coordinator=coord)
+    report = await catalog.assess(Selection("synthetic"), data)
+    assert role(report)["native_config_evidence"] == (
+        "verified" if effort in ("low", None) else "incompatible"
+    )
+    assert {k: role(report)["selection"][k] for k in selected[0]} == selected[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("override", [
+    {"extra_request_params": None},
+    {"extra_request_params": {}},
+    {"extra_request_params": {"thinking": {"type": "adaptive"}}},
+    {"extra_request_params": {"thinking": None}},
+])
+async def test_expert_override_is_shallow_and_clear_is_not_resurrected(tmp_path, override):
+    from amplifier_foundation.spawn_utils import ProviderPreference, apply_provider_preferences
+
+    inherited = {"extra_request_params": {
+        "thinking": {"type": "enabled", "budget_tokens": 4096}, "output_config": {"effort": "max"},
+    }}
+    p = provider("provider-anthropic", compatibility_config=inherited)
+    catalog = custom_catalog(tmp_path, synthetic_policy([
+        {"provider": p.instance_id, "model": "claude-haiku-5-5", "config": override},
+    ]))
+    data = inputs([p], [inventory(p, ("claude-haiku-5-5",), state="fresh_complete")])
+    coord, mounted = await concrete_host(p, inherited)
+    policy = catalog.describe(Selection("synthetic"))["effective_policy"]
+    selected = await resolve_model_role(["general"], policy["roles"], mounted, coordinator=coord)
+    report = await catalog.assess(Selection("synthetic"), data)
+    child = apply_provider_preferences(coord.config, [ProviderPreference(**selected[0])])
+    assert child["providers"][0]["config"]["extra_request_params"] == override["extra_request_params"]
+    assert {k: role(report)["selection"][k] for k in selected[0]} == selected[0]
+    assert dict(p.compatibility_config["extra_request_params"]["thinking"]) == inherited["extra_request_params"]["thinking"]
+
+
+def test_nested_compatibility_snapshot_allowlist_and_immutability():
+    knobs = {"extra_request_params": {"thinking": {"type": "adaptive"},
+                                     "output_config": {"effort": "high"}}}
+    p = provider("provider-anthropic", compatibility_config=knobs)
+    knobs["extra_request_params"]["output_config"]["effort"] = "low"
+    assert p.compatibility_config["extra_request_params"]["output_config"]["effort"] == "high"
+    with pytest.raises(TypeError):
+        p.compatibility_config["extra_request_params"]["thinking"]["type"] = "disabled"
+    for value in (
+        {"extra_request_params": {"endpoint": "synthetic"}},
+        {"extra_request_params": {"thinking": {"endpoint": "synthetic"}}},
+        {"extra_request_params": {"output_config": {"endpoint": "synthetic"}}},
+    ):
+        with pytest.raises(ValueError, match="accepts only"):
+            provider(compatibility_config=value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("clear", [None, {}, {"effort": None}])
+@pytest.mark.parametrize("inherited", [False, True])
+@pytest.mark.parametrize("effort", ["low", "max"])
+async def test_caller_does_not_resurrect_expert_effort_clear(tmp_path, clear, inherited, effort):
+    from amplifier_foundation.spawn_utils import ProviderPreference, apply_provider_preferences
+
+    knobs = {"extra_request_params": {"output_config": clear, "thinking": {"type": "disabled"}}}
+    raw = synthetic_policy([
+        {"provider": "anthropic", "model": "claude-haiku-*", "config": {} if inherited else knobs},
+    ], preset={"delegation": {"inherit": "effort"}})
+    catalog = custom_catalog(tmp_path, raw)
+    p = provider("provider-anthropic", compatibility_config=knobs if inherited else {})
+    coord, mounted = await concrete_host(p, knobs if inherited else {})
+    before = copy.deepcopy(coord.config)
+    policy = catalog.describe(Selection("synthetic"))["effective_policy"]
+    caller = CallerContext("anthropic", "claude-haiku-5-5", effort, p.instance_id)
+    records = []
+    async def record(value):
+        records.append(value)
+    selected = await resolve_model_role(
+        ["general"], policy["roles"], mounted, coordinator=coord,
+        preresolved_models={p.instance_id: [caller.model]}, caller_context=caller,
+        preset=parse_preset(policy), on_clamp=record,
+    )
+    child = apply_provider_preferences(coord.config, [ProviderPreference(**selected[0])])
+    assert child["providers"][0]["config"]["extra_request_params"]["output_config"] == clear
+    assert records[0].granted_effort is None and records[0].honored is False
+    report = await catalog.assess(Selection("synthetic"), inputs(
+        [p], [inventory(p, (caller.model,), state="fresh_complete")], caller_context=caller,
+    ))
+    assert {k: role(report)["selection"][k] for k in selected[0]} == selected[0]
+    assert coord.config == before
+
+
 @pytest.mark.asyncio
 async def test_custom_canonical_55_does_not_collapse_bundled_legacy_alias(tmp_path):
     custom = custom_catalog(
