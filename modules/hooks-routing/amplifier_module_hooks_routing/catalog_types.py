@@ -69,6 +69,20 @@ def _strings(value: Any) -> tuple[str, ...]:
     return tuple(value)
 
 
+def _compatibility_leaf(value: Any, path: str, types: tuple[type, ...]) -> None:
+    if value is not None and type(value) not in types:
+        raise ValueError(f"compatibility_config.{path} accepts only scalar leaves or None")
+
+
+def _compatibility_thinking(value: Any, path: str) -> None:
+    if value is None or isinstance(value, str):
+        return
+    if not isinstance(value, Mapping) or set(value) - {"type", "mode", "budget_tokens"}:
+        raise ValueError(f"compatibility_config.{path} accepts only type/mode/budget_tokens")
+    for key, leaf in value.items():
+        _compatibility_leaf(leaf, f"{path}.{key}", (int,) if key == "budget_tokens" else (str,))
+
+
 @dataclass(frozen=True)
 class Selection:
     matrix_id: str
@@ -147,27 +161,25 @@ class ProviderSnapshot:
             or set(self.compatibility_config) - set(COMPATIBILITY_CONFIG_KEYS)
         ):
             raise ValueError("compatibility_config accepts only effort/thinking keys")
-        thinking = self.compatibility_config.get("thinking")
-        if thinking is not None and (
-            not isinstance(thinking, (str, Mapping))
-            or isinstance(thinking, Mapping) and set(thinking) - {"type", "mode", "budget_tokens"}
-        ):
-            raise ValueError("compatibility_config.thinking accepts only type/mode/budget_tokens")
+        for key in ("effort", "reasoning_effort", "thinking_mode", "thinking_type"):
+            _compatibility_leaf(self.compatibility_config.get(key), key, (str,))
+        for key in ("thinking_budget_tokens", "thinking_budget", "budget_tokens"):
+            _compatibility_leaf(self.compatibility_config.get(key), key, (int,))
+        _compatibility_leaf(self.compatibility_config.get("extended_thinking"), "extended_thinking", (bool,))
+        _compatibility_leaf(self.compatibility_config.get("between_tools"), "between_tools", (bool, str))
+        _compatibility_thinking(self.compatibility_config.get("thinking"), "thinking")
         extra = self.compatibility_config.get("extra_request_params")
         if extra is not None:
             if not isinstance(extra, Mapping) or set(extra) - {"thinking", "output_config"}:
                 raise ValueError("compatibility_config.extra_request_params accepts only thinking/output_config")
-            thinking = extra.get("thinking")
-            if thinking is not None and (
-                not isinstance(thinking, (str, Mapping))
-                or isinstance(thinking, Mapping) and set(thinking) - {"type", "mode", "budget_tokens"}
-            ):
-                raise ValueError("extra_request_params.thinking accepts only type/mode/budget_tokens")
+            _compatibility_thinking(extra.get("thinking"), "extra_request_params.thinking")
             output = extra.get("output_config")
             if output is not None and (
                 not isinstance(output, Mapping) or set(output) - {"effort"}
             ):
-                raise ValueError("extra_request_params.output_config accepts only effort")
+                raise ValueError("compatibility_config.extra_request_params.output_config accepts only effort")
+            if isinstance(output, Mapping):
+                _compatibility_leaf(output.get("effort"), "extra_request_params.output_config.effort", (str,))
         object.__setattr__(self, "compatibility_config", freeze(self.compatibility_config))
 
 

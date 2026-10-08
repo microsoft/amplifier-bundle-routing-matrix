@@ -1347,3 +1347,161 @@ async def test_custom_canonical_55_does_not_collapse_bundled_legacy_alias(tmp_pa
     assert not canonical["execution_ready"] and not alias["execution_ready"]
     assert custom.describe(Selection("github-copilot"))["aliases"] == []
     assert custom.describe(Selection("copilot"))["aliases"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("config,expected", [
+    ({"extra_request_params": {"output_config": {"effort": "low"}}}, "verified"),
+    ({"extra_request_params.output_config.effort": "low"}, "unknown"),
+    ({"extra_request_params": {"output_config": {"effort": "low"}},
+      "extra_request_params.output_config.effort": "low"}, "unknown"),
+    ({"extra_request_params": {"output_config.effort": "low"}}, "unknown"),
+    ({"extra_request_params.output_config": {"effort": "low"}}, "unknown"),
+    ({"extra_request_params": {"output_config": {"effort": "max"}},
+      "extra_request_params.output_config.effort": "low"}, "incompatible"),
+    ({"extra_request_params": {"thinking": {}}}, "unknown"),
+    ({"extra_request_params": {"output_config": {"effort": ["low"]}}}, "unknown"),
+])
+async def test_structural_choice_metadata_never_qualifies_literal_dots(tmp_path, config, expected):
+    # Non-Haiku also needs path-safe evidence; this is not a Haiku-only guard.
+    p = provider(config_choices={
+        "extra_request_params.output_config.effort": ["low", "['low']"],
+        "extra_request_params.thinking": ["{}"],
+    })
+    catalog = custom_catalog(tmp_path, synthetic_policy([
+        {"provider": p.instance_id, "model": "synthetic-model", "config": config},
+    ]))
+    coord, mounted = await concrete_host(p, {})
+    policy = catalog.describe(Selection("synthetic"))["effective_policy"]
+    before = copy.deepcopy(policy)
+    selected = await resolve_model_role(["general"], policy["roles"], mounted, coordinator=coord)
+    data = inputs([p], [inventory(p, ("synthetic-model",), state="fresh_complete")])
+    report = await catalog.assess(Selection("synthetic"), data)
+    assert report == await catalog.assess(Selection("synthetic"), data)
+    assert role(report)["native_config_evidence"] == report["compatibility"] == expected
+    assert {k: role(report)["selection"][k] for k in selected[0]} == selected[0]
+    assert policy == before
+    assert report["enforcement"]["status"] == "not_enforced" and not report["execution_ready"]
+    mounted[p.instance_id].list_models.assert_not_called()
+
+
+@pytest.mark.parametrize("path", [
+    ("thinking", "type"), ("thinking", "mode"), ("thinking", "budget_tokens"),
+    ("extra_request_params", "thinking", "type"),
+    ("extra_request_params", "thinking", "mode"),
+    ("extra_request_params", "thinking", "budget_tokens"),
+    ("extra_request_params", "output_config", "effort"),
+    ("effort",), ("reasoning_effort",), ("thinking_mode",), ("thinking_type",),
+    ("thinking_budget_tokens",), ("thinking_budget",), ("budget_tokens",),
+    ("extended_thinking",), ("between_tools",),
+])
+@pytest.mark.parametrize("leaf", [{"unrelated": "synthetic-value"}, ["synthetic-value"]])
+def test_compatibility_snapshot_leaf_shapes_are_closed(path, leaf):
+    config = leaf
+    for part in reversed(path):
+        config = {part: config}
+    with pytest.raises(ValueError, match="compatibility_config"):
+        provider(compatibility_config=config)
+
+
+@pytest.mark.parametrize("path", [
+    ("thinking", "type"), ("thinking", "mode"), ("thinking", "budget_tokens"),
+    ("extra_request_params", "thinking", "type"),
+    ("extra_request_params", "thinking", "mode"),
+    ("extra_request_params", "thinking", "budget_tokens"),
+    ("extra_request_params", "output_config", "effort"),
+])
+def test_compatibility_snapshot_leaf_none_clear_is_retained(path):
+    from amplifier_module_hooks_routing.catalog_types import thaw
+
+    config = None
+    for part in reversed(path):
+        config = {part: config}
+    before = copy.deepcopy(config)
+    p = provider(compatibility_config=config)
+    assert thaw(p.compatibility_config) == before
+    config.clear()
+    assert thaw(p.compatibility_config) == before
+
+
+@pytest.mark.parametrize("config", [
+    {"thinking_budget_tokens": True}, {"thinking_budget": 1.5}, {"budget_tokens": "4096"},
+    {"effort": False}, {"reasoning_effort": 1},
+    {"thinking_mode": False}, {"thinking_type": 1}, {"extended_thinking": "disabled"},
+    {"thinking": {"budget_tokens": False}},
+    {"extra_request_params": {"thinking": {"type": False}}},
+    {"extra_request_params": {"output_config": {"effort": 1}}},
+])
+def test_compatibility_snapshot_rejects_wrong_scalar_leaf_types(config):
+    with pytest.raises(ValueError, match="compatibility_config"):
+        provider(compatibility_config=config)
+
+
+def test_compatibility_snapshot_default_and_all_explicit_clears():
+    from amplifier_module_hooks_routing.catalog_types import thaw
+    from amplifier_module_hooks_routing.haiku_compatibility import COMPATIBILITY_CONFIG_KEYS
+
+    assert thaw(provider().compatibility_config) == {}
+    clears = dict.fromkeys(COMPATIBILITY_CONFIG_KEYS)
+    assert thaw(provider(compatibility_config=clears).compatibility_config) == clears
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("inherited", [False, True])
+@pytest.mark.parametrize("thinking,effort,code", [
+    ({"mode": "disabled"}, "max", "haiku_thinking_representation_unknown"),
+    ({"mode": "disabled"}, "xhigh", "haiku_thinking_representation_unknown"),
+    ({"mode": "disabled"}, "high", "haiku_thinking_representation_unknown"),
+    ({"mode": "adaptive"}, "high", "haiku_thinking_representation_unknown"),
+    ({"type": "adaptive", "mode": "disabled"}, "max", "haiku_thinking_representation_unknown"),
+    ({"type": "disabled", "mode": "adaptive"}, "high", "haiku_thinking_representation_unknown"),
+    ({"type": "synthetic-unknown"}, "high", "haiku_thinking_representation_unknown"),
+    ({"type": "disabled"}, "max", "haiku_disabled_thinking_effort"),
+    ({"type": "disabled"}, "high", None),
+    ({"type": "adaptive"}, "max", None),
+    ({"type": None, "mode": None}, None, None),
+])
+async def test_thinking_representation_is_not_qualified_by_choice_metadata(
+    tmp_path, inherited, thinking, effort, code,
+):
+    from amplifier_foundation.spawn_utils import ProviderPreference, apply_provider_preferences
+    from amplifier_module_hooks_routing.haiku_compatibility import HaikuCompatibilityError
+
+    knobs = {"extra_request_params": {
+        "thinking": thinking, "output_config": {"effort": effort},
+    }}
+    p = provider("provider-anthropic", compatibility_config=knobs if inherited else {},
+                 config_choices={
+                     **{f"extra_request_params.thinking.{k}": [v]
+                        for k, v in thinking.items() if v is not None},
+                     **({"extra_request_params.output_config.effort": [effort]} if effort else {}),
+                 })
+    catalog = custom_catalog(tmp_path, synthetic_policy([
+        {"provider": p.instance_id, "model": "claude-haiku-*",
+         "config": {} if inherited else knobs},
+    ]))
+    coord, mounted = await concrete_host(p, knobs if inherited else {})
+    before = copy.deepcopy(coord.config)
+    policy = catalog.describe(Selection("synthetic"))["effective_policy"]
+    data = inputs([p], [inventory(p, ("claude-haiku-5-5",), state="fresh_complete")])
+    async def resolve():
+        return await resolve_model_role(
+            ["general"], policy["roles"], mounted, coordinator=coord,
+            preresolved_models={p.instance_id: ["claude-haiku-5-5"]},
+        )
+    if code:
+        with pytest.raises(HaikuCompatibilityError) as runtime_error:
+            await resolve()
+        with pytest.raises(HaikuCompatibilityError) as catalog_error:
+            await catalog.assess(Selection("synthetic"), data)
+        assert runtime_error.value.code == catalog_error.value.code == code
+        assert str(runtime_error.value) == str(catalog_error.value)
+    else:
+        selected = await resolve()
+        report = await catalog.assess(Selection("synthetic"), data)
+        assert role(report)["native_config_evidence"] == report["compatibility"] == "verified"
+        child = apply_provider_preferences(coord.config, [ProviderPreference(**selected[0])])
+        assert child["providers"][0]["config"]["extra_request_params"] == knobs["extra_request_params"]
+        assert report["enforcement"]["status"] == "not_enforced" and not report["execution_ready"]
+    assert coord.config == before
+    mounted[p.instance_id].list_models.assert_not_called()

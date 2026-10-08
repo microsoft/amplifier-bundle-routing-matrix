@@ -32,14 +32,14 @@ _UNSUPPORTED_PATHS = (
 )
 
 
-def _choice_values(config: Mapping, prefix: str = "") -> list[tuple[str, Any]]:
-    """Choice evidence for supplied effective knobs; None explicitly clears."""
+def _choice_values(
+    config: Mapping, prefix: tuple[str, ...] = (),
+) -> list[tuple[tuple[str, ...], Any]]:
+    """Retain structural path identity; None explicitly clears."""
     values = []
     for key, value in config.items():
-        path = f"{prefix}.{key}" if prefix else key
+        path = (*prefix, key)
         if isinstance(value, Mapping) and value:
-            # Keep every structural value, even when a literal dotted key
-            # collides with a nested path. Neither may conceal the other.
             values.extend(_choice_values(value, path))
         elif value is not None:
             values.append((path, value))
@@ -413,10 +413,21 @@ class RoutingCatalogV1:
                         **thaw(provider.compatibility_config), **selected["config"],
                     })
                     choices = provider.config_choices
-                    config_known = all(choices is not None and key in choices and choices[key] for key, _ in config)
+                    # Dotted metadata denotes structural traversal only. A
+                    # literal dot in any component has no qualified schema,
+                    # even if its value equals the structural leaf's value.
+                    qualified = [
+                        (".".join(path), value) for path, value in config
+                        if all("." not in part for part in path)
+                        and not isinstance(value, (Mapping, list, tuple))
+                    ]
+                    config_known = len(qualified) == len(config) and all(
+                        choices is not None and key in choices and choices[key]
+                        for key, _ in qualified
+                    )
                     invalid_config = any(
                         choices is not None and key in choices and choices[key]
-                        and str(value) not in choices[key] for key, value in config
+                        and str(value) not in choices[key] for key, value in qualified
                     )
                     report["native_config_evidence"] = "incompatible" if invalid_config else "verified" if config_known else "unknown"
                     if invalid_config:

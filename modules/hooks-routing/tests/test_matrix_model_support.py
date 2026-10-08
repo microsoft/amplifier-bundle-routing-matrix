@@ -117,6 +117,48 @@ def test_glob_is_not_a_compatibility_claim():
     assert effective == policy and errors == []
 
 
+@pytest.mark.parametrize("thinking", [
+    {"mode": "disabled"}, {"mode": "adaptive"}, {"mode": "enabled"},
+    {"type": "adaptive", "mode": "disabled"},
+    {"type": "disabled", "mode": "adaptive"},
+    {"type": "synthetic-unknown"}, {"type": []}, {"mode": False},
+    {"type": {"unrelated": "synthetic-value"}}, ["disabled"], False,
+])
+@pytest.mark.parametrize("expert", [False, True])
+@pytest.mark.parametrize("effort", ["max", None])
+def test_unqualified_thinking_representations_refuse_without_effort_dependency(thinking, expert, effort):
+    knobs = {"thinking": thinking, "reasoning_effort": effort}
+    if expert:
+        knobs = {"extra_request_params": {"thinking": thinking, "output_config": {"effort": effort}}}
+    errors = haiku_config_errors("anthropic", HAIKU_55, knobs)
+    assert errors and errors[0].code == "haiku_thinking_representation_unknown"
+
+
+@pytest.mark.parametrize("field", ["thinking", "thinking_mode", "thinking_type"])
+@pytest.mark.parametrize("effort", ["high", "xhigh", "max"])
+def test_scalar_disabled_effort_boundary(field, effort):
+    errors = haiku_config_errors("anthropic", HAIKU_55, {field: "disabled", "reasoning_effort": effort})
+    assert [e.code for e in errors] == ([] if effort == "high" else ["haiku_disabled_thinking_effort"])
+
+
+@pytest.mark.parametrize("config", [
+    {"thinking_type": "adaptive", "thinking_mode": "disabled"},
+    {"thinking": {"type": "adaptive"}, "thinking_mode": "disabled"},
+    {"thinking": "disabled", "thinking_type": "adaptive"},
+    {"thinking_type": [], "reasoning_effort": "high"},
+    {"thinking_mode": {"unrelated": "synthetic-value"}},
+    {"thinking": {"type": "adaptive", "budget_tokens": []}},
+    {"thinking": {"budget_tokens": 4096}},
+    {"thinking_budget_tokens": []},
+    {"thinking_budget": {"unrelated": "synthetic-value"}},
+    {"extra_request_params": {"output_config": ["max"]}},
+    {"extra_request_params": {"output_config": "max"}},
+])
+def test_ambiguous_or_nonstring_thinking_leaves_fail_conservatively(config):
+    errors = haiku_config_errors("anthropic", HAIKU_55, config)
+    assert errors and errors[0].code == "haiku_thinking_representation_unknown"
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "model,code",

@@ -326,6 +326,17 @@ override after concrete selection; it does not deep-merge a branch the preferenc
 replaced. An explicit expert output-config clear is reported as unhonored effort,
 not a false applied-effort claim.
 
+Nested thinking `mode` is not a synonym for the provider-wire `type`
+discriminator. A non-`None` nested mode, unknown discriminator, malformed leaf
+or conflicting scalar/type representation raises
+`haiku_thinking_representation_unknown`, with or without effort or matching
+choice metadata. Expert thinking must be a type-bearing object or an explicit
+clear, not a scalar mode. Empty objects remain unqualified in choice evidence.
+This is conservative routing refusal, not a new provider encoding claim.
+The snapshot allowlist has closed scalar leaf shapes and retains `None` clears;
+see [catalog-api](catalog-api.md#exact-input-shapes). Literal dotted config keys
+never borrow structurally qualified choice metadata, even at equal values.
+
 Globs and arbitrary instance IDs defer loader checks until resolution supplies
 the concrete model and exact mounted-module provenance. The resolver checks the
 selected mount config after applying the same shallow preference overrides as

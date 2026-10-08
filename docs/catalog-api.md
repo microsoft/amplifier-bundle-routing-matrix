@@ -84,7 +84,16 @@ knobs for concrete Haiku checks, **not the account mount config**. Its allowlist
 `extended_thinking`, `extra_request_params`. `thinking` may be a scalar mode or
 a mapping with only `type`, `mode`, `budget_tokens`. `extra_request_params` accepts
 only `thinking` (the same shape) and `output_config` (only `effort`); extra keys
-refuse at every nested level. `None` retains explicit clear semantics.
+refuse at every nested level. Effort and type/mode leaves are strings; budget
+leaves are integers (not booleans); `extended_thinking` is boolean and
+`between_tools` is boolean or string. No leaf accepts a mapping or sequence.
+`None` retains explicit clear semantics at every allowed leaf and branch.
+These are snapshot shapes, not a provider-wire schema or value qualification.
+For concrete Haiku, a non-`None` nested `mode` is unsupported, not translated to
+wire `type`; unknown or omitted discriminators with non-cleared thinking leaves
+and conflicting representations raise
+`haiku_thinking_representation_unknown` even when choice metadata advertises
+them or no effort was supplied. Expert thinking scalars are also unqualified.
 Values are copied/frozen and no default is synthesized. Supply the same relevant
 inherited knobs that runtime will clone; omission describes no supplied knobs,
 not proof about a live mount. Never copy credentials or arbitrary account options.
@@ -100,8 +109,12 @@ shallow preference merge as Foundation, not just the returned override map.
 Nested choice metadata uses dotted paths such as
 `extra_request_params.output_config.effort`. Every non-`None` effective value
 needs matching metadata to be verified; absent/empty choice lists stay unknown,
-mismatched choices are incompatible. Empty objects are not verified absence,
-and colliding literal dotted keys cannot conceal a nested value. This is
+mismatched choices are incompatible. Empty/container leaves remain unqualified
+even if metadata advertises their
+string representation. Dotted metadata denotes structural traversal only:
+literal dots in any key component stay unknown, including literal-only paths
+and equal-valued collisions. A structurally qualified mismatch still makes the
+plan incompatible; an unqualified literal cannot borrow that metadata. This is
 snapshot choice evidence, not proof of request encoding or account entitlement.
 
 Enums:
