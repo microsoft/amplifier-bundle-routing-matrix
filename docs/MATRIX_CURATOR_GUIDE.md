@@ -320,9 +320,13 @@ provider/full-stack qualification is separate.
 The guard checks scalar thinking modes and the expert
 `extra_request_params.thinking` / `extra_request_params.output_config.effort`
 encoders as well as scalar effort/budget knobs. Explicit thinking disable with
-`xhigh`/`max` is refused on native 5.5; `None` clears remain distinct from literal
-`default`/`none`. Caller inheritance also clones an effective expert effort
-override after concrete selection; it does not deep-merge a branch the preference
+`xhigh`/`max` is refused on native 5.5. A present `extended_thinking: null`
+disables computed thinking just like `false`; omission retains adaptive thinking
+and all five efforts. Qualified expert `thinking.type: adaptive` overrides that
+lower-precedence disable; expert `disabled` retains the restriction. Other `None`
+clears remain distinct from literal `default`/`none`. Caller inheritance also
+clones an effective expert effort override after concrete selection; it does not
+deep-merge a branch the preference
 replaced. An explicit expert output-config clear is reported as unhonored effort,
 not a false applied-effort claim.
 

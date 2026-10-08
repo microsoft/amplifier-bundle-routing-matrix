@@ -141,6 +141,32 @@ def test_scalar_disabled_effort_boundary(field, effort):
     assert [e.code for e in errors] == ([] if effort == "high" else ["haiku_disabled_thinking_effort"])
 
 
+@pytest.mark.parametrize("effort", HAIKU_55_EFFORTS)
+@pytest.mark.parametrize("knobs,disabled", [
+    ({}, False),
+    ({"extended_thinking": True}, False),
+    ({"extended_thinking": None}, True),
+    ({"extended_thinking": False}, True),
+    *[({**lower, "extra_request_params": {"thinking": {"type": "adaptive"}}}, False)
+      for lower in (
+          {"extended_thinking": None}, {"extended_thinking": False},
+          {"thinking": "disabled"}, {"thinking": {"type": "disabled"}},
+          {"thinking_type": "disabled"}, {"thinking_mode": "disabled"},
+      )],
+    ({"extended_thinking": True,
+      "extra_request_params": {"thinking": {"type": "disabled"}}}, True),
+    ({"extended_thinking": None, "extra_request_params": {"thinking": None}}, True),
+    ({"extended_thinking": None, "extra_request_params": {"thinking": {}}}, True),
+])
+def test_effective_thinking_disable_respects_presence_and_expert_precedence(knobs, disabled, effort):
+    before = deepcopy(knobs)
+    errors = haiku_config_errors("anthropic", HAIKU_55, {**knobs, "reasoning_effort": effort})
+    assert [e.code for e in errors] == (
+        ["haiku_disabled_thinking_effort"] if disabled and effort in ("xhigh", "max") else []
+    )
+    assert knobs == before
+
+
 @pytest.mark.parametrize("config", [
     {"thinking_type": "adaptive", "thinking_mode": "disabled"},
     {"thinking": {"type": "adaptive"}, "thinking_mode": "disabled"},

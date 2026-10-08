@@ -84,6 +84,25 @@ def effective_haiku_effort(config: Mapping[str, Any]) -> Any:
     return config.get("reasoning_effort") if config.get("reasoning_effort") is not None else config.get("effort")
 
 
+def _haiku_thinking_disabled(config: Mapping[str, Any]) -> bool:
+    """Qualified expert thinking wins; present-null mount thinking disables."""
+    extra = config.get("extra_request_params")
+    extra = extra if isinstance(extra, Mapping) else {}
+    thinking = extra.get("thinking", config.get("thinking"))
+    if ("thinking" in extra and isinstance(thinking, Mapping)
+            and thinking.get("type") in ("adaptive", "disabled")):
+        return thinking["type"] == "disabled"
+    return (
+        thinking == "disabled"
+        or isinstance(thinking, Mapping) and thinking.get("type") == "disabled"
+        or config.get("thinking_type") == "disabled"
+        or config.get("thinking_mode") == "disabled"
+        or "extended_thinking" in config and (
+            config["extended_thinking"] is None or config["extended_thinking"] is False
+        )
+    )
+
+
 def is_compatibility_leaf(value: Any, types: tuple[type, ...]) -> bool:
     """Closed scalar shapes shared by snapshots and merged runtime config."""
     return value is None or type(value) in types
@@ -244,17 +263,8 @@ def haiku_config_errors(
                 "adaptive thinking; manual budgets are qualified only for native Anthropic 4.5.",
             )
         )
-    # The transport escape hatch wins over computed thinking/output_config.
-    thinking = extra.get("thinking", config.get("thinking"))
-    disabled = (
-        thinking == "disabled"
-        or isinstance(thinking, Mapping) and thinking.get("type") == "disabled"
-        or config.get("thinking_type") == "disabled"
-        or config.get("thinking_mode") == "disabled"
-        or config.get("extended_thinking") is False
-    )
     effective_effort = effective_haiku_effort(config)
-    if support is True and disabled and effective_effort in ("xhigh", "max"):
+    if support is True and _haiku_thinking_disabled(config) and effective_effort in ("xhigh", "max"):
         errors.append(HaikuCompatibilityError(
             "haiku_disabled_thinking_effort", model, "thinking",
             "Remove explicit thinking disable or use low, medium, high; "

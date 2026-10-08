@@ -35,6 +35,9 @@ leaves share closed scalar shapes with explicit `None` clears; validate them
 before no-effort/native-4.5 early exits. Nested thinking `mode` is not wire `type`:
 non-None mode, unknown discriminators and conflicting representations refuse
 conservatively, independent of choice metadata or the presence of effort.
+Present `extended_thinking: None` disables computed native 5.5 thinking just
+like `False`; omission stays adaptive. Qualified expert thinking `type` wins
+over lower-precedence disables; never infer disable from absence.
 Policy instance names are not backend proof. Finish deferred Gemini inert-key
 checks after concrete selection, and clamp inherited expert effort without
 resurrecting branches explicitly replaced or cleared by a preference.
