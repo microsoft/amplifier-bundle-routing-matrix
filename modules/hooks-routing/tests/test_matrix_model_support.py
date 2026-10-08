@@ -160,6 +160,64 @@ def test_ambiguous_or_nonstring_thinking_leaves_fail_conservatively(config):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("inherited", [False, True])
+@pytest.mark.parametrize("model", [HAIKU_55, HAIKU_45[0]])
+@pytest.mark.parametrize("config,key", [
+    ({"extended_thinking": {"value": "disabled"}}, "extended_thinking"),
+    ({"between_tools": {"value": True}}, "between_tools"),
+    ({"extended_thinking": []}, "extended_thinking"),
+    ({"extended_thinking": "disabled"}, "extended_thinking"),
+    ({"between_tools": []}, "between_tools"),
+    ({"between_tools": 1}, "between_tools"),
+    ({"effort": {"value": "high"}}, "effort"),
+    ({"reasoning_effort": False}, "reasoning_effort"),
+    ({"thinking_budget_tokens": True}, "thinking_budget_tokens"),
+    ({"thinking_budget": "4096"}, "thinking_budget"),
+    ({"budget_tokens": 4096.0}, "budget_tokens"),
+    ({"extra_request_params": {"output_config": {"effort": ["high"]}}},
+     "extra_request_params.output_config.effort"),
+])
+async def test_effective_scalar_leaf_shapes_refuse_before_early_exit_or_fallback(
+    inherited, model, config, key,
+):
+    # Include an ordinary 4.5 budget to reach the native-manual early continue.
+    knobs = {**({"thinking_budget_tokens": 32000} if model in HAIKU_45 else {}), **config}
+    policy = matrix("claude-haiku-*", {} if inherited else knobs)
+    policy["roles"]["fast"]["candidates"].append(
+        {"provider": "anthropic", "model": "claude-sonnet-5-5"},
+    )
+    coord, mounted = host(config=knobs if inherited else {}, models=[model])
+    available = []
+    coord.get_capability = lambda name: available.append if name == "provider.check_available" else None
+    before = deepcopy(coord.config), deepcopy(policy)
+    with pytest.raises(HaikuCompatibilityError) as error:
+        await resolve_model_role(["fast", "general"], policy["roles"], mounted, coordinator=coord)
+    assert error.value.code == "haiku_thinking_representation_unknown"
+    assert error.value.key == key and error.value.model == model
+    assert available == ["synthetic-native"]  # no candidate or role fallback
+    assert (coord.config, policy) == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model,key", [
+    (HAIKU_55, "extended_thinking"), (HAIKU_45[0], "between_tools"),
+])
+async def test_explicit_none_clear_replaces_malformed_inherited_scalar(model, key):
+    original = {key: {"value": "synthetic-malformed"}, "temperature": 1.0}
+    coord, mounted = host(config=original, models=[model])
+    override = {key: None}
+    selected = await resolve_model_role(
+        ["fast"], matrix("claude-haiku-*", override)["roles"], mounted, coordinator=coord,
+    )
+    from amplifier_foundation.spawn_utils import ProviderPreference, apply_provider_preferences
+
+    child = apply_provider_preferences(coord.config, [ProviderPreference(**selected[0])])
+    assert child["providers"][0]["config"][key] is None
+    assert child["providers"][0]["config"]["temperature"] == 1.0
+    assert coord.config["providers"][0]["config"] == original
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "model,code",
     [

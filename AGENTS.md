@@ -30,8 +30,9 @@ copy of account config. Full-stack provider support remains a separate gate.
 Choice evidence checks inherited plus shallow-overridden knobs, including the
 allowlisted expert thinking/output-effort paths; missing metadata stays unknown.
 Structural choice paths never qualify literal dotted keys, even at equal values;
-empty/container leaves stay unqualified. Snapshot leaves have closed scalar
-shapes with explicit `None` clears. Nested thinking `mode` is not wire `type`:
+empty/container leaves stay unqualified. Snapshot and merged effective Haiku
+leaves share closed scalar shapes with explicit `None` clears; validate them
+before no-effort/native-4.5 early exits. Nested thinking `mode` is not wire `type`:
 non-None mode, unknown discriminators and conflicting representations refuse
 conservatively, independent of choice metadata or the presence of effort.
 Policy instance names are not backend proof. Finish deferred Gemini inert-key

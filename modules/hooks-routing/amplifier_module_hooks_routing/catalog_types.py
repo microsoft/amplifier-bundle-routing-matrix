@@ -10,7 +10,9 @@ from types import MappingProxyType
 from typing import Any
 
 from .knob_consistency import CallerContext
-from .haiku_compatibility import COMPATIBILITY_CONFIG_KEYS
+from .haiku_compatibility import (
+    COMPATIBILITY_CONFIG_KEYS, COMPATIBILITY_SCALAR_TYPES, is_compatibility_leaf,
+)
 from .matrix_loader import validate_matrix_name
 
 CATALOG_STATES = (
@@ -70,7 +72,7 @@ def _strings(value: Any) -> tuple[str, ...]:
 
 
 def _compatibility_leaf(value: Any, path: str, types: tuple[type, ...]) -> None:
-    if value is not None and type(value) not in types:
+    if not is_compatibility_leaf(value, types):
         raise ValueError(f"compatibility_config.{path} accepts only scalar leaves or None")
 
 
@@ -161,12 +163,8 @@ class ProviderSnapshot:
             or set(self.compatibility_config) - set(COMPATIBILITY_CONFIG_KEYS)
         ):
             raise ValueError("compatibility_config accepts only effort/thinking keys")
-        for key in ("effort", "reasoning_effort", "thinking_mode", "thinking_type"):
-            _compatibility_leaf(self.compatibility_config.get(key), key, (str,))
-        for key in ("thinking_budget_tokens", "thinking_budget", "budget_tokens"):
-            _compatibility_leaf(self.compatibility_config.get(key), key, (int,))
-        _compatibility_leaf(self.compatibility_config.get("extended_thinking"), "extended_thinking", (bool,))
-        _compatibility_leaf(self.compatibility_config.get("between_tools"), "between_tools", (bool, str))
+        for key, types in COMPATIBILITY_SCALAR_TYPES.items():
+            _compatibility_leaf(self.compatibility_config.get(key), key, types)
         _compatibility_thinking(self.compatibility_config.get("thinking"), "thinking")
         extra = self.compatibility_config.get("extra_request_params")
         if extra is not None:

@@ -26,6 +26,17 @@ COMPATIBILITY_CONFIG_KEYS = (
     "extended_thinking",
     "extra_request_params",
 )
+COMPATIBILITY_SCALAR_TYPES = {
+    "effort": (str,),
+    "reasoning_effort": (str,),
+    "thinking_mode": (str,),
+    "thinking_type": (str,),
+    "thinking_budget_tokens": (int,),
+    "thinking_budget": (int,),
+    "budget_tokens": (int,),
+    "extended_thinking": (bool,),
+    "between_tools": (bool, str),
+}
 
 
 class HaikuCompatibilityError(ValueError):
@@ -73,6 +84,11 @@ def effective_haiku_effort(config: Mapping[str, Any]) -> Any:
     return config.get("reasoning_effort") if config.get("reasoning_effort") is not None else config.get("effort")
 
 
+def is_compatibility_leaf(value: Any, types: tuple[type, ...]) -> bool:
+    """Closed scalar shapes shared by snapshots and merged runtime config."""
+    return value is None or type(value) in types
+
+
 def _unqualified_thinking_paths(config: Mapping[str, Any]) -> list[str]:
     """Recognized syntax only, not provider-wire qualification from metadata.
 
@@ -88,18 +104,20 @@ def _unqualified_thinking_paths(config: Mapping[str, Any]) -> list[str]:
     output = extra.get("output_config")
     if output is not None and not isinstance(output, Mapping):
         paths.append("extra_request_params.output_config")
-    for key in ("thinking_budget_tokens", "thinking_budget", "budget_tokens"):
-        if config.get(key) is not None and type(config[key]) is not int:
+    elif isinstance(output, Mapping) and not is_compatibility_leaf(output.get("effort"), (str,)):
+        paths.append("extra_request_params.output_config.effort")
+    for key, types in COMPATIBILITY_SCALAR_TYPES.items():
+        if not is_compatibility_leaf(config.get(key), types):
             paths.append(key)
     for key, thinking in (("thinking", config.get("thinking")),
                           ("extra_request_params.thinking", extra.get("thinking"))):
         if isinstance(thinking, Mapping):
             if (set(thinking) - {"type", "mode", "budget_tokens"}
+                    or any(not is_compatibility_leaf(value, (int,) if key == "budget_tokens" else (str,))
+                           for key, value in thinking.items())
                     or thinking.get("mode") is not None
                     or thinking.get("type") is None and any(v is not None for v in thinking.values())
-                    or thinking.get("type") is not None and thinking.get("type") not in modes
-                    or thinking.get("budget_tokens") is not None
-                    and type(thinking.get("budget_tokens")) is not int):
+                    or thinking.get("type") is not None and thinking.get("type") not in modes):
                 paths.append(key)
         elif thinking is not None and (
             key.startswith("extra_request_params")

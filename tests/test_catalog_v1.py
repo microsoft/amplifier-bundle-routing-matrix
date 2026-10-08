@@ -1505,3 +1505,84 @@ async def test_thinking_representation_is_not_qualified_by_choice_metadata(
         assert report["enforcement"]["status"] == "not_enforced" and not report["execution_ready"]
     assert coord.config == before
     mounted[p.instance_id].list_models.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model,key,value,code", [
+    ("claude-haiku-5-5", "extended_thinking", {"value": "disabled"},
+     "haiku_thinking_representation_unknown"),
+    ("claude-haiku-4-5", "between_tools", {"value": True},
+     "haiku_thinking_representation_unknown"),
+    ("claude-haiku-5-5", "extended_thinking", "disabled",
+     "haiku_thinking_representation_unknown"),
+    ("claude-haiku-4-5", "between_tools", 1, "haiku_thinking_representation_unknown"),
+    ("claude-haiku-5-5", "extended_thinking", False, None),
+    ("claude-haiku-5-5", "extended_thinking", None, None),
+    ("claude-haiku-4-5", "between_tools", True, None),
+    ("claude-haiku-4-5", "between_tools", False, None),
+    ("claude-haiku-4-5", "between_tools", "between_tools", None),
+    ("claude-haiku-4-5", "between_tools", "disabled", None),
+    ("claude-haiku-4-5", "between_tools", None, None),
+    ("claude-haiku-5-5", "thinking", "disabled", None),
+    ("claude-haiku-5-5", "thinking_type", "disabled", None),
+    ("claude-haiku-5-5", "thinking_mode", "disabled", None),
+])
+async def test_effective_scalar_leaf_shapes_runtime_catalog_parity(tmp_path, model, key, value, code):
+    from amplifier_foundation.spawn_utils import ProviderPreference, apply_provider_preferences
+    from amplifier_module_hooks_routing.haiku_compatibility import HaikuCompatibilityError
+
+    knobs = {key: value}
+    if model == "claude-haiku-4-5":
+        knobs["thinking_budget_tokens"] = 32000
+    if code:
+        # Snapshot construction refuses malformed mount leaves; policy overrides
+        # must not bypass that shape boundary during runtime or assessment.
+        with pytest.raises(ValueError, match="compatibility_config"):
+            provider("provider-anthropic", compatibility_config=knobs)
+    inherited = {"thinking_budget_tokens": 4096} if model == "claude-haiku-4-5" else {}
+    p = provider("provider-anthropic", compatibility_config=inherited,
+                 config_choices={key: [str(value)], "thinking_budget_tokens": ["32000"]})
+    catalog = custom_catalog(tmp_path, synthetic_policy([
+        {"provider": p.instance_id, "model": "claude-haiku-*", "config": knobs},
+        {"provider": p.instance_id, "model": "claude-sonnet-5-5"},
+    ]))
+    coord, mounted = await concrete_host(p, {**inherited, "temperature": 1.0})
+    available = []
+    coord.register_capability("provider.check_available", available.append)
+    before = copy.deepcopy(coord.config)
+    policy = catalog.describe(Selection("synthetic"))["effective_policy"]
+    policy_before = copy.deepcopy(policy)
+    data = inputs([p], [inventory(p, (model,), state="fresh_complete")])
+    async def resolve():
+        return await resolve_model_role(
+            ["general", "fast"], policy["roles"], mounted, coordinator=coord,
+            preresolved_models={p.instance_id: [model]},
+        )
+    if code:
+        errors = []
+        for operation in (resolve, lambda: catalog.assess(Selection("synthetic"), data)):
+            try:
+                await operation()
+            except HaikuCompatibilityError as error:
+                errors.append(error)
+            else:
+                errors.append(None)
+        assert all(error is not None for error in errors), errors
+        assert errors[0].code == errors[1].code == code
+        assert errors[0].key == errors[1].key == key
+        assert str(errors[0]) == str(errors[1])
+    else:
+        selected = await resolve()
+        report = await catalog.assess(Selection("synthetic"), data)
+        assert report == await catalog.assess(Selection("synthetic"), data)
+        assert role(report)["native_config_evidence"] == report["compatibility"] == "verified"
+        assert {k: role(report)["selection"][k] for k in selected[0]} == selected[0]
+        assert role(report)["selection"]["module"] == p.module
+        child = apply_provider_preferences(coord.config, [ProviderPreference(**selected[0])])
+        assert child["providers"][0]["config"] == {
+            **before["providers"][0]["config"], **knobs, "default_model": model, "priority": 0,
+        }
+        assert report["enforcement"]["status"] == "not_enforced" and not report["execution_ready"]
+    assert available == [p.instance_id]
+    assert coord.config == before and policy == policy_before
+    mounted[p.instance_id].list_models.assert_not_called()
