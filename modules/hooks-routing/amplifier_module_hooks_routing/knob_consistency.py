@@ -68,6 +68,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from .haiku_compatibility import haiku_effort_support, is_haiku
+
 logger = logging.getLogger(__name__)
 
 # The four inheritance modes (ROUTING-PROPOSAL.md section 3.2).
@@ -88,12 +90,9 @@ VALID_ON_EXHAUSTED = ("fall_back", "error")
 # hygiene test. One spelling, every family.
 CANONICAL_EFFORT_KEY = "reasoning_effort"
 
-# Models that accept no effort parameter at all. Measured on our own traffic:
-# ``claude-haiku-4-5`` requests carry no effort field and a fixed
-# ``thinking: {budget_tokens: 32000}`` (n=228 requests / 10 runs, PRESETS.md
-# section 0.3). Inheriting an effort into one of these is a no-op, and the
-# clamp record must say so rather than pretend intent was honoured.
-DEFAULT_EFFORT_UNSUPPORTED: tuple[str, ...] = ("claude-haiku-*",)
+# Optional custom non-Haiku exclusions. Haiku uses shared concrete compatibility
+# instead of a family wildcard that would erase native 5.5 caller intent.
+DEFAULT_EFFORT_UNSUPPORTED: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -170,8 +169,10 @@ class Preset:
     def effort_key_for(self, family: str) -> str:
         return self.effort_keys.get(family, CANONICAL_EFFORT_KEY)
 
-    def supports_effort(self, model: str) -> bool:
-        """False when *model* accepts no effort parameter (e.g. haiku)."""
+    def supports_effort(self, model: str, backend: str | None = None) -> bool:
+        """Haiku support needs an exact model/backend, never a family glob."""
+        if is_haiku(model):
+            return haiku_effort_support(model, backend) is True
         lowered = model.lower()
         return not any(
             fnmatch.fnmatch(lowered, pat.lower()) for pat in self.effort_unsupported
@@ -455,7 +456,10 @@ def validate_preset(matrix_file: dict[str, Any]) -> list[str]:
                 continue
             cfg = cand.get("config") or {}
             model = str(cand.get("model", ""))
-            if CANONICAL_EFFORT_KEY in cfg and not preset.supports_effort(model):
+            if (
+                CANONICAL_EFFORT_KEY in cfg and not is_haiku(model)
+                and not preset.supports_effort(model, str(cand.get("provider", "")))
+            ):
                 errors.append(
                     f"Role {role_name!r} candidate {i} ({model}): "
                     f"{CANONICAL_EFFORT_KEY} declared on a model that accepts "
@@ -637,10 +641,8 @@ def _with_effort(
 ) -> dict[str, Any]:
     """Return a copy of *candidate* carrying *effort*, honouring the target.
 
-    Inherited effort wins over the candidate's own declared effort
-    (ROUTING-PROPOSAL.md section 4.8's proposed precedence rule), except that
-    a model with no effort parameter has the key removed entirely rather than
-    silently accepting a value it will drop.
+    Inherited effort wins over the candidate's declared effort. Haiku keeps
+    intent pending concrete compatibility validation in the resolver.
     """
     out = dict(candidate)
     cfg = dict(out.get("config") or {})
@@ -648,7 +650,9 @@ def _with_effort(
     key = preset.effort_key_for(family)
     model = str(out.get("model", ""))
 
-    if not preset.supports_effort(model):
+    # Haiku compatibility is decided AFTER concrete model/mount selection.
+    # An unsupported/unknown target must refuse, not erase inherited intent.
+    if not is_haiku(model) and not preset.supports_effort(model, family):
         cfg.pop(key, None)
     elif effort is not None:
         cfg[key] = effort
@@ -719,7 +723,7 @@ def plan_candidates(
     if mode == "effort":
         planned = [_with_effort(c, preset, caller.effort) for c in dict_candidates]
         top = planned[0]
-        honored = preset.supports_effort(str(top.get("model", "")))
+        honored = preset.supports_effort(str(top.get("model", "")), str(top.get("provider", "")))
         record = ClampRecord(
             role=role,
             mode=mode,

@@ -10,6 +10,9 @@ from types import MappingProxyType
 from typing import Any
 
 from .knob_consistency import CallerContext
+from .haiku_compatibility import (
+    COMPATIBILITY_CONFIG_KEYS, COMPATIBILITY_SCALAR_TYPES, is_compatibility_leaf,
+)
 from .matrix_loader import validate_matrix_name
 
 CATALOG_STATES = (
@@ -68,6 +71,20 @@ def _strings(value: Any) -> tuple[str, ...]:
     return tuple(value)
 
 
+def _compatibility_leaf(value: Any, path: str, types: tuple[type, ...]) -> None:
+    if not is_compatibility_leaf(value, types):
+        raise ValueError(f"compatibility_config.{path} accepts only scalar leaves or None")
+
+
+def _compatibility_thinking(value: Any, path: str) -> None:
+    if value is None or isinstance(value, str):
+        return
+    if not isinstance(value, Mapping) or set(value) - {"type", "mode", "budget_tokens"}:
+        raise ValueError(f"compatibility_config.{path} accepts only type/mode/budget_tokens")
+    for key, leaf in value.items():
+        _compatibility_leaf(leaf, f"{path}.{key}", (int,) if key == "budget_tokens" else (str,))
+
+
 @dataclass(frozen=True)
 class Selection:
     matrix_id: str
@@ -124,6 +141,8 @@ class ProviderSnapshot:
     # Choice metadata only, never credentials, endpoints or mount options.
     config_choices: Mapping[str, tuple[str, ...]] | None = None
     native_capabilities: tuple[str, ...] | None = None
+    # Only model/effort/thinking compatibility inputs, never account config.
+    compatibility_config: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         ScopeBinding(self.module, self.instance_id, self.binding_id, self.binding_revision)
@@ -139,6 +158,27 @@ class ProviderSnapshot:
             }))
         if self.native_capabilities is not None:
             object.__setattr__(self, "native_capabilities", _strings(self.native_capabilities))
+        if (
+            not isinstance(self.compatibility_config, Mapping)
+            or set(self.compatibility_config) - set(COMPATIBILITY_CONFIG_KEYS)
+        ):
+            raise ValueError("compatibility_config accepts only effort/thinking keys")
+        for key, types in COMPATIBILITY_SCALAR_TYPES.items():
+            _compatibility_leaf(self.compatibility_config.get(key), key, types)
+        _compatibility_thinking(self.compatibility_config.get("thinking"), "thinking")
+        extra = self.compatibility_config.get("extra_request_params")
+        if extra is not None:
+            if not isinstance(extra, Mapping) or set(extra) - {"thinking", "output_config"}:
+                raise ValueError("compatibility_config.extra_request_params accepts only thinking/output_config")
+            _compatibility_thinking(extra.get("thinking"), "extra_request_params.thinking")
+            output = extra.get("output_config")
+            if output is not None and (
+                not isinstance(output, Mapping) or set(output) - {"effort"}
+            ):
+                raise ValueError("compatibility_config.extra_request_params.output_config accepts only effort")
+            if isinstance(output, Mapping):
+                _compatibility_leaf(output.get("effort"), "extra_request_params.output_config.effort", (str,))
+        object.__setattr__(self, "compatibility_config", freeze(self.compatibility_config))
 
 
 @dataclass(frozen=True)

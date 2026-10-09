@@ -48,7 +48,7 @@
     "fast": [
       {
         "config": {
-          "thinking_budget_tokens": 32000
+          "extended_thinking": true
         },
         "model": "claude-haiku-4-5",
         "provider": "anthropic"
@@ -176,7 +176,7 @@
     "fast": [
       {
         "config": {
-          "thinking_budget_tokens": 32000
+          "extended_thinking": true
         },
         "model": "claude-haiku-4-5",
         "provider": "anthropic"
@@ -394,7 +394,7 @@
     "coding": [
       {
         "config": {
-          "thinking_budget_tokens": 32000
+          "extended_thinking": true
         },
         "model": "claude-haiku-4-5",
         "provider": "anthropic"
@@ -430,7 +430,7 @@
     "fast": [
       {
         "config": {
-          "thinking_budget_tokens": 32000
+          "extended_thinking": true
         },
         "model": "claude-haiku-4-5",
         "provider": "anthropic"
@@ -439,7 +439,7 @@
     "general": [
       {
         "config": {
-          "thinking_budget_tokens": 32000
+          "extended_thinking": true
         },
         "model": "claude-haiku-4-5",
         "provider": "anthropic"
@@ -482,7 +482,7 @@
     "ui-coding": [
       {
         "config": {
-          "thinking_budget_tokens": 32000
+          "extended_thinking": true
         },
         "model": "claude-haiku-4-5",
         "provider": "anthropic"
@@ -490,9 +490,7 @@
     ],
     "vision": [
       {
-        "config": {
-          "thinking_budget_tokens": 32000
-        },
+        "config": {},
         "model": "claude-haiku-4.5",
         "provider": "github-copilot"
       }

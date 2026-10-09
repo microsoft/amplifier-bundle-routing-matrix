@@ -18,6 +18,35 @@ Routing-specific evaluation configurations, scenarios, graders, reuse rules and 
 
 Preserve custom-file precedence, explicit intent, caller inheritance, exact mounted-instance provenance and failure behavior. The current `openai` matrix is API-first across API and ChatGPT; it is **not API-only**. Do not silently change saved IDs, widen account scope, invent fallback IDs, or label wildcard/template discovery verified. Catalog membership and entitlement are different evidence.
 
+Haiku compatibility is shared in `haiku_compatibility.py`, not a family-wide
+inert-key rule. Exact native Anthropic 5.5 accepts five efforts and rejects
+manual budgets/between_tools; native 4.5 retains manual budgets and rejects
+effort. Validate the concrete selected model against its exact mounted module
+and inherited mount knobs. Globs defer validation; unknown aliases/backends
+refuse explicit effort/budgets rather than stripping them or falling back.
+Seven shipped native Haiku candidates use `claude-haiku-*` with
+`extended_thinking: true`, no fixed budget/effort: updated provider 4.5 is
+manual/default 32000, 5.5 adaptive/vendor-medium omission. Preserve custom pins
+and shadowing files; inherited/custom 5.5 manual budgets still refuse before
+fallback, never clear automatically. Automatic family selection is not a
+quality/cost, native computer-use or entitlement claim.
+Catalog `compatibility_config` is an allowlisted immutable snapshot, never a
+copy of account config. Full-stack provider support remains a separate gate.
+Choice evidence checks inherited plus shallow-overridden knobs, including the
+allowlisted expert thinking/output-effort paths; missing metadata stays unknown.
+Structural choice paths never qualify literal dotted keys, even at equal values;
+empty/container leaves stay unqualified. Snapshot and merged effective Haiku
+leaves share closed scalar shapes with explicit `None` clears; validate them
+before no-effort/native-4.5 early exits. Nested thinking `mode` is not wire `type`:
+non-None mode, unknown discriminators and conflicting representations refuse
+conservatively, independent of choice metadata or the presence of effort.
+Present `extended_thinking: None` disables computed native 5.5 thinking just
+like `False`; omission stays adaptive. Qualified expert thinking `type` wins
+over lower-precedence disables; never infer disable from absence.
+Policy instance names are not backend proof. Finish deferred Gemini inert-key
+checks after concrete selection, and clamp inherited expert effort without
+resurrecting branches explicitly replaced or cleared by a preference.
+
 The bounded catalog library is documented in `docs/catalog-api.md`. It reuses effective resolver semantics with snapshots and independent initial state; never pass live escalation state, reporting sinks or mutable caches to assessment. Catalog calls must not reach runtime logger handlers: preserve runtime diagnostics by explicit reporting injection, not global logger disabling. Explicit-preference assessment and next-dispatch prediction remain unsupported; broader specification examples are not executable interfaces.
 
 ## Verification

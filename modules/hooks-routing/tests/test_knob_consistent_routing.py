@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -911,13 +912,17 @@ class TestShippedKnobConsistentMatrix:
                 "claude-haiku-4-5",
             ]
         )
+        coordinator = SimpleNamespace(config={"providers": [
+            {"module": "provider-anthropic", "instance_id": "anthropic", "config": {}}
+        ]})
         for role in roles:
-            cold = await resolve_model_role([role], roles, anthropic_providers)
+            cold = await resolve_model_role([role], roles, anthropic_providers, coordinator=coordinator)
             with_caller = await resolve_model_role(
                 [role],
                 roles,
                 anthropic_providers,
                 caller_context=anthropic_caller,
+                coordinator=coordinator,
                 # No preset passed -- mirrors mount()'s own
                 # `preset if agent_caller_context is not None else None` gate
                 # being irrelevant here: parse_preset(data) is None either way.

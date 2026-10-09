@@ -99,7 +99,7 @@
 #      now says what it wants; `medium` where nothing more specific was
 #      established. Three exceptions, all enforced by the loader rather than
 #      chosen here (matrix_loader.INERT_CONFIG_RULES):
-#        * claude-haiku-* on ANY provider -- `reasoning_effort` is REJECTED at
+#        * Historical pre-5.5 guard (superseded 2026-10-07): effort rejected at
 #          every value (measured: effort absent on the wire, budget pinned at
 #          32000). Its documented replacement is `thinking_budget_tokens`.
 #        * gemini/* -- `reasoning_effort` is REJECTED; `thinking_level` is the
@@ -114,7 +114,7 @@
 #      is one of exactly two globs -- `gpt-?.?-terra*` (work) or
 #      `gpt-?.?-luna*` (cheap/fast, and `ui-coding` at max effort). There are
 #      no openai fallback rungs left at all.
-#  10. Haiku carries `thinking_budget_tokens: 32000` instead of a blank. The
+#  10. Historical pre-5.5 note, superseded by the curator compatibility table:
 #      loader REJECTS `reasoning_effort` on any model whose name contains
 #      'haiku', under any provider -- it collapses every level above 'low'
 #      into one identical request. 32000 is what `medium` resolves to and what
@@ -139,7 +139,7 @@
 
 name: openai
 description: "Interim GPT-6+ routing for both OpenAI backends. Sol 6.1 replaces Terra; Luna tracks current clean IDs. Knob-consistent delegation preserves the caller's tier/effort ceiling."
-updated: "2026-10-02"
+updated: "2026-10-07"
 
 # ---------------------------------------------------------------------------
 # Knob-consistent delegation preset -- DEFAULT ON for this matrix.

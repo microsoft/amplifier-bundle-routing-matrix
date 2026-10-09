@@ -3,8 +3,9 @@
 **Bounded first catalog slice, independently verified; awaiting PR adoption.** The vision
 and catalog contract remain DRAFT, not ratified or frozen. The routing library
 now implements the subset in [catalog-api](catalog-api.md), plus two additive
-exact-module OpenAI profiles. The original eight policies/golden entries are
-unchanged. No mandatory dispatch containment, consumer adoption, paid evaluation
+exact-module OpenAI profiles. That catalog slice left the original eight
+policies/golden entries unchanged; the later Haiku stock refresh below is separate.
+No mandatory dispatch containment, consumer adoption, paid evaluation
 or merge is established by this implementation.
 
 ## Read in this order
@@ -46,6 +47,20 @@ Baseline [public routing revision](https://github.com/microsoft/amplifier-bundle
 Core's provider discovery contract permits manual-entry/empty lists. Runtime integration inspection also found direct mounted-provider access, auxiliary provider.complete calls, explicit spawn preferences and foreign-runtime dispatch outside the routing hook. The provider:request hook currently handles a banner, not mandatory admission. Catalog source alone cannot qualify those paths.
 
 No Azure-specific provider checkout/discovery contract was verified. Require an actual adapter/deployment snapshot before claiming support; preserve unknown rather than inventing a module or models.
+
+### Native Haiku stock refresh — 2026-10-09
+
+Seven native candidates (`anthropic` fast, `balanced` fast, `economy` general,
+fast, coding, ui-coding and vision) restore `claude-haiku-*`, replacing fixed
+32000 budgets with `extended_thinking: true` and no effort. With the updated
+provider, selected 4.5 uses manual/default 32000 thinking; selected 5.5 uses
+adaptive thinking and vendor-medium omission. 4.5-only dated inventories still
+resolve; mixed 4.5/5.5 inventories select 5.5. Copilot/order/other roles are unchanged.
+Custom-file precedence and explicit pins remain intact. Inherited/custom manual
+budgets on selected 5.5 refuse before fallback rather than being erased.
+Adoption requires updated routing/provider versions and no shadowing custom matrix.
+This source change supplies no quality/cost, native computer-use, entitlement or
+deployed-adoption evidence; full-stack provider qualification is a separate gate.
 
 ## Review record for the expanded design
 

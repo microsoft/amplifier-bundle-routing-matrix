@@ -3,9 +3,8 @@
 # Anthropic-only routing. All roles use Claude models exclusively.
 # Use when you want to run entirely on your Anthropic API account.
 #
-# Uses class-scoped globs (claude-opus-*, claude-sonnet-*, claude-haiku-*) so
-# new Claude releases are picked up automatically -- the resolver's version-aware
-# sort with date-suffix stripping selects the highest clean version.
+# Claude families use class globs. Haiku thinking is version-specific:
+# native 4.5 uses the provider's default manual budget; native 5.5 is adaptive.
 #
 # Required roles: "general" and "fast" must be defined in every matrix.
 # See docs/MATRIX_CURATOR_GUIDE.md for schema details.
@@ -31,7 +30,7 @@
 
 name: anthropic
 description: "Anthropic-only routing. All roles use Claude models exclusively."
-updated: "2026-09-07"
+updated: "2026-10-09"
 
 roles:
   general:
@@ -47,17 +46,9 @@ roles:
     candidates:
       - provider: anthropic
         model: claude-haiku-*
-        # Haiku collapses every effort level above 'low' into ONE request, so
-        # `reasoning_effort` is rejected outright by the loader
-        # (matrix_loader.INERT_CONFIG_RULES). 32000 is the dial Haiku really
-        # reads, and is exactly what both `medium` and a blank already
-        # produced on the wire -- explicit, not a behaviour change.
-        # REVISIT WHEN HAIKU 5 SHIPS: if it gains real effort support, swap
-        # this back to `reasoning_effort`. The guard is keyed on the model
-        # substring 'haiku' under ANY provider, so claude-haiku-5 will keep
-        # being rejected until that rule is updated too.
+        # Provider selects manual/default 32000 on 4.5, adaptive on 5.5.
         config:
-          thinking_budget_tokens: 32000
+          extended_thinking: true
 
   coding:
     description: "Code generation, implementation, debugging"

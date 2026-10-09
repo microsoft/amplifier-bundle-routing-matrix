@@ -32,6 +32,20 @@ _UNSUPPORTED_PATHS = (
 )
 
 
+def _choice_values(
+    config: Mapping, prefix: tuple[str, ...] = (),
+) -> list[tuple[tuple[str, ...], Any]]:
+    """Retain structural path identity; None explicitly clears."""
+    values = []
+    for key, value in config.items():
+        path = (*prefix, key)
+        if isinstance(value, Mapping) and value:
+            values.extend(_choice_values(value, path))
+        elif value is not None:
+            values.append((path, value))
+    return values
+
+
 @dataclass(frozen=True)
 class PreparedCatalogSources:
     entries: Mapping[str, Any]
@@ -255,7 +269,8 @@ class _SnapshotCoordinator:
         self.providers = providers
         self.config = {"providers": [
             {"module": p.snapshot.module, "instance_id": key,
-             "config": {"priority": p.snapshot.priority, "default_model": p.snapshot.default_model}}
+             "config": {**thaw(p.snapshot.compatibility_config),
+                        "priority": p.snapshot.priority, "default_model": p.snapshot.default_model}}
             for key, p in providers.items()
         ]}
 
@@ -394,12 +409,25 @@ class RoutingCatalogV1:
                         if compatible != "incompatible":
                             compatible = "unknown"
                         reasons.append("preferred_candidate_uncertain")
-                    config = selected["config"]
+                    config = _choice_values({
+                        **thaw(provider.compatibility_config), **selected["config"],
+                    })
                     choices = provider.config_choices
-                    config_known = all(choices is not None and key in choices and choices[key] for key in config)
+                    # Dotted metadata denotes structural traversal only. A
+                    # literal dot in any component has no qualified schema,
+                    # even if its value equals the structural leaf's value.
+                    qualified = [
+                        (".".join(path), value) for path, value in config
+                        if all("." not in part for part in path)
+                        and not isinstance(value, (Mapping, list, tuple))
+                    ]
+                    config_known = len(qualified) == len(config) and all(
+                        choices is not None and key in choices and choices[key]
+                        for key, _ in qualified
+                    )
                     invalid_config = any(
                         choices is not None and key in choices and choices[key]
-                        and str(value) not in choices[key] for key, value in config.items()
+                        and str(value) not in choices[key] for key, value in qualified
                     )
                     report["native_config_evidence"] = "incompatible" if invalid_config else "verified" if config_known else "unknown"
                     if invalid_config:

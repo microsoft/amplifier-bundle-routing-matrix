@@ -97,62 +97,14 @@ class TestRuleTable:
         )
         assert inert_config_rule("ollama", "qwen3:32b", "reasoning_effort") is None
 
-    # -----------------------------------------------------------------------
-    # The reconciliation with PR #48 (model_performance-iai)
-    # -----------------------------------------------------------------------
-    #
-    # #48 landed a MODEL-keyed haiku guard; #49 landed this PROVIDER-keyed
-    # gemini guard. Merging them into one table is only correct if BOTH
-    # rejections survive with their own keying. These tests pin that, so a
-    # future edit cannot quietly drop one of them back to silent-drop.
+    def test_haiku_is_not_subject_to_family_wide_stripping(self) -> None:
+        """Haiku compatibility is version/backend-aware and refuses intent."""
+        assert all(r.model_marker != "haiku" for r in INERT_CONFIG_RULES)
+        assert inert_config_rule("anthropic", "claude-haiku-5-5", "reasoning_effort") is None
 
-    def test_a_haiku_rule_is_enforced(self) -> None:
-        """PR #48's measured finding must survive the merge into this table."""
-        rule = inert_config_rule("anthropic", "claude-haiku-4-5", "reasoning_effort")
-        assert rule is not None
-        assert "1,438" in rule.reason  # #48's measured n, carried over verbatim
-        assert "20260901-threeknob" in rule.reason
-        assert "32000" in rule.remediation("claude-haiku-4-5", "high")
+    def test_haiku_refusal_and_gemini_stripping_remain_distinct(self) -> None:
+        from amplifier_module_hooks_routing.haiku_compatibility import HaikuCompatibilityError
 
-    def test_haiku_rule_is_model_keyed_not_provider_keyed(self) -> None:
-        """Haiku's defect is at the MODEL: anthropic-the-provider is fine.
-
-        Keying it on the provider would reject effort on every Anthropic
-        model, most of which honour it -- which is why one shared key shape
-        could not express both findings and the table carries two fields.
-        """
-        haiku = next(r for r in INERT_CONFIG_RULES if r.model_marker == "haiku")
-        assert haiku.provider == "*"
-        assert haiku.model_marker == "haiku"
-        # ...and the sibling row keys the other way round.
-        gemini = next(r for r in INERT_CONFIG_RULES if r.provider == "gemini")
-        assert gemini.model_marker == ""
-
-    def test_haiku_row_matches_under_any_provider_name(self) -> None:
-        """`provider="*"` preserves #48's shipped matching semantics exactly.
-
-        The guard on main matched the model substring under ANY provider name.
-        Narrowing the merged row to `provider="anthropic"` would silently stop
-        rejecting an inert effort key on a haiku model served under some other
-        provider id -- a behaviour regression the merge must not introduce.
-        """
-        for provider in ("anthropic", "github-copilot", "bedrock", ""):
-            assert (
-                inert_config_rule(provider, "claude-haiku-4-5", "effort") is not None
-            ), provider
-
-    def test_a_narrow_row_is_matched_before_the_wildcard_row(self) -> None:
-        """First match wins, so ordering is load-bearing, not cosmetic."""
-        providers = [r.provider for r in INERT_CONFIG_RULES]
-        assert providers.index("gemini") < providers.index("*")
-
-    def test_both_rejections_are_enforced_by_the_one_mechanism(self) -> None:
-        """One table, two live rules -- not two mechanisms that can disagree.
-
-        The whole argument for merging (#49's PR body, "THE DESIGN CALL") is
-        that two mechanisms would mean two possible answers to "is this key
-        live on this candidate?". This asserts there is exactly one answer.
-        """
         matrix = {
             "roles": {
                 "reasoning": {
@@ -177,9 +129,9 @@ class TestRuleTable:
         assert any("thinking_budget_tokens" in e for e in errors)  # haiku's fix
         assert any("thinking_level" in e for e in errors)  # gemini's fix
 
-        cleaned, _ = strip_inert_config(matrix)
-        for candidate in cleaned["roles"]["reasoning"]["candidates"]:
-            assert "reasoning_effort" not in candidate["config"]
+        with pytest.raises(HaikuCompatibilityError, match="haiku_effort_unsupported"):
+            strip_inert_config(matrix)
+        assert matrix["roles"]["reasoning"]["candidates"][0]["config"] == {"reasoning_effort": "high"}
 
 
 # ---------------------------------------------------------------------------
