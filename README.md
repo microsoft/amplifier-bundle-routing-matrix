@@ -36,12 +36,18 @@ Native 4.5 still accepts manual budgets and rejects effort. Unknown/future IDs,
 aliases and unqualified backends refuse explicit effort/budgets with
 `HaikuCompatibilityError`, not silent stripping or model fallback.
 
-Budget-bearing stock Anthropic Haiku globs are now pinned to `claude-haiku-4-5`.
-This is an observable compatibility selection change: a catalog containing 5.5
-no longer auto-upgrades those entries with a legacy 32000 budget. Copilot's
-unqualified native-Anthropic budget knobs are removed; its model pins are retained.
-No 5.5 role promotion or quality claim is made. Custom exact 5.5 intent remains
-supported when the selected mount has compatible knobs and an updated provider.
+Seven stock native Anthropic Haiku candidates use `claude-haiku-*` with
+`extended_thinking: true`, without a fixed budget or effort. They select 5.5 when
+listed, and retain 4.5 (including dated 4.5) on 4.5-only inventories. The updated
+provider encodes 4.5 as manual thinking with its default 32000 budget, and 5.5 as
+adaptive thinking with unset effort (vendor medium default).
+
+Adoption requires the updated routing/provider versions and the shipped matrix
+to win loading; custom shadowing files and explicit pins are not rewritten.
+Inherited or custom manual budgets still raise `HaikuCompatibilityError` if the
+glob selects 5.5, before fallback; routing never silently removes them or selects
+4.5 instead. Copilot pins/config remain unchanged. This is automatic family
+selection, not evidence of quality, cost, native computer-use support or entitlement.
 See the [curator change table](docs/MATRIX_CURATOR_GUIDE.md#haiku-version-and-backend-compatibility).
 
 ### Bounded catalog library

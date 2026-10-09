@@ -24,7 +24,12 @@ manual budgets/between_tools; native 4.5 retains manual budgets and rejects
 effort. Validate the concrete selected model against its exact mounted module
 and inherited mount knobs. Globs defer validation; unknown aliases/backends
 refuse explicit effort/budgets rather than stripping them or falling back.
-Shipped budget-bearing Haiku selections are pinned to 4.5, not promoted to 5.5.
+Seven shipped native Haiku candidates use `claude-haiku-*` with
+`extended_thinking: true`, no fixed budget/effort: updated provider 4.5 is
+manual/default 32000, 5.5 adaptive/vendor-medium omission. Preserve custom pins
+and shadowing files; inherited/custom 5.5 manual budgets still refuse before
+fallback, never clear automatically. Automatic family selection is not a
+quality/cost, native computer-use or entitlement claim.
 Catalog `compatibility_config` is an allowlisted immutable snapshot, never a
 copy of account config. Full-stack provider support remains a separate gate.
 Choice evidence checks inherited plus shallow-overridden knobs, including the

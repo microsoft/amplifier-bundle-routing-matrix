@@ -948,6 +948,111 @@ async def test_injected_silent_reporting_preserves_glob_failure_semantics(caplog
     assert any("Failed to list models" in record.getMessage() for record in caplog.records)
 
 
+SHIPPED_NATIVE_HAIKU_ROLES = (
+    ("anthropic", "fast"),
+    ("balanced", "fast"),
+    ("economy", "general"),
+    ("economy", "fast"),
+    ("economy", "coding"),
+    ("economy", "ui-coding"),
+    ("economy", "vision"),
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name,role_name", SHIPPED_NATIVE_HAIKU_ROLES)
+@pytest.mark.parametrize("models,expected", [
+    (("claude-haiku-4-5",), "claude-haiku-4-5"),
+    (("claude-haiku-4-5-20251001",), "claude-haiku-4-5-20251001"),
+    (("claude-haiku-4-5-20251001", "claude-haiku-4-5"), "claude-haiku-4-5"),
+    (("claude-haiku-5-5",), "claude-haiku-5-5"),
+    (("claude-haiku-4-5-20251001", "claude-haiku-5-5", "claude-haiku-4-5"),
+     "claude-haiku-5-5"),
+])
+async def test_shipped_native_haiku_catalog_matches_runtime(catalog, name, role_name, models, expected):
+    p = provider("provider-anthropic", "synthetic-native",
+                 config_choices={"extended_thinking": ["True"]})
+    data = inputs([p], [inventory(p, models, state="fresh_complete")],
+                  required_roles=(role_name,))
+    effective = catalog.describe(Selection(name))["effective_policy"]
+    before = copy.deepcopy(effective)
+    coord, mounted, _, _ = runtime([p])
+    mounted[p.instance_id].list_models = AsyncMock(return_value=list(models))
+    resolved = await resolve_model_role(
+        [role_name], effective["roles"], mounted, coordinator=coord,
+    )
+    first = await catalog.assess(Selection(name), data)
+    assert first == await catalog.assess(Selection(name), data)
+    selected = role(first, role_name)["selection"]
+    assert {key: selected[key] for key in ("provider", "model", "config")} == resolved[0]
+    assert selected["model"] == expected
+    assert selected["config"] == {"extended_thinking": True}
+    assert selected["module"] == p.module and selected["instance_id"] == p.instance_id
+    assert role(first, role_name)["native_config_evidence"] == "verified"
+    # Choice/catalog fixtures do not establish transport, modality or entitlement.
+    assert first["enforcement"]["status"] == "not_enforced" and not first["execution_ready"]
+    assert dict(p.compatibility_config) == {}
+    assert catalog.describe(Selection(name))["effective_policy"] == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name,role_name", SHIPPED_NATIVE_HAIKU_ROLES)
+async def test_shipped_native_haiku_catalog_inherited_budget_refuses(catalog, name, role_name):
+    from amplifier_module_hooks_routing.haiku_compatibility import HaikuCompatibilityError
+
+    p = provider("provider-anthropic", "synthetic-native",
+                 compatibility_config={"thinking_budget_tokens": 32000})
+    models = ("claude-haiku-4-5", "claude-haiku-5-5")
+    data = inputs([p], [inventory(p, models, state="fresh_complete")],
+                  required_roles=(role_name,))
+    effective = catalog.describe(Selection(name))["effective_policy"]
+    before = copy.deepcopy(effective)
+    coord, mounted, _, _ = runtime([p])
+    mounted[p.instance_id].list_models = AsyncMock(return_value=list(models))
+    available = []
+    coord.get_capability = lambda key: available.append if key == "provider.check_available" else None
+    with pytest.raises(HaikuCompatibilityError) as runtime_error:
+        await resolve_model_role(
+            [role_name, "general"], effective["roles"], mounted, coordinator=coord,
+        )
+    with pytest.raises(HaikuCompatibilityError) as catalog_error:
+        await catalog.assess(Selection(name), data)
+    assert runtime_error.value.code == catalog_error.value.code == "haiku_manual_thinking_forbidden"
+    assert runtime_error.value.model == catalog_error.value.model == "claude-haiku-5-5"
+    assert available == [p.instance_id]
+    assert dict(p.compatibility_config) == {"thinking_budget_tokens": 32000}
+    assert catalog.describe(Selection(name))["effective_policy"] == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model,config", [
+    *[(model, {"thinking_budget_tokens": 32000})
+      for model in ("claude-haiku-4-5", "claude-haiku-4-5-20251001")],
+    *[("claude-haiku-5-5", {"reasoning_effort": effort})
+      for effort in ("low", "medium", "high", "xhigh", "max")],
+])
+async def test_custom_haiku_pins_shadow_stock_upgrade_without_rewrite(tmp_path, model, config):
+    policy = yaml.safe_load((ROUTING / "balanced.yaml").read_text())
+    policy["roles"]["fast"]["candidates"] = [
+        {"provider": "anthropic", "model": model, "config": config},
+    ]
+    catalog = custom_catalog(tmp_path, policy, stem="balanced")
+    original_bytes = (tmp_path / "balanced.yaml").read_bytes()
+    p = provider("provider-anthropic", "synthetic-native")
+    data = inputs([p], [inventory(p, ("claude-haiku-4-5", "claude-haiku-5-5"), state="fresh_complete")],
+                  required_roles=("fast",))
+    effective = catalog.describe(Selection("balanced"))["effective_policy"]
+    coord, mounted, _, _ = runtime([p])
+    resolved = await resolve_model_role(["fast"], effective["roles"], mounted, coordinator=coord)
+    report = await catalog.assess(Selection("balanced"), data)
+    selected = role(report, "fast")["selection"]
+    assert resolved == [{"provider": p.instance_id, "model": model, "config": config}]
+    assert {key: selected[key] for key in ("provider", "model", "config")} == resolved[0]
+    assert catalog.describe(Selection("balanced"))["effective_policy"] == policy
+    assert (tmp_path / "balanced.yaml").read_bytes() == original_bytes
+    mounted[p.instance_id].list_models.assert_not_called()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("model,config,caller_effort,expected_error", [
     *[("claude-haiku-5-5", {}, level, None)

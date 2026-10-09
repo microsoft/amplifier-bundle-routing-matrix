@@ -125,7 +125,7 @@
 
 name: economy
 description: "Budget-first routing. Cheap tier for utility roles, mid-tier where quality matters."
-updated: "2026-10-07"
+updated: "2026-10-09"
 
 roles:
   general:
@@ -136,10 +136,10 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-haiku-4-5
-        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
+        model: claude-haiku-*
+        # Provider selects manual/default 32000 on 4.5, adaptive on 5.5.
         config:
-          thinking_budget_tokens: 32000
+          extended_thinking: true
       - provider: gemini
         model: "gemini-[3-9]*-flash-lite"
       - provider: gemini
@@ -162,10 +162,10 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-haiku-4-5
-        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
+        model: claude-haiku-*
+        # Provider selects manual/default 32000 on 4.5, adaptive on 5.5.
         config:
-          thinking_budget_tokens: 32000
+          extended_thinking: true
       - provider: gemini
         model: "gemini-[3-9]*-flash-lite"
       - provider: gemini
@@ -192,10 +192,10 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-haiku-4-5
-        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
+        model: claude-haiku-*
+        # Provider selects manual/default 32000 on 4.5, adaptive on 5.5.
         config:
-          thinking_budget_tokens: 32000
+          extended_thinking: true
       - provider: gemini
         model: "gemini-[3-9]*-flash"
         config:
@@ -216,10 +216,10 @@ roles:
         config:
           reasoning_effort: max
       - provider: anthropic
-        model: claude-haiku-4-5
-        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
+        model: claude-haiku-*
+        # Provider selects manual/default 32000 on 4.5, adaptive on 5.5.
         config:
-          thinking_budget_tokens: 32000
+          extended_thinking: true
       - provider: gemini
         model: "gemini-[3-9]*-flash"
         config:
@@ -383,10 +383,10 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-haiku-4-5
-        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
+        model: claude-haiku-*
+        # Provider selects manual/default 32000 on 4.5, adaptive on 5.5.
         config:
-          thinking_budget_tokens: 32000
+          extended_thinking: true
 
   image-gen:
     description: "Image generation, visual mockup creation, visual ideation"

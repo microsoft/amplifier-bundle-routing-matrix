@@ -29,6 +29,16 @@ from amplifier_module_hooks_routing.resolver import NoScopedRouteError, resolve_
 
 ROOT = Path(__file__).resolve().parents[3]
 
+SHIPPED_NATIVE_HAIKU = (
+    ("anthropic", "fast", 0),
+    ("balanced", "fast", 1),
+    ("economy", "general", 1),
+    ("economy", "fast", 1),
+    ("economy", "coding", 1),
+    ("economy", "ui-coding", 1),
+    ("economy", "vision", 3),
+)
+
 
 def matrix(model, config=None, provider="anthropic"):
     return {
@@ -459,6 +469,105 @@ def test_shipped_haiku_candidates_are_backend_qualified(path):
                 continue
             config = candidate.get("config", {})
             if candidate["provider"] == "anthropic":
-                assert model == HAIKU_45[0] and config == {"thinking_budget_tokens": 32000}
+                assert model == "claude-haiku-*" and config == {"extended_thinking": True}
             else:
                 assert model == "claude-haiku-4.5" and not config
+
+
+def test_seven_shipped_native_haiku_paths_are_retained():
+    actual = set()
+    for path in (ROOT / "routing").glob("*.yaml"):
+        policy = yaml.safe_load(path.read_text())
+        for role, data in policy["roles"].items():
+            for index, candidate in enumerate(data["candidates"]):
+                if candidate["provider"] == "anthropic" and "haiku" in candidate["model"]:
+                    actual.add((path.stem, role, index))
+    assert actual == set(SHIPPED_NATIVE_HAIKU)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name,role,index", SHIPPED_NATIVE_HAIKU)
+@pytest.mark.parametrize("models,expected", [
+    ([HAIKU_45[0]], HAIKU_45[0]),
+    ([HAIKU_45[1]], HAIKU_45[1]),
+    (list(reversed(HAIKU_45)), HAIKU_45[0]),
+    ([HAIKU_55], HAIKU_55),
+    ([HAIKU_45[1], HAIKU_55, HAIKU_45[0]], HAIKU_55),
+])
+async def test_shipped_native_haiku_globs_resolve_with_version_neutral_thinking(
+    name, role, index, models, expected,
+):
+    from amplifier_foundation.spawn_utils import ProviderPreference, apply_provider_preferences
+
+    raw = yaml.safe_load((ROOT / "routing" / f"{name}.yaml").read_text())
+    before = deepcopy(raw)
+    policy, preset, errors = compose_effective_matrix(raw)
+    candidate = policy["roles"][role]["candidates"][index]
+    assert candidate == {
+        "provider": "anthropic", "model": "claude-haiku-*",
+        "config": {"extended_thinking": True},
+    }
+    assert preset is None and errors == []
+    coord, mounted = host(models=models)
+    original_mount = deepcopy(coord.config)
+    selected = await resolve_model_role(
+        [role], policy["roles"], mounted, coordinator=coord,
+    )
+    assert selected == [{
+        "provider": "synthetic-native", "model": expected,
+        "config": {"extended_thinking": True},
+    }]
+    mounted["synthetic-native"].list_models.assert_awaited_once()
+    child = apply_provider_preferences(coord.config, [ProviderPreference(**selected[0])])
+    child_config = child["providers"][0]["config"]
+    assert child_config["default_model"] == expected
+    assert child_config["extended_thinking"] is True
+    assert not ({"thinking_budget_tokens", "thinking_budget", "budget_tokens",
+                 "reasoning_effort", "effort"} & child_config.keys())
+    assert haiku_config_errors("anthropic", expected, child_config) == []
+    assert coord.config == original_mount and raw == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name,role,index", SHIPPED_NATIVE_HAIKU)
+@pytest.mark.parametrize("inherited", [False, True])
+async def test_shipped_glob_55_budget_refuses_before_candidate_or_role_fallback(
+    name, role, index, inherited,
+):
+    policy = yaml.safe_load((ROOT / "routing" / f"{name}.yaml").read_text())
+    if not inherited:
+        policy["roles"][role]["candidates"][index]["config"]["thinking_budget_tokens"] = 32000
+    policy["roles"][role]["candidates"].append(
+        {"provider": "anthropic", "model": "claude-sonnet-5-5"},
+    )
+    policy, _, _ = compose_effective_matrix(policy)
+    coord, mounted = host(
+        config={"thinking_budget_tokens": 32000} if inherited else {},
+        models=[HAIKU_45[0], HAIKU_55],
+    )
+    available = []
+    coord.get_capability = lambda key: available.append if key == "provider.check_available" else None
+    before = deepcopy(policy), deepcopy(coord.config)
+    with pytest.raises(HaikuCompatibilityError) as error:
+        await resolve_model_role([role, "general"], policy["roles"], mounted, coordinator=coord)
+    assert error.value.code == "haiku_manual_thinking_forbidden"
+    assert error.value.model == HAIKU_55 and error.value.key == "thinking_budget_tokens"
+    assert available == ["synthetic-native"]  # neither later candidate nor role attempted
+    assert (policy, coord.config) == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model,config", [
+    *[(model, {"thinking_budget_tokens": 32000}) for model in HAIKU_45],
+    *[(HAIKU_55, {"reasoning_effort": effort}) for effort in HAIKU_55_EFFORTS],
+])
+async def test_explicit_custom_pin_overrides_stock_glob_unchanged(model, config):
+    stock = yaml.safe_load((ROOT / "routing" / "balanced.yaml").read_text())
+    override = {"fast": [{"provider": "anthropic", "model": model, "config": config}]}
+    before = deepcopy(stock), deepcopy(override)
+    policy, _, errors = compose_effective_matrix(stock, config_overrides=override)
+    coord, mounted = host(models=[HAIKU_45[0], HAIKU_55])
+    selected = await resolve_model_role(["fast"], policy["roles"], mounted, coordinator=coord)
+    assert selected == [{"provider": "synthetic-native", "model": model, "config": config}]
+    assert errors == [] and (stock, override) == before
+    mounted["synthetic-native"].list_models.assert_not_called()

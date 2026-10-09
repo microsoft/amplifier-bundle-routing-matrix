@@ -352,26 +352,38 @@ applicable Gemini inert-key stripping after actual module/model resolution.
 permit candidate/role fallback. Remove an incompatible custom setting explicitly
 or pin a qualified target; nothing silently clears expert/caller intent.
 
-#### October 7 shipped selection/config change
+#### October 9 native wildcard upgrade (supersedes October 7 pins)
 
 With a synthetic catalog containing native 4.5, its dated snapshot and 5.5:
 
 | Matrix / roles | Before | After |
 | --- | --- | --- |
-| `anthropic` / fast | `claude-haiku-*` → 5.5 with budget 32000 | exact `claude-haiku-4-5`, budget 32000 |
-| `balanced` / fast, native fallback | same glob → 5.5 with budget 32000 | exact native 4.5, budget 32000 |
-| `economy` / general, fast, coding, ui-coding, vision, native candidates | same glob → 5.5 with budget 32000 | exact native 4.5, budget 32000 |
-| `balanced` / fast; `economy` / general, fast, coding, ui-coding, vision, Copilot candidates | exact `claude-haiku-4.5`, unqualified native budget 32000 | same exact pin, no manual-budget override |
+| `anthropic` / fast | exact `claude-haiku-4-5`, budget 32000 | `claude-haiku-*` → 5.5, `extended_thinking: true` |
+| `balanced` / fast, native fallback | exact native 4.5, budget 32000 | same glob/config → 5.5 |
+| `economy` / general, fast, coding, ui-coding, vision, native candidates | exact native 4.5, budget 32000 | same glob/config → 5.5 |
+| `balanced` / fast; `economy` / general, fast, coding, ui-coding, vision, Copilot candidates | exact `claude-haiku-4.5`, no manual-budget override | same pin/config |
 | `copilot` / fast | exact `claude-haiku-4.5`, no budget | same pin/config |
 
-This deliberately freezes seven broad native selections to their legacy tier.
-It is **not unchanged resolution**: older dated-only inventories formerly selected
-the snapshot; the new exact alias bypasses listing and remains unverified if absent
-from an authoritative catalog. Role order and unrelated efforts remain unchanged.
-Only the economy vision Copilot-budget entry changes in the existing fixed-roster
-golden recording; the other recorded entries remain byte-identical.
-No automatic fast-role promotion or comparative quality claim follows from the
-5.5 protocol facts. Custom exact 5.5 candidates with valid effort remain intact.
+This restores automatic family selection for seven native candidates, with no
+fixed budget or effort. On 4.5-only inventories the glob selects native 4.5,
+including `claude-haiku-4-5-20251001` when only the dated ID is listed. The updated
+provider uses manual thinking with default budget 32000 for 4.5 and adaptive
+thinking for 5.5; unset 5.5 effort retains the vendor medium default.
+
+This is **not unchanged resolution**: mixed inventories now select 5.5. The
+fixed-roster golden fixture changes only six selected native Haiku configs to
+`extended_thinking: true`; economy vision still selects its unchanged Copilot
+predecessor in that roster. Role order and unrelated efforts remain unchanged.
+Explicit 4.5 pins/manual budgets and exact 5.5 candidates with valid effort remain
+intact. An inherited/custom manual budget on selected 5.5 still raises
+`HaikuCompatibilityError` before candidate/role fallback; routing does not erase
+the budget or downgrade to 4.5.
+
+Users adopt this through updated routing and provider versions when the shipped
+matrix wins loading. A shadowing custom matrix keeps its policy; saved pins and
+preferences are not rewritten. The wildcard does not qualify hypothetical future
+versions. Automatic selection is not a comparative quality/cost win, native
+computer-use acceptance, entitlement proof or evidence of deployed adoption.
 
 ---
 

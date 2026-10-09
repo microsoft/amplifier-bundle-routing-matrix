@@ -3,8 +3,8 @@
 # Anthropic-only routing. All roles use Claude models exclusively.
 # Use when you want to run entirely on your Anthropic API account.
 #
-# Opus/Sonnet use class globs. Budget-bearing Haiku is pinned to native 4.5;
-# automatic 5.5 selection would carry a forbidden manual budget.
+# Claude families use class globs. Haiku thinking is version-specific:
+# native 4.5 uses the provider's default manual budget; native 5.5 is adaptive.
 #
 # Required roles: "general" and "fast" must be defined in every matrix.
 # See docs/MATRIX_CURATOR_GUIDE.md for schema details.
@@ -30,7 +30,7 @@
 
 name: anthropic
 description: "Anthropic-only routing. All roles use Claude models exclusively."
-updated: "2026-10-07"
+updated: "2026-10-09"
 
 roles:
   general:
@@ -45,10 +45,10 @@ roles:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
     candidates:
       - provider: anthropic
-        model: claude-haiku-4-5
-        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
+        model: claude-haiku-*
+        # Provider selects manual/default 32000 on 4.5, adaptive on 5.5.
         config:
-          thinking_budget_tokens: 32000
+          extended_thinking: true
 
   coding:
     description: "Code generation, implementation, debugging"

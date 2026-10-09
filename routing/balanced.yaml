@@ -123,7 +123,7 @@
 
 name: balanced
 description: "Quality/cost balance for mixed workloads. Curated by Amplifier Foundation team."
-updated: "2026-10-07"
+updated: "2026-10-09"
 
 roles:
   general:
@@ -162,10 +162,10 @@ roles:
         config:
           reasoning_effort: medium
       - provider: anthropic
-        model: claude-haiku-4-5
-        # Legacy manual-budget target; native 5.5 requires adaptive thinking.
+        model: claude-haiku-*
+        # Provider selects manual/default 32000 on 4.5, adaptive on 5.5.
         config:
-          thinking_budget_tokens: 32000
+          extended_thinking: true
       - provider: gemini
         model: "gemini-[3-9]*-flash"
         config:
