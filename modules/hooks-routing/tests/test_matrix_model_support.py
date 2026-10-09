@@ -563,7 +563,7 @@ async def test_shipped_glob_55_budget_refuses_before_candidate_or_role_fallback(
 ])
 async def test_explicit_custom_pin_overrides_stock_glob_unchanged(model, config):
     stock = yaml.safe_load((ROOT / "routing" / "balanced.yaml").read_text())
-    override = {"fast": [{"provider": "anthropic", "model": model, "config": config}]}
+    override = {"fast": {"candidates": [{"provider": "anthropic", "model": model, "config": config}]}}
     before = deepcopy(stock), deepcopy(override)
     policy, _, errors = compose_effective_matrix(stock, config_overrides=override)
     coord, mounted = host(models=[HAIKU_45[0], HAIKU_55])
