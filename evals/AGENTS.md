@@ -43,4 +43,50 @@ Live output requires an explicit private ignored directory outside source repos,
 `/.eval-deps/` is only the ignored development asset cache. `/evals/results/` is
 an accidental-output safeguard, not an approved raw-results location.
 
+## Separate smoke prototype
+
+`live_smoke.py`, `live_transport.py`, `smoke_cli.py` and `live_provider/` use
+`routing-live-smoke/v1`, not the offline experiment schema. It is pre-trial
+instrumentation, not permission to spend or change routing policy. Preflight
+requires exact source/quote/task/grammar/image-bound qualification evidence and
+controller resource authority. A reference string or image boolean is not proof.
+
+Core validates providers with a separate authority-less coordinator. The eval
+shim mounts a permanently dormant public Provider there: truthful unavailable
+metadata and model/list/parser calls that always refuse, even after cleanup.
+Actual root/child initialization and each send require the exact controller
+factory object through `provider.before_load` and independent wire gating.
+Never bypass validation, authorize by coordinator classname, use a fake
+successful inference provider or consult ambient credentials.
+
+Native counts are locally refused before underlying HTTP because their billing
+is unqualified. No fake count, successful zero response or byte/token estimate.
+Financial reservation uses the parent-qualified full native context bound and
+highest long-context category/output rates. The 8192 ceiling is serialized UTF-8
+BODY BYTES only; actual tokens come from complete vendor generation usage.
+Generation requires explicit default Standard service and exact model/high effort.
+
+The task now discloses `restricted-python-v1` before trials. Its closed AST
+grammar forbids imports/reflection/IO/indirect calls/protected rebinding and
+separates the model namespace from the trusted driver. Host only parses/hashes;
+compile/execute only in the qualified credential-free Docker assessor. Rejected
+grammar is ungradable with no fabricated awards. Critical pass means only
+observed input immutability across the complete case set, not universal safety.
+Driver/validator/image changes invalidate qualification; never broaden grammar
+after observing model output. Await assessor custody through repeated cancellation.
+
+Pure smoke tests need no Core/Foundation/SDK installation. Full-stack tests are
+selected only after real Core and Foundation are pre-imported in the same pytest
+process; invoke them explicitly as in README and check the selected count.
+Do not turn their mount failures into skips/xfails. Use one parent-supplied
+isolated environment with intercepted HTTP and no credentials; launch no extra
+environment and never execute generated artifacts in that subject/controller.
+Quotes in tests are explicitly synthetic, not live price evidence.
+
+`test_assessor_controls.py` is an explicit opt-in Docker check, not ordinary CI.
+Use a parent-qualified isolation proof and registrar, one control container at a
+time. Persist intent/register/claim before creation; destroy only each owned
+exact name and independently verify absence. Never sweep other claimed resources.
+Raw control journals stay private/ignored; the parent owns publication review.
+
 Do not auto-run paid recurrence or mutate shipping matrix policy. If sources/tasks/grader/runtime change, use the reuse disposition in `RESULT-REUSE.md`; never relabel old scores as fresh execution. Capture tested commands, remaining gaps and agreed decisions here or in the document that owns them, without importing private project context.
