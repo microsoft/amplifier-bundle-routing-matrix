@@ -5,6 +5,8 @@
 Read `README.md`, `docs/HANDOFF.md`, `docs/VISION.md`, and the documents relevant to your change:
 - Catalog, identity, scope or host integration: `contracts/routing-catalog.v1.md`, `docs/CATALOG-SPEC.md`, `docs/PROVIDER_AVAILABILITY.md`.
 - Model preferences, evaluation or evidence: `docs/EVALUATION-PROGRAM.md`, `docs/MATRIX_CURATOR_GUIDE.md`.
+- Image-operation routing direction: `contracts/image-routing.v1.md` and
+  `docs/IMAGE-ROUTING.md`; drafts only, not changed matrix policy or live support.
 - Offline routing evaluation tooling: `evals/AGENTS.md` and `evals/README.md`.
 - Tests and release gates: `.github/workflows/ci.yml`, `ruff.toml`, module `pyproject.toml` and module tests.
 
