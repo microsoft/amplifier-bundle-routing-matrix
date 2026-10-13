@@ -94,12 +94,16 @@ roles:
         config:
           reasoning_effort: medium
   image-gen:
-    description: "Image generation (limited — gpt-image not available via chat API)"
+    description: "Image planning; native generation requires a qualified OpenAI API image operation"
+    # The profile's exact provider-openai module constraint remains in force.
     candidates:
       - provider: openai
         model: gpt-6.1-sol
         config:
           reasoning_effort: high
+          image_generation:
+            model: gpt-image-2.5-flare
+            transport: responses
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
