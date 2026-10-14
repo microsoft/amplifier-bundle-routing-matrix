@@ -529,6 +529,133 @@ GitHub, so whoever merges must run `gh pr ready 68` first. That is the only prac
 (app-cli #320 is still `isDraft: false`), and the next fan-out will re-run the coin flip
 until the goal template says which reading it means.
 
+### F6 — my own documentation executed itself and silently reverted the compliance action
+
+Filed as **`model_performance-cozt`**. Self-inflicted, caught, and worth recording because it
+is this program's signature failure mode aimed at the tooling: **a confident, plausible,
+wrong outcome that exits 0.**
+
+Having complied with the F5 ruling at **17:33:05** (`convert_to_draft`, confirmed on
+GitHub's timeline), this lane wrote its marker with a heredoc opened as `python3 - <<PY` —
+**delimiter unquoted**. An unquoted heredoc expands its body before the interpreter sees it,
+and the body was prose that quoted two commands in backticks, *as documentation*:
+
+```
+"...complied on the ruling: `gh pr ready --undo 68`. FINAL STATE isDraft true..."
+"...a draft PR cannot be merged on GitHub; run `gh pr ready 68` first..."
+```
+
+Backticks in an unquoted heredoc are **command substitution**. The shell ran both:
+
+| Substitution | Effect |
+|---|---|
+| `gh pr ready --undo 68` | no-op — already draft (`! Pull request #68 is already "in draft"`) |
+| `gh pr ready 68` | **flipped the PR back out of draft** (`✓ marked as "ready for review"`) |
+
+**100 seconds after complying, the documentation about the ruling silently undid it.**
+
+**Why it nearly escaped:** exit code 0; stdout entirely correct (push fine, readback matched,
+JSON validated); the only trace was two stderr lines amid normal git/gh chatter; and the
+written text was *almost* right — the substitutions returned empty, leaving two small holes
+(`"complied on the ruling: ."`) rather than visible corruption.
+
+**Confirmed independently, not inferred** — GitHub's own timeline:
+
+```
+ready_for_review  17:11:47Z  bkrabach   <- deliberate
+convert_to_draft  17:33:05Z  bkrabach   <- complying with the ruling
+ready_for_review  17:34:48Z  bkrabach   <- NOT deliberate: the heredoc
+```
+
+No workflow in `.github/workflows/` touches draft state, and `publication_readback.sh` was
+checked and is read-only. The heredoc is the whole cause.
+
+**Fix, applied here and generally:** quote the delimiter (`<<'PY'`) whenever the body is
+**data** rather than a template. The exposure generalises to any agent writing documentation
+*about* commands — the more faithfully the prose quotes a real command, the more damage an
+unquoted delimiter does, and quoting real commands is what good documentation does.
+`gh pr merge`, `git push --force` or a teardown script would have run identically.
+
+**Ordering rule adopted for the rest of this lane:** assert the PR's draft state **last**,
+after every file write, and verify it afterwards — so no later write can revert it again.
+
+### F7 — PR #68 was MERGED to main (and so were all three siblings, in a 28-second sweep)
+
+Filed as **`model_performance-8jk4`**. Reported, not absorbed.
+
+```
+state        MERGED
+mergedAt     2026-09-07T17:35:42Z
+mergedBy     bkrabach
+mergeCommit  4e53f8575a3a35f785d928d9deffbafe868fcea3
+merged head  9a87ab6194a281cd0495e2b435bca5e9522b5f61
+```
+
+The lean file is **live on main** — `context/routing-instructions.md`, 745 bytes, verified on
+`origin/main`. The goal forbids this in three places: *"DO NOT MERGE — the manager merges"*,
+*"Do not merge anything to main"*, *"Never merge"*.
+
+**What this lane can establish:** no command block it issued contained a merge verb. Its one
+known command-execution accident (**F6 / `cozt`**) performed exactly two substitutions, both
+PR-ready variants, both on stderr and both on GitHub's timeline at 17:34:48. The merge is
+**54 seconds later**.
+
+**What it cannot:** the actor, beyond the account. `bkrabach` is the shared token used by the
+manager process, every sibling lane, and this lane. Nothing finer is available from the API.
+**A DO-NOT-MERGE rule is unenforceable and unauditable under a shared token** — that is
+itself the finding.
+
+**What this lane owns anyway.** Three consecutive replies opened with the imperative
+*"Merge https://…/pull/68"*. A reviewer flagged that framing; the wording was corrected to
+*"READY FOR YOUR MERGE DECISION"* and the priority list reordered — but the earlier text had
+already gone out. Whether or not it caused this, **a lane forbidden to merge should never
+have put merging on its top line**, and this sequence is exactly why.
+
+#### RETRACTED — "F6 removed the last guard" was wrong, and the batch data disproves it
+
+I first reasoned: a draft PR cannot be merged, F6 flipped #68 out of draft 54 seconds
+before the merge, therefore F6 enabled it. **That inference is false.** Checking the
+siblings:
+
+| PR | merged at | was draft? |
+|---|---|---|
+| app-cli #320 | 17:35:14Z | no |
+| **wayfinder #11** | 17:35:23Z | **YES — and merged anyway** |
+| skills #65 | 17:35:33Z | no |
+| routing-matrix #68 | 17:35:42Z | no |
+
+**Wayfinder #11 was a draft and was merged nine seconds before mine.** So the draft flag did
+not gate this merge at all, and F6 was not its enabling cause. A causal chain built on one
+observation, falsified by four — recorded rather than quietly deleted, because that is the
+exact failure mode this program keeps catching.
+
+#### And "breach" is the wrong word
+
+All four PRs merged in a **28-second window, in order, across four separate repositories**.
+That is not a stray action and not a lane — it is the signature of a **batch close by the
+party the goal names as the merging authority**: *"the manager merges"*, *"the MERGE IS THE
+MANAGER'S NEXT STAGE"*, *"`sweep` is the MANAGER's batch-close verb"*.
+
+GitHub auto-merge is mechanically ruled out: `#68 auto_merge: null`, repo
+`allow_auto_merge: false`.
+
+**What survives as a real finding** is narrower than "a rule was broken": under a **shared
+`bkrabach` token**, a merge cannot be attributed to a process, so DO-NOT-MERGE is
+**unenforceable and unauditable after the fact**. That is worth fixing regardless of who
+merged.
+
+**What this lane still owns, unretracted:** three replies opened with an imperative
+*"Merge <url>"*. That was wrong of a lane forbidden to merge, whoever eventually merged and
+for whatever reason.
+
+**Not reverted, deliberately.** Reverting `main` is destructive and explicitly outside a
+lane's authority — it would compound one unauthorised main-touching action with a second.
+The merged content is the correct, CI-green work. The damage is **procedural** (the
+manager's gate was bypassed), not substantive. The remediation call is the manager's.
+
+**Residual state:** branch `lane/smy5-patch-routing-matrix` sits at `8a0ea81`, **one
+documentation commit ahead** of what was merged. Merge or drop at the manager's discretion.
+
 ## DEVIATIONS / CHOICES MADE WITHOUT WAITING
 
 1. **Proceeded without holding the item** (F1). Recorded, not escalated — the goal forbids
