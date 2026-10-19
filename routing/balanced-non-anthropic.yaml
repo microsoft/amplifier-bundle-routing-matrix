@@ -1,0 +1,214 @@
+# Routing Matrix: balanced-non-anthropic
+#
+# A variant of the "balanced" matrix that uses NO Anthropic models.
+# Every role is served by similarly capable models from other providers
+# (OpenAI, Gemini, GitHub Copilot GPT models, Ollama). Useful when Anthropic
+# access is unavailable, undesired, or prohibited by policy.
+#
+# Maps semantic roles to ranked provider/model candidates.
+# The routing hook tries candidates top-to-bottom, using the first
+# that matches an installed provider.
+#
+# Schema:
+#   provider: Module mount name (e.g., "openai", "gemini", "github-copilot")
+#             For multi-instance providers, use the instance id directly.
+#   model:    Exact model name or glob pattern. Class-scoped globs
+#             (gemini-*-pro-preview, gpt-[0-9].[0-9]) auto-track
+#             within-class version bumps. Copilot candidates stay PINNED because
+#             the github-copilot provider has no static fallback for list_models().
+#   config:   Optional model parameters (e.g., reasoning_effort: high|xhigh)
+#
+# Required roles: "general" and "fast" must be defined in every matrix.
+# All other roles are optional — agents fall back through their model_role list.
+#
+# Ordering rule: With Anthropic removed, OpenAI candidates lead each
+# multi-provider role, followed by Gemini, then GitHub Copilot GPT models,
+# then Ollama as a local fallback. Copilot Claude pins from balanced.yaml are
+# replaced by their GPT equivalents to keep this matrix Anthropic-free.
+#
+# Curated by Amplifier Foundation team. See docs/MATRIX_CURATOR_GUIDE.md.
+
+name: balanced-non-anthropic
+description: "Quality/cost balance for mixed workloads, without Anthropic models. Curated by Amplifier Foundation team."
+updated: "2026-08-20"
+
+roles:
+  # ---------------------------------------------------------------------------
+  # Foundation Roles (required in every matrix)
+  # ---------------------------------------------------------------------------
+
+  general:
+    description: "Versatile catch-all, no specialization needed"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+      - provider: gemini
+        model: gemini-*-pro-preview
+      - provider: github-copilot
+        model: gpt-5.5
+      - provider: ollama
+        model: "*"
+
+  fast:
+    description: "Quick utility tasks — parsing, classification, file ops, bulk work"
+    candidates:
+      - provider: openai
+        model: gpt-?.?-mini*
+      - provider: gemini
+        model: gemini-*-flash-preview
+      - provider: github-copilot
+        model: gpt-5.4-mini
+      - provider: ollama
+        model: "*"
+
+  # ---------------------------------------------------------------------------
+  # Coding Domain Roles
+  # ---------------------------------------------------------------------------
+
+  coding:
+    description: "Code generation, implementation, debugging"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+      - provider: gemini
+        model: gemini-*-pro-preview
+      - provider: github-copilot
+        model: gpt-5.5
+      - provider: ollama
+        model: "*"
+
+  ui-coding:
+    description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+      - provider: gemini
+        model: gemini-*-pro-preview
+      - provider: github-copilot
+        model: gpt-5.5
+
+  security-audit:
+    description: "Vulnerability assessment, attack surface analysis, code auditing"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: xhigh
+      - provider: gemini
+        model: gemini-*-pro-preview
+        config:
+          reasoning_effort: high
+      - provider: github-copilot
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
+
+  # ---------------------------------------------------------------------------
+  # Cognitive Mode Roles
+  # ---------------------------------------------------------------------------
+
+  reasoning:
+    description: "Deep architectural reasoning, system design, complex multi-step analysis"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: xhigh
+      - provider: gemini
+        model: gemini-*-pro-preview
+        config:
+          reasoning_effort: high
+      - provider: github-copilot
+        model: gpt-5.5
+        config:
+          reasoning_effort: high
+
+  critique:
+    description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: xhigh
+      - provider: gemini
+        model: gemini-*-pro-preview
+        config:
+          reasoning_effort: xhigh
+      - provider: github-copilot
+        model: gpt-5.5
+        config:
+          reasoning_effort: xhigh
+
+  creative:
+    description: "Design direction, aesthetic judgment, high-quality creative output"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+      - provider: gemini
+        model: gemini-*-pro-preview
+      - provider: github-copilot
+        model: gpt-5.5
+
+  writing:
+    description: "Long-form content — documentation, marketing, case studies, storytelling"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+      - provider: gemini
+        model: gemini-*-pro-preview
+      - provider: github-copilot
+        model: gpt-5.5
+
+  research:
+    description: "Deep investigation, information synthesis across multiple sources"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
+      - provider: gemini
+        model: gemini-*-pro-preview
+        config:
+          reasoning_effort: high
+      - provider: github-copilot
+        model: gpt-5.5
+
+  # ---------------------------------------------------------------------------
+  # Capability Roles
+  # ---------------------------------------------------------------------------
+
+  vision:
+    description: "Understanding visual input — screenshots, diagrams, UI mockups"
+    candidates:
+      - provider: gemini
+        model: gemini-*-flash-preview
+      - provider: gemini
+        model: gemini-*-pro-preview
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+      - provider: github-copilot
+        model: gpt-5.5
+
+  image-gen:
+    # nano-banana-pro-preview as exact name: bypasses list_models() filter
+    # (which requires "gemini" in model name) and passes directly to the API.
+    description: "Image generation, visual mockup creation, visual ideation"
+    candidates:
+      - provider: gemini
+        model: nano-banana-pro-preview
+
+  # ---------------------------------------------------------------------------
+  # Operational Role
+  # ---------------------------------------------------------------------------
+
+  critical-ops:
+    description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
+    candidates:
+      - provider: openai
+        model: "gpt-[0-9].[0-9]"
+        config:
+          reasoning_effort: high
+      - provider: gemini
+        model: gemini-*-pro-preview
+      - provider: github-copilot
+        model: gpt-5.5
