@@ -400,6 +400,8 @@ async def resolve_model_role(
     provider_module_allowlist: tuple[str, ...] | None = None,
     observations: Any = None,
     report_logs: bool = True,
+    candidate_accept: Any = None,
+    strict_availability: bool = False,
 ) -> list[dict[str, Any]]:
     """Resolve model role(s) against routing matrix.
 
@@ -564,7 +566,7 @@ async def resolve_model_role(
             except _AvailabilityContractError:
                 raise
             except Exception as error:
-                if availability is None:
+                if availability is None or strict_availability:
                     raise
                 if failure is None:
                     failure = error
@@ -642,6 +644,21 @@ async def resolve_model_role(
                     clamp_record.honored = False
                     clamp_record.reason = "explicit expert output_config clears inherited effort"
 
+            # Optional operation consumers qualify the complete concrete choice,
+            # after inherited/clamped knobs, before committing the winner.
+            # Exceptions are not incompatibility and never license fallback.
+            if candidate_accept is not None:
+                from copy import deepcopy
+
+                accepted = await candidate_accept(deepcopy({
+                    "provider": matched_name, "model": resolved_model, "config": config,
+                }))
+                if type(accepted) is not bool:
+                    raise ValueError("Operation candidate acceptance must return a bool")
+                if not accepted:
+                    observe("operation_incompatible", role, candidate, matched_name)
+                    continue
+
             # Report only for the role that actually resolved -- a record for
             # a role that fell through would describe a decision nothing
             # acted on. Emit, never inject.
@@ -653,6 +670,12 @@ async def resolve_model_role(
                         logger.warning("routing clamp reporting failed", exc_info=True)
 
             observe("selected", role, candidate, matched_name)
+            # Native operation knobs are not chat-provider mount overrides.
+            # In particular, shallow spawn config merging must not replace a
+            # retained image opt-out/backend pin with a policy's image model.
+            # Only the negotiated operation path consumes this namespace.
+            returned_config = (config if candidate_accept is not None else
+                               {key: value for key, value in config.items() if key != "image_generation"})
             return [
                 {
                     # The mounted key find_provider_by_type() actually
@@ -660,7 +683,7 @@ async def resolve_model_role(
                     # not be provider_type (the matrix's bare type string).
                     "provider": matched_name,
                     "model": resolved_model,
-                    "config": config,
+                    "config": returned_config,
                 }
             ]
 

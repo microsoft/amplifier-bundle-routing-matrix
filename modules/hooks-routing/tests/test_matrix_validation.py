@@ -143,12 +143,13 @@ class TestAllMatrices:
 
     @pytest.mark.parametrize("matrix_file", _matrix_ids())
     def test_no_duplicate_candidates(self, matrix_file: str) -> None:
-        """No role should have the same provider+model pair listed twice."""
+        """Reject duplicate operation choices as well as ordinary model pairs."""
         data = _load(matrix_file)
         for role_name, role_def in data["roles"].items():
             seen = set()
             for candidate in role_def["candidates"]:
-                key = (candidate["provider"], candidate["model"])
+                image = candidate.get("config", {}).get("image_generation", {}) if role_name == "image-gen" else {}
+                key = (candidate["provider"], candidate["model"], image.get("model"), image.get("transport"))
                 assert key not in seen, (
                     f"{matrix_file}/{role_name}: duplicate candidate "
                     f"{candidate['provider']}/{candidate['model']}"

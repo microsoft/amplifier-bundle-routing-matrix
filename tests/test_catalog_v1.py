@@ -124,7 +124,13 @@ def runtime(providers, agents=None, capabilities=None, own_prefs=None):
 def test_additive_profiles_clone_policy_without_family_or_effort_changes(name, module):
     base = load_matrix(ROUTING / "openai.yaml")
     new = load_matrix(ROUTING / f"{name}.yaml")
-    assert new["roles"] == base["roles"]
+    if name == "openai-chatgpt":
+        assert {k: v for k, v in new["roles"].items() if k != "image-gen"} == {
+            k: v for k, v in base["roles"].items() if k != "image-gen"}
+        assert "image_generation" not in new["roles"]["image-gen"]["candidates"][0]["config"]
+        assert base["roles"]["image-gen"]["candidates"][0]["config"]["image_generation"]["transport"] == "responses"
+    else:
+        assert new["roles"] == base["roles"]
     assert new["preset"] == base["preset"]
     assert provider_module_allowlist(new) == (module,)
     assert "provider_module_allowlist" not in base
