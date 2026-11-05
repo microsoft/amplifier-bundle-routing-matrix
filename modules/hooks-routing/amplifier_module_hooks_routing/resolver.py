@@ -555,7 +555,7 @@ async def resolve_model_role(
                         provider_key=matched_name,
                         preresolved_models=preresolved_models,
                         inflight_model_lists=inflight_model_lists,
-                        propagate_failure=availability is not None,
+                        propagate_failure=strict_availability or availability is not None,
                         report_logs=report_logs,
                     )
                     if resolved_model is None:
