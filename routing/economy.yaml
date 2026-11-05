@@ -390,9 +390,29 @@ roles:
 
   image-gen:
     description: "Image generation, visual mockup creation, visual ideation"
+    # Policy preference, not measured quality or live entitlement evidence.
+    # Keep agent/tool use on the mainline model; native images are separate.
     candidates:
+      - provider: openai
+        model: gpt-6-luna
+        config:
+          image_generation:
+            model: gpt-image-2.5-flare
+            transport: responses
       - provider: gemini
-        model: gemini-3-pro-image
+        model: "gemini-[3-9]*-flash-lite"
+        config:
+          image_generation:
+            model: gemini-3.1-flash-lite-image
+            transport: interactions
+      # Pre-dispatch alternative for references/controls Flash Lite cannot accept.
+      # Never retry an executed or uncertain image effect on another candidate.
+      - provider: gemini
+        model: "gemini-[3-9]*-flash-lite"
+        config:
+          image_generation:
+            model: gemini-nano-banana-2.1
+            transport: interactions
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"

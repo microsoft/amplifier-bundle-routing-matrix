@@ -2,6 +2,10 @@
 
 This page describes the proposed destination, not shipped capabilities or current work. It is not ratified or frozen. Implementation status, review gaps and sequencing belong in [HANDOFF](HANDOFF.md). The proposed external seam is [routing-catalog.v1](../contracts/routing-catalog.v1.md); its concrete shapes belong in [CATALOG-SPEC](CATALOG-SPEC.md).
 
+The [image-role contract](../contracts/image-routing.v1.md) applies this direction
+to operation-aware image selection. [Policy notes](IMAGE-ROUTING.md) keep current
+candidate proposals separate from the durable principles here.
+
 ## What this bundle is
 
 A portable, evidence-informed owner of model-routing strategies. Agents ask for capabilities; hosts present understandable choices; the same routing policy determines assessed and executed choices. Strategies evolve from measured outcomes without rewriting user intent, silently changing saved selection meaning, or expanding approved provider/account scope.
@@ -52,3 +56,4 @@ A maintainer can trace each changed role preference to a reviewed evidence packe
 | Date | Change | Basis |
 | --- | --- | --- |
 | 2026-10-02 | Initial draft direction; no accepted amendments or lock. | Request for reusable evidence-based strategies, consumer catalog ownership and safe future-agent handoff. |
+| 2026-10-13 | Add the image-operation seam without changing existing principles. | Single-winner routing and image-only model compatibility require distinct operation qualification. |

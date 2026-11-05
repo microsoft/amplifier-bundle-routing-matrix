@@ -221,9 +221,15 @@ roles:
 
   image-gen:
     description: "Image generation, visual mockup creation, visual ideation"
+    # Gemini-only policy; native-image execution is qualified separately.
+    # Keep agent/tool use on the mainline model, not the image-only model.
     candidates:
       - provider: gemini
-        model: gemini-3-pro-image
+        model: "gemini-[3-9]*-pro-preview"
+        config:
+          image_generation:
+            model: gemini-nano-banana-2.1
+            transport: interactions
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"

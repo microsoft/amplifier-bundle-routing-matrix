@@ -111,12 +111,12 @@ def test_interim_openai_candidates_are_v6_and_terra_is_no_longer_selected():
             for candidate in role["candidates"]:
                 assert "terra" not in candidate["model"]
                 if candidate["provider"] == "openai":
-                    assert candidate["model"] in {"gpt-6.1-sol", "gpt-[6-9]*-luna"}
+                    assert candidate["model"] in {"gpt-6.1-sol", "gpt-[6-9]*-luna", "gpt-6-luna", "gpt-6-astra"}
                     checked += 1
                 if candidate["provider"] == "github-copilot" and candidate["model"].startswith("gpt-"):
                     assert candidate["model"] in {"gpt-6.1-sol", "gpt-6-luna"}
-    # Original 49 plus 13 unchanged policy candidates in each additive profile.
-    assert checked == 49 + 26
+    # Original candidates plus API image controllers in three shared strategies.
+    assert checked == 49 + 26 + 3
 
 
 @pytest.mark.asyncio

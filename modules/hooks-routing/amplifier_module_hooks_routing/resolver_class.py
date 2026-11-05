@@ -248,6 +248,59 @@ class MatrixModelRoleResolver:
             for r in resolved
         ]
 
+    operation_resolution_protocol = "amplifier.operation-routing.v1"
+
+    async def resolve_for(self, model_role, *, requirements, accept):
+        """Prepare compatible concrete candidates without changing ordinary resolve.
+
+        Preparation never spends live escalation state. Policies that require
+        a budgeted escalation need an execution-commit protocol and refuse here
+        rather than consuming budget before the caller's admission.
+        """
+        from copy import deepcopy
+        from amplifier_foundation.spawn_utils import ProviderPreference
+        from .resolver import resolve_model_role
+
+        if not isinstance(requirements, dict) or not callable(accept):
+            raise ValueError("Operation requirements and acceptance callback are required")
+        roles = [model_role] if isinstance(model_role, str) else list(model_role)
+        active = self._preset is not None and getattr(self._preset, "active", False)
+        caller = None
+        if active:
+            from .knob_consistency import derive_caller_context
+            caller = derive_caller_context(self._coordinator, self._preset)
+        before = getattr(self._escalations, "used", None)
+        # Resolve one role at a time so an incompatible role's escalation
+        # cannot leak into an accepted later role.
+        for role in roles:
+            trial = deepcopy(self._escalations)
+            records = []
+
+            async def record(value):
+                records.append(value)
+
+            result = await resolve_model_role(
+                [role], self._matrix_roles, self._providers,
+                preresolved_models=self._preresolved_models,
+                inflight_model_lists=self._inflight_model_lists,
+                coordinator=self._coordinator, caller_context=caller,
+                preset=self._preset if active else None,
+                escalations=trial if active else None,
+                on_clamp=record if active else None,
+                provider_module_allowlist=self.provider_module_allowlist,
+                candidate_accept=accept, strict_availability=True,
+            )
+            if result:
+                if active and self._escalations is not None:
+                    if self._escalations.used != before:
+                        raise ValueError("Routing state changed during operation preparation")
+                    if trial.used != before:
+                        raise ValueError("Budgeted operation escalation requires explicit execution admission")
+                for value in records:
+                    await self._record_clamp(value)
+                return [ProviderPreference(**value) for value in result]
+        return []
+
     async def _record_clamp(self, record: Any) -> None:
         """Keep the record locally, then forward it to the mount-time sink.
 

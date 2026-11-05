@@ -259,9 +259,22 @@ def test_every_recorded_matrix_is_still_in_the_fixture() -> None:
     "matrix_name", sorted(_load_golden()), ids=lambda n: n.replace(".yaml", "")
 )
 def test_resolution_is_byte_identical_to_pre_feature(matrix_name: str) -> None:
-    """Every role of every pre-existing matrix resolves exactly as it did."""
+    """Preserve the historic snapshot except the explicitly reviewed image role."""
     golden = _load_golden()[matrix_name]
     current = asyncio.run(_snapshot())[matrix_name]
+    image_revision = {
+        "balanced.yaml": ("openai", "gpt-6.1-sol"),
+        "quality.yaml": ("openai", "gpt-6-astra"),
+        "economy.yaml": ("openai", "gpt-6-luna"),
+        "gemini.yaml": ("gemini", "gemini-3-pro-preview"),
+    }
+    if matrix_name in image_revision:
+        provider, model = image_revision[matrix_name]
+        assert current["image-gen"] == [{"provider": provider, "model": model, "config": {}}]
+        # Keep the old fixture as historical evidence, never regenerate other
+        # roles merely because one role gained operation-aware selection.
+        current = {key: value for key, value in current.items() if key != "image-gen"}
+        golden = {key: value for key, value in golden.items() if key != "image-gen"}
     assert current == golden, (
         f"{matrix_name}: default-path resolution CHANGED.\n"
         f"  expected (pre-feature): {json.dumps(golden, sort_keys=True)}\n"

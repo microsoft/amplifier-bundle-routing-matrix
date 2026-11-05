@@ -123,8 +123,10 @@ PROVIDER_MODELS: dict[str, list[str]] = {
 # reason. An empty set means "must serve every role".
 EXEMPT: dict[str, set[str]] = {
     "anthropic": {"image-gen"},
-    "openai": {"image-gen"},
-    "openai-chatgpt": {"image-gen"},
+    "openai": set(),
+    # This test measures ordinary agent/planning roles, NOT native image output.
+    # Operation-aware preparation separately rejects unsupported subscription APIs.
+    "openai-chatgpt": set(),
     "github-copilot": {"image-gen"},
     "gemini": set(),  # gemini IS the image-gen provider
 }
