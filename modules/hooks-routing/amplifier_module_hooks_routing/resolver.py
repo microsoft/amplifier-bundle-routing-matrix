@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import fnmatch
 import inspect
 import logging
 import re
 from typing import Any
+
+from amplifier_foundation.model_patterns import (
+    is_glob_pattern as _is_glob,
+    model_matches_pattern,
+    select_model_pattern,
+)
 
 from .haiku_compatibility import effective_haiku_effort, is_haiku, require_haiku_config
 from .matrix_loader import inert_config_rule
@@ -52,47 +57,10 @@ class _AvailabilityContractError(TypeError):
     """Host integration failure, not a candidate that permits fallback."""
 
 
-# Matches trailing date suffixes on model snapshot IDs so clean-versioned model
-# names sort above date-stamped snapshots under natural-sort ordering. Handles
-# both compact (YYYYMMDD) and hyphenated (YYYY-MM-DD) forms:
-#   claude-opus-4-20250514           -> claude-opus-4
-#   claude-haiku-4-5-20251001        -> claude-haiku-4-5
-#   gpt-5.4-pro-2026-03-05           -> gpt-5.4-pro
+# Existing exact-model INSTANCE intent equivalence, not inventory ranking.
+# Keep this legacy relation unchanged: narrowing it to the pure ranker's
+# validated snapshot grammar would change which account is selected.
 _DATE_SUFFIX_RE = re.compile(r"-(?:\d{4}-\d{2}-\d{2}|\d{8})$")
-
-# Used by the natural-sort key to split model names into mixed text/integer parts.
-_DIGIT_RUN_RE = re.compile(r"(\d+)")
-
-
-def _is_glob(pattern: str) -> bool:
-    """Check whether *pattern* contains glob wildcard characters."""
-    return any(c in pattern for c in "*?[")
-
-
-def _version_sort_key(name: str) -> tuple:
-    """Natural-sort key that handles semver-like IDs correctly.
-
-    Two refinements over pure lexicographic sort:
-
-    1. **Date-suffix stripping.** A trailing ``-YYYYMMDD`` or ``-YYYY-MM-DD``
-       is removed before sorting. This ensures clean-versioned IDs like
-       ``claude-opus-4-7`` sort above snapshot IDs like
-       ``claude-opus-4-20250514`` (which is actually Opus 4.0, not 4.2 billion).
-
-    2. **Numeric-aware splitting.** Digit runs are compared as integers so
-       ``claude-opus-4-10`` > ``claude-opus-4-7`` (the string sort would pick
-       ``4-7`` because ``'7' > '1'`` lexicographically).
-
-    Secondary key (``-len(name)``) is a tie-breaker that prefers shorter names
-    when the primary key is equal — e.g. ``gpt-5.4`` wins over
-    ``gpt-5.4-2026-03-05`` because aliases are preferred over pinned snapshots.
-    """
-    stripped = _DATE_SUFFIX_RE.sub("", name)
-    primary: list[Any] = [
-        int(p) if p.isdigit() else p for p in _DIGIT_RUN_RE.split(stripped)
-    ]
-    # Descending sort uses (primary, -len) so shorter names rank higher on ties.
-    return (primary, -len(name))
 
 
 def _get_provider_specs(coordinator: Any) -> list[dict[str, Any]]:
@@ -158,7 +126,7 @@ def _instance_serves_model(spec: dict[str, Any] | None, model_pattern: str) -> b
     have = default_model.lower()
     want = model_pattern.lower()
     if _is_glob(model_pattern):
-        return fnmatch.fnmatch(have, want)
+        return model_matches_pattern(have, want)
     # Exact patterns: an instance pinned to a dated snapshot of the same
     # model still serves it (claude-haiku-4-5 vs claude-haiku-4-5-20251001).
     return have == want or _DATE_SUFFIX_RE.sub("", have) == _DATE_SUFFIX_RE.sub(
@@ -780,13 +748,14 @@ async def _resolve_glob(
 ) -> str | None:
     """Resolve a glob model pattern against a provider's model list.
 
-    Uses natural-sort ordering (see :func:`_version_sort_key`) so that:
+    Uses Foundation's public model-pattern ordering so that:
 
     * Higher version numbers win (``claude-opus-4-10`` > ``claude-opus-4-7``).
     * Clean-versioned IDs outrank snapshot IDs with date suffixes
       (``claude-opus-4-7`` > ``claude-opus-4-20250514``).
     * Shorter aliases outrank pinned snapshots on equal primary keys
       (``gpt-5.4`` > ``gpt-5.4-2026-03-05``).
+    * Snapshot-only ties prefer the newest valid date, independent of API order.
 
     When *preresolved_models* is provided and *provider_key* is already present
     in it, ``list_models()`` is skipped entirely — the stored list is used
@@ -824,19 +793,5 @@ async def _resolve_glob(
 
 
 def select_glob_model(pattern: str, model_names: list[str]) -> str | None:
-    """Pure model selection shared by runtime and snapshot planning."""
-    # Case-insensitive, OS-independent glob matching: lowercase both sides
-    # before comparing (raw fnmatch.filter() uses os.path.normcase, which is
-    # case-sensitive on Linux/Mac and case-insensitive on Windows -- an
-    # OS-dependent inconsistency). This matches the canonical model-glob
-    # semantics used by amplifier_foundation.spawn_utils (agent-spawn model
-    # resolution) and the unified-llm-client reference implementation, so a
-    # pattern like "Qwen3.6-*" deterministically matches "qwen3.6-35b-..."
-    # on every platform. Original casing is preserved in the returned name.
-    lowered_pattern = pattern.lower()
-    matched = [m for m in model_names if fnmatch.fnmatch(m.lower(), lowered_pattern)]
-    if not matched:
-        return None
-
-    matched.sort(key=_version_sort_key, reverse=True)
-    return matched[0]
+    """Compatibility entry point; Foundation owns pure inventory selection."""
+    return select_model_pattern(pattern, model_names)

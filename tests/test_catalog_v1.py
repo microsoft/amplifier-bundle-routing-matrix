@@ -861,7 +861,11 @@ def test_ci_root_matrix_requires_real_runtime_in_same_pytest_process():
     job = workflow["jobs"]["test-root"]
     assert job["strategy"]["matrix"]["python-version"] == ["3.11", "3.12", "3.13"]
     command = next(step["run"] for step in job["steps"] if step.get("name") == "Run root tests")
-    assert "--with git+https://github.com/microsoft/amplifier-foundation" in command
+    assert "--with ./modules/hooks-routing" in command
+    # The hook declares Foundation itself; CI must not overlay a different main.
+    import tomllib
+    metadata = tomllib.loads((ROOT / "modules/hooks-routing/pyproject.toml").read_text())
+    assert any(dep.startswith("amplifier-foundation") for dep in metadata["project"]["dependencies"])
     assert "import amplifier_core" in command
     assert "amplifier_core.models" in command
     assert "amplifier_foundation.spawn_utils" in command

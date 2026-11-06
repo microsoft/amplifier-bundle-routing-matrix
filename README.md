@@ -6,6 +6,23 @@ The routing hook tries candidates top-to-bottom and uses the first that matches 
 
 ## Matrices
 
+### Model-pattern selection dependency
+
+The hook uses the public
+[`amplifier_foundation.model_patterns`](https://github.com/microsoft/amplifier-foundation/blob/3a03b5daaa3fee7aa381101553fa4874cf9417a5/amplifier_foundation/model_patterns.py)
+API for inventory matching and ranking. Its Python 3.11+ metadata and lockfile
+declare that dependency explicitly; a host that supplies Foundation itself must
+load a revision with this API. There is no private-key or lexical fallback for
+an older Foundation. This branch pins the exact **candidate** revision for
+review, not an accepted release; adopt the accepted upstream revision before merge.
+
+Matching preserves original IDs and remains case-insensitive. Natural numeric
+versions outrank smaller versions; an undated alias outranks its corresponding
+snapshot; snapshot-only ties now prefer the newest valid date rather than API
+order. Product-tier text remains lexical, not a quality/cost ranking: use a
+more-specific pattern for a tier. Provider recommendations, account selection,
+explicit-ID passthrough, cache and fallback policy remain unchanged.
+
 Ten matrices ship with this bundle. The original eight retain their policy;
 two additive profiles restrict OpenAI module selection without changing models
 or efforts:
