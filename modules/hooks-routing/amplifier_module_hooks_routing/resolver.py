@@ -11,6 +11,7 @@ from typing import Any
 from amplifier_foundation.model_patterns import (
     is_glob_pattern as _is_glob,
     model_matches_pattern,
+    model_pattern_sort_key,
     select_model_pattern,
 )
 
@@ -18,6 +19,11 @@ from .haiku_compatibility import effective_haiku_effort, is_haiku, require_haiku
 from .matrix_loader import inert_config_rule
 
 logger = logging.getLogger(__name__)
+
+# Older app-cli previews import this private name and silently fall back to
+# lexical sorting if it disappears. Keep an identity alias, not a second
+# algorithm, while new consumers use Foundation's public API directly.
+_version_sort_key = model_pattern_sort_key
 
 
 class NoScopedRouteError(ValueError):

@@ -16,6 +16,11 @@ load a revision with this API. There is no private-key or lexical fallback for
 an older Foundation. This branch pins the exact **candidate** revision for
 review, not an accepted release; adopt the accepted upstream revision before merge.
 
+For mixed-version compatibility, `resolver._version_sort_key` remains an identity
+alias to Foundation's `model_pattern_sort_key`: older CLI previews import that
+name before falling back to lexical ordering. New consumers should use the public
+Foundation API. The alias adds no separate ranking implementation.
+
 Matching preserves original IDs and remains case-insensitive. Natural numeric
 versions outrank smaller versions; an undated alias outranks its corresponding
 snapshot; snapshot-only ties now prefer the newest valid date rather than API

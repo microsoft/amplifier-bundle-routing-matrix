@@ -4,9 +4,25 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from amplifier_foundation.model_patterns import select_model_pattern
+from amplifier_foundation.model_patterns import model_pattern_sort_key, select_model_pattern
 from amplifier_module_hooks_routing.resolver import resolve_model_role, select_glob_model
 from amplifier_module_hooks_routing.catalog_audit import audit_matrix_catalogs
+
+
+@pytest.mark.parametrize("inventory,expected", [
+    (["model-9", "model-10"], "model-10"),
+    (["model-10-20260101", "model-10-2026-11-01"], "model-10-2026-11-01"),
+    (["Model-10-20261101", "MODEL-10"], "MODEL-10"),
+])
+def test_legacy_cli_sort_key_import_is_the_canonical_function(inventory, expected):
+    # app-cli 446053dd commands/routing.py::_best_glob_match imports this exact
+    # name inside a broad except. Removal silently selects lexical winners.
+    from amplifier_module_hooks_routing.resolver import _version_sort_key
+
+    assert _version_sort_key is model_pattern_sort_key
+    for models in (inventory, list(reversed(inventory))):
+        assert sorted(models, key=_version_sort_key, reverse=True)[0] == expected
+        assert select_glob_model("model-*", models) == expected
 
 
 @pytest.mark.asyncio
