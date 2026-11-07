@@ -76,6 +76,24 @@ async def test_recommended_inventory_resolves_exact_id(matrix, role, group, vect
         }
 
 
+@pytest.mark.asyncio
+async def test_unfiltered_month_year_uses_numeric_order_not_provider_chronology():
+    vector = next(v for v in VECTORS if v["name"] == "snapshot-only-month-year")
+    roles = yaml.safe_load((ROOT / "routing/gemini.yaml").read_text())["roles"]
+    for inventory, expected in (
+        (vector["raw"], "gemini-4-pro-preview-12-2026"),
+        (list(reversed(vector["raw"])), "gemini-4-pro-preview-12-2026"),
+        (vector["defaults"], vector["winner"]),
+    ):
+        provider = Mock(list_models=AsyncMock(return_value=inventory))
+        result = await resolve_model_role(
+            ["general"], roles, {"gemini": provider}, preresolved_models={}
+        )
+        assert result[0]["model"] == expected
+        assert result[0]["model"] in inventory
+        provider.list_models.assert_awaited_once()
+
+
 @pytest.mark.parametrize("model", [
     "gemini-4-pro-image", "gemini-4-pro-image-preview",
     "gemini-4-pro-preview-tts", "gemini-4-pro-preview-tts-001",

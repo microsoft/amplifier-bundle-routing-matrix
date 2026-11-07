@@ -68,6 +68,12 @@ ID or discovery override. Synthetic fixture parity is not live entitlement or
 quality evidence; same-version previews may still be selected with an explicit
 broader provider inventory because the matrix remains preview-first.
 
+With explicitly unfiltered inventory containing multiple `MM-YYYY` snapshots,
+Foundation's existing numeric ordering puts `12-2026` ahead of `01-2027`;
+`MM-YYYY` is not part of its calendar-date suffix grammar. Recommended provider
+defaults instead preselect those snapshots chronologically before routing, so
+the same pair yields `01-2027` with defaults. No routing date grammar is expanded.
+
 ### Haiku version compatibility
 
 Exact native Anthropic `claude-haiku-5-5` accepts `reasoning_effort` values
