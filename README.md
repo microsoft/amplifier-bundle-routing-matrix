@@ -9,12 +9,13 @@ The routing hook tries candidates top-to-bottom and uses the first that matches 
 ### Model-pattern selection dependency
 
 The hook uses the public
-[`amplifier_foundation.model_patterns`](https://github.com/microsoft/amplifier-foundation/blob/3a03b5daaa3fee7aa381101553fa4874cf9417a5/amplifier_foundation/model_patterns.py)
+[`amplifier_foundation.model_patterns`](https://github.com/microsoft/amplifier-foundation/blob/a52ad1558419c828c86c0139b9b4bc351e3a618f/amplifier_foundation/model_patterns.py)
 API for inventory matching and ranking. Its Python 3.11+ metadata and lockfile
 declare that dependency explicitly; a host that supplies Foundation itself must
 load a revision with this API. There is no private-key or lexical fallback for
-an older Foundation. This branch pins the exact **candidate** revision for
-review, not an accepted release; adopt the accepted upstream revision before merge.
+an older Foundation. The dependency pins the accepted upstream revision from
+[Foundation PR #461](https://github.com/microsoft/amplifier-foundation/pull/461);
+hosts supplying Foundation independently must include that API.
 
 For mixed-version compatibility, `resolver._version_sort_key` remains an identity
 alias to Foundation's `model_pattern_sort_key`: older CLI previews import that

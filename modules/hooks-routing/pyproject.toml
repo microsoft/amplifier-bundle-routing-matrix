@@ -9,8 +9,8 @@ description = "Hook module for routing matrix model selection"
 requires-python = ">=3.11"
 dependencies = [
     "pyyaml",
-    # Candidate graph only: replace with the accepted upstream revision before merge.
-    "amplifier-foundation @ git+https://github.com/microsoft/amplifier-foundation@3a03b5daaa3fee7aa381101553fa4874cf9417a5",
+    # Accepted public model-pattern API (Foundation PR #461).
+    "amplifier-foundation @ git+https://github.com/microsoft/amplifier-foundation@a52ad1558419c828c86c0139b9b4bc351e3a618f",
 ]
 
 [project.optional-dependencies]
