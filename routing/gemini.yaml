@@ -106,18 +106,29 @@
 
 name: gemini
 description: "Google Gemini-only routing. All roles use Gemini models exclusively."
-updated: "2026-10-07"
+updated: "2026-11-06"
 
 roles:
   general:
     description: "Versatile catch-all, no specialization needed"
     candidates:
-      - provider: gemini
+      - &pro_general
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro"
 
   fast:
     description: "Quick utility tasks — parsing, classification, file ops, bulk work"
@@ -132,82 +143,170 @@ roles:
   coding:
     description: "Code generation, implementation, debugging"
     candidates:
-      - provider: gemini
+      - &pro_coding
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro"
 
   ui-coding:
     description: "Frontend/UI code — components, layouts, styling, spatial reasoning"
     candidates:
-      - provider: gemini
+      - &pro_ui
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro"
 
   security-audit:
     description: "Vulnerability assessment, attack surface analysis, code auditing"
     candidates:
-      - provider: gemini
+      - &pro_security
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro"
 
   reasoning:
     description: "Deep architectural reasoning, system design, complex multi-step analysis"
     candidates:
-      - provider: gemini
+      - &pro_reasoning
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro"
 
   critique:
     description: "Analytical evaluation — finding flaws in existing work, not generating solutions"
     candidates:
-      - provider: gemini
+      - &pro_critique
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro"
 
   creative:
     description: "Design direction, aesthetic judgment, high-quality creative output"
     candidates:
-      - provider: gemini
+      - &pro_creative
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro"
 
   writing:
     description: "Long-form content — documentation, marketing, case studies, storytelling"
     candidates:
-      - provider: gemini
+      - &pro_writing
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro"
 
   research:
     description: "Deep investigation, information synthesis across multiple sources"
     candidates:
-      - provider: gemini
+      - &pro_research
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro"
 
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
@@ -224,19 +323,41 @@ roles:
     # Gemini-only policy; native-image execution is qualified separately.
     # Keep agent/tool use on the mainline model, not the image-only model.
     candidates:
-      - provider: gemini
+      - &pro_image
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           image_generation:
             model: gemini-nano-banana-2.1
             transport: interactions
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro"
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
     candidates:
-      - provider: gemini
+      - &pro_critical
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro"

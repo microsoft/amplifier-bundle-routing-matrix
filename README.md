@@ -49,6 +49,25 @@ or efforts:
 
 Browse the matrix files directly in the [`routing/`](routing/) directory.
 
+### Gemini Pro catalog compatibility
+
+Stock Pro roles retain preview preference in the same provider position:
+preview alias, numeric preview snapshots, then stable Pro alias. The four
+snapshot shapes are `MM-YYYY`, `YYYY-MM-DD`, `MM-DD` and `NNN`, matching the
+ordinary preview spellings recognized by the
+[provider's recommendation policy](https://github.com/microsoft/amplifier-module-provider-gemini/blob/6669ea5a15affe6ab9ed9b4ef31b36a595b5c282/amplifier_module_provider_gemini/_model_listing.py).
+Closed digit patterns, not `pro*` or `preview*`, exclude image/TTS suffixes.
+YAML anchors reuse the existing candidate/config; alternatives do not change
+thinking settings, native-image settings or cross-provider order.
+
+This avoids stranding Pro roles when recommended discovery returns stable GA
+instead of its same-version preview, or a dated-only newer preview. The `[3-9]`
+generation boundary, other tiers, custom matrices and provider defaults remain
+unchanged. Missing compatible Pro inventory still means no match, not an invented
+ID or discovery override. Synthetic fixture parity is not live entitlement or
+quality evidence; same-version previews may still be selected with an explicit
+broader provider inventory because the matrix remains preview-first.
+
 ### Haiku version compatibility
 
 Exact native Anthropic `claude-haiku-5-5` accepts `reasoning_effort` values

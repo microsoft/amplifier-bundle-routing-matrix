@@ -121,7 +121,7 @@
 
 name: quality
 description: "Best available models. Prioritizes capability over cost."
-updated: "2026-10-07"
+updated: "2026-11-06"
 
 roles:
   general:
@@ -135,12 +135,23 @@ roles:
         model: claude-sonnet-*
         config:
           reasoning_effort: medium
-      - provider: gemini
+      - &pro_general
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_general
+        model: "gemini-[3-9]*-pro"
       - provider: github-copilot
         model: claude-sonnet-5.5
         config:
@@ -179,12 +190,23 @@ roles:
         model: claude-sonnet-*
         config:
           reasoning_effort: medium
-      - provider: gemini
+      - &pro_coding
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_coding
+        model: "gemini-[3-9]*-pro"
       - provider: github-copilot
         model: claude-sonnet-5.5
         config:
@@ -201,12 +223,23 @@ roles:
         model: claude-sonnet-*
         config:
           reasoning_effort: medium
-      - provider: gemini
+      - &pro_ui
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_ui
+        model: "gemini-[3-9]*-pro"
       - provider: github-copilot
         model: claude-sonnet-5.5
         config:
@@ -223,12 +256,23 @@ roles:
         model: claude-sonnet-*
         config:
           reasoning_effort: high
-      - provider: gemini
+      - &pro_security
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_security
+        model: "gemini-[3-9]*-pro"
       - provider: github-copilot
         model: gpt-6.1-sol
         config:
@@ -241,12 +285,23 @@ roles:
         model: gpt-6.1-sol
         config:
           reasoning_effort: xhigh
-      - provider: gemini
+      - &pro_reasoning
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_reasoning
+        model: "gemini-[3-9]*-pro"
       - provider: anthropic
         model: claude-opus-*
         config:
@@ -267,12 +322,23 @@ roles:
         model: claude-sonnet-*
         config:
           reasoning_effort: xhigh
-      - provider: gemini
+      - &pro_critique
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_critique
+        model: "gemini-[3-9]*-pro"
       - provider: github-copilot
         model: claude-opus-5.5
         config:
@@ -289,12 +355,23 @@ roles:
         model: claude-opus-*
         config:
           reasoning_effort: medium
-      - provider: gemini
+      - &pro_creative
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_creative
+        model: "gemini-[3-9]*-pro"
       - provider: github-copilot
         model: claude-opus-5.5
         config:
@@ -311,12 +388,23 @@ roles:
         model: claude-opus-*
         config:
           reasoning_effort: medium
-      - provider: gemini
+      - &pro_writing
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: medium
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_writing
+        model: "gemini-[3-9]*-pro"
       - provider: github-copilot
         model: claude-opus-5.5
         config:
@@ -333,12 +421,23 @@ roles:
         model: claude-opus-*
         config:
           reasoning_effort: high
-      - provider: gemini
+      - &pro_research
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_research
+        model: "gemini-[3-9]*-pro"
       - provider: github-copilot
         model: claude-opus-5.5
         config:
@@ -347,12 +446,23 @@ roles:
   vision:
     description: "Understanding visual input — screenshots, diagrams, UI mockups"
     candidates:
-      - provider: gemini
+      - &pro_vision
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: low
+      - <<: *pro_vision
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_vision
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_vision
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_vision
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_vision
+        model: "gemini-[3-9]*-pro"
       - provider: openai
         model: gpt-6.1-sol
         config:
@@ -377,12 +487,23 @@ roles:
           image_generation:
             model: gpt-image-2.5-sunburst
             transport: responses
-      - provider: gemini
+      - &pro_image
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           image_generation:
             model: gemini-3-pro-image
             transport: interactions
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_image
+        model: "gemini-[3-9]*-pro"
 
   critical-ops:
     description: "High-reliability operational tasks — infrastructure, orchestration, coordination"
@@ -395,12 +516,23 @@ roles:
         model: claude-opus-*
         config:
           reasoning_effort: medium
-      - provider: gemini
+      - &pro_critical
+        provider: gemini
         model: "gemini-[3-9]*-pro-preview"
         config:
           extra_request_params:
             thinking_config:
               thinking_level: high
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9][0-9][0-9]"
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9]-[0-9][0-9]"
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro-preview-[0-9][0-9][0-9]"
+      - <<: *pro_critical
+        model: "gemini-[3-9]*-pro"
       - provider: github-copilot
         model: claude-opus-5.5
         config:

@@ -1,0 +1,13 @@
+[
+  {"name":"stable","raw":["gemini-3.8-pro"],"defaults":["gemini-3.8-pro"],"winner":"gemini-3.8-pro"},
+  {"name":"same-version-preview-omitted","raw":["gemini-3.8-pro","gemini-3.8-pro-preview"],"defaults":["gemini-3.8-pro"],"winner":"gemini-3.8-pro"},
+  {"name":"newer-preview-preferred","raw":["gemini-3.8-pro","gemini-3.9-pro-preview"],"defaults":["gemini-3.8-pro","gemini-3.9-pro-preview"],"winner":"gemini-3.9-pro-preview"},
+  {"name":"snapshot-only-month-year","raw":["gemini-4-pro-preview-12-2026","gemini-4-pro-preview-01-2027"],"defaults":["gemini-4-pro-preview-01-2027"],"winner":"gemini-4-pro-preview-01-2027"},
+  {"name":"snapshot-only-iso","raw":["gemini-4-pro-preview-2026-10-01","gemini-4-pro-preview-2026-11-01"],"defaults":["gemini-4-pro-preview-2026-11-01"],"winner":"gemini-4-pro-preview-2026-11-01"},
+  {"name":"snapshot-only-month-day","raw":["gemini-4-pro-preview-10-01"],"defaults":["gemini-4-pro-preview-10-01"],"winner":"gemini-4-pro-preview-10-01"},
+  {"name":"snapshot-only-number","raw":["gemini-4-pro-preview-001","gemini-4-pro-preview-002"],"defaults":["gemini-4-pro-preview-002"],"winner":"gemini-4-pro-preview-002"},
+  {"name":"newer-snapshot-preview-before-stable","raw":["gemini-3.8-pro","gemini-4-pro-preview-01-2027"],"defaults":["gemini-3.8-pro","gemini-4-pro-preview-01-2027"],"winner":"gemini-4-pro-preview-01-2027"},
+  {"name":"no-pro","raw":["gemini-3.8-flash","gemini-3.1-flash-lite"],"defaults":["gemini-3.1-flash-lite","gemini-3.8-flash"],"winner":null},
+  {"name":"media-only","raw":["gemini-4-pro-image-preview","gemini-4-pro-preview-tts","gemini-4-pro-preview-01-2027-tts"],"defaults":[],"winner":null},
+  {"name":"generation-floor-unchanged","raw":["gemini-2.5-pro"],"defaults":["gemini-2.5-pro"],"winner":null}
+]
