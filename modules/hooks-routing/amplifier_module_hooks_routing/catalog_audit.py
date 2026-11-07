@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import fnmatch
 import re
 from typing import Any
 
-from .resolver import _is_glob, _version_sort_key
+from amplifier_foundation.model_patterns import (
+    is_glob_pattern,
+    match_model_pattern,
+    model_pattern_sort_key,
+)
 
 
 def _family(model: str) -> str | None:
@@ -29,8 +32,8 @@ def _family(model: str) -> str | None:
 def _freshness_key(model: str) -> tuple:
     """Compare Pro GA/preview as peers; prefer GA on an equal release version."""
     if _family(model) == "gemini-pro":
-        return (_version_sort_key(model.removesuffix("-preview")), not model.endswith("-preview"))
-    return (_version_sort_key(model), True)
+        return (model_pattern_sort_key(model.removesuffix("-preview")), not model.endswith("-preview"))
+    return (model_pattern_sort_key(model), True)
 
 
 async def collect_catalogs(providers: dict[str, Any], timeout: float = 60) -> dict[str, dict]:
@@ -81,12 +84,12 @@ def audit_matrix_catalogs(matrices: dict[str, dict], catalogs: dict[str, dict]) 
                     pattern = candidate["model"]
                     context = {"provider": backend, "matrix": matrix_name, "role": role,
                                "candidate": index + 1, "pattern": pattern}
-                    matches = [m for m in names if fnmatch.fnmatch(m.lower(), pattern.lower())]
+                    matches = match_model_pattern(pattern, names)
                     if not matches:
-                        issues.append({"kind": "missing_glob" if _is_glob(pattern) else "missing_pin",
+                        issues.append({"kind": "missing_glob" if is_glob_pattern(pattern) else "missing_pin",
                                        **context})
                         continue
-                    selected = max(matches, key=_version_sort_key)
+                    selected = matches[0]
                     family = _family(selected)
                     peers = [m for m in names if family and _family(m) == family]
                     if peers:

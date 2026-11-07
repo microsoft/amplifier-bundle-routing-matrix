@@ -6,6 +6,29 @@ The routing hook tries candidates top-to-bottom and uses the first that matches 
 
 ## Matrices
 
+### Model-pattern selection dependency
+
+The hook uses the public
+[`amplifier_foundation.model_patterns`](https://github.com/microsoft/amplifier-foundation/blob/a52ad1558419c828c86c0139b9b4bc351e3a618f/amplifier_foundation/model_patterns.py)
+API for inventory matching and ranking. Its Python 3.11+ metadata and lockfile
+declare that dependency explicitly; a host that supplies Foundation itself must
+load a revision with this API. There is no private-key or lexical fallback for
+an older Foundation. The dependency pins the accepted upstream revision from
+[Foundation PR #461](https://github.com/microsoft/amplifier-foundation/pull/461);
+hosts supplying Foundation independently must include that API.
+
+For mixed-version compatibility, `resolver._version_sort_key` remains an identity
+alias to Foundation's `model_pattern_sort_key`: older CLI previews import that
+name before falling back to lexical ordering. New consumers should use the public
+Foundation API. The alias adds no separate ranking implementation.
+
+Matching preserves original IDs and remains case-insensitive. Natural numeric
+versions outrank smaller versions; an undated alias outranks its corresponding
+snapshot; snapshot-only ties now prefer the newest valid date rather than API
+order. Product-tier text remains lexical, not a quality/cost ranking: use a
+more-specific pattern for a tier. Provider recommendations, account selection,
+explicit-ID passthrough, cache and fallback policy remain unchanged.
+
 Ten matrices ship with this bundle. The original eight retain their policy;
 two additive profiles restrict OpenAI module selection without changing models
 or efforts:
@@ -26,6 +49,31 @@ or efforts:
 > `openai-knob-consistent` was **removed on 2026-09-07**. Once the `preset:` block became `openai`'s default on 2026-09-02, the two files were the same matrix under two names. Select **`openai`** instead -- it is byte-for-byte what `openai-knob-consistent` used to give you.
 
 Browse the matrix files directly in the [`routing/`](routing/) directory.
+
+### Gemini Pro catalog compatibility
+
+Stock Pro roles retain preview preference in the same provider position:
+preview alias, numeric preview snapshots, then stable Pro alias. The four
+snapshot shapes are `MM-YYYY`, `YYYY-MM-DD`, `MM-DD` and `NNN`, matching the
+ordinary preview spellings recognized by the
+[provider's recommendation policy](https://github.com/microsoft/amplifier-module-provider-gemini/blob/6669ea5a15affe6ab9ed9b4ef31b36a595b5c282/amplifier_module_provider_gemini/_model_listing.py).
+Closed digit patterns, not `pro*` or `preview*`, exclude image/TTS suffixes.
+YAML anchors reuse the existing candidate/config; alternatives do not change
+thinking settings, native-image settings or cross-provider order.
+
+This avoids stranding Pro roles when recommended discovery returns stable GA
+instead of its same-version preview, or a dated-only newer preview. The `[3-9]`
+generation boundary, other tiers, custom matrices and provider defaults remain
+unchanged. Missing compatible Pro inventory still means no match, not an invented
+ID or discovery override. Synthetic fixture parity is not live entitlement or
+quality evidence; same-version previews may still be selected with an explicit
+broader provider inventory because the matrix remains preview-first.
+
+With explicitly unfiltered inventory containing multiple `MM-YYYY` snapshots,
+Foundation's existing numeric ordering puts `12-2026` ahead of `01-2027`;
+`MM-YYYY` is not part of its calendar-date suffix grammar. Recommended provider
+defaults instead preselect those snapshots chronologically before routing, so
+the same pair yields `01-2027` with defaults. No routing date grammar is expanded.
 
 ### Haiku version compatibility
 

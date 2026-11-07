@@ -19,7 +19,12 @@ IMAGE_MATRICES = ("balanced", "quality", "economy", "gemini", "openai", "openai-
 # Ordinary tool-using model families, separate from native image-only models.
 MAINLINE_MODELS = {
     "openai": {"gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna"},
-    "gemini": {"gemini-3.1-pro-preview", "gemini-3.8-flash", "gemini-3.1-flash-lite"},
+    "gemini": {
+        "gemini-3.1-pro-preview", "gemini-3.1-pro",
+        "gemini-3.1-pro-preview-01-2027", "gemini-3.1-pro-preview-2027-01-01",
+        "gemini-3.1-pro-preview-01-01", "gemini-3.1-pro-preview-001",
+        "gemini-3.8-flash", "gemini-3.1-flash-lite",
+    },
 }
 IMAGE_ONLY_MODELS = {
     "gpt-image-2.5-flare",
@@ -44,8 +49,8 @@ def image_candidates(name):
 @pytest.mark.parametrize(
     "name,controller,image_model,providers",
     [
-        ("balanced", "gpt-6.1-sol", "gpt-image-2.5-flare", ["openai", "gemini"]),
-        ("quality", "gpt-6-astra", "gpt-image-2.5-sunburst", ["openai", "gemini"]),
+        ("balanced", "gpt-6.1-sol", "gpt-image-2.5-flare", ["openai"] + ["gemini"] * 6),
+        ("quality", "gpt-6-astra", "gpt-image-2.5-sunburst", ["openai"] + ["gemini"] * 6),
         ("economy", "gpt-6-luna", "gpt-image-2.5-flare", ["openai", "gemini", "gemini"]),
     ],
 )
@@ -77,7 +82,19 @@ def test_shared_image_policy_is_openai_first(name, controller, image_model, prov
 )
 def test_gemini_native_image_preferences_remain_separate(name, agent_model, image_models):
     candidates = [row for row in image_candidates(name) if row["provider"] == "gemini"]
-    assert [row["model"] for row in candidates] == [agent_model] * len(image_models)
+    if agent_model.endswith("-pro-preview"):
+        expected_models = [
+            agent_model,
+            agent_model + "-[0-9][0-9]-[0-9][0-9][0-9][0-9]",
+            agent_model + "-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]",
+            agent_model + "-[0-9][0-9]-[0-9][0-9]",
+            agent_model + "-[0-9][0-9][0-9]",
+            agent_model.removesuffix("-preview"),
+        ]
+        image_models = image_models * 6
+    else:
+        expected_models = [agent_model] * len(image_models)
+    assert [row["model"] for row in candidates] == expected_models
     assert [row["config"]["image_generation"] for row in candidates] == [
         {"model": model, "transport": "interactions"} for model in image_models
     ]

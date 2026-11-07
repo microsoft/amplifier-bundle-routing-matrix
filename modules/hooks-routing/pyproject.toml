@@ -7,7 +7,11 @@ name = "amplifier-module-hooks-routing"
 version = "0.1.1"
 description = "Hook module for routing matrix model selection"
 requires-python = ">=3.11"
-dependencies = ["pyyaml"]
+dependencies = [
+    "pyyaml",
+    # Accepted public model-pattern API (Foundation PR #461).
+    "amplifier-foundation @ git+https://github.com/microsoft/amplifier-foundation@a52ad1558419c828c86c0139b9b4bc351e3a618f",
+]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio"]
@@ -17,3 +21,6 @@ hooks-routing = "amplifier_module_hooks_routing:mount"
 
 [tool.hatch.build.targets.wheel]
 packages = ["amplifier_module_hooks_routing"]
+
+[tool.hatch.metadata]
+allow-direct-references = true

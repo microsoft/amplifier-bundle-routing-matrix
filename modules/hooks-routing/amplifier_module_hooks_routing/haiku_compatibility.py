@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from amplifier_foundation.model_patterns import is_glob_pattern
+
 EFFORT_KEYS = ("effort", "reasoning_effort")
 HAIKU_55 = "claude-haiku-5-5"
 HAIKU_45 = ("claude-haiku-4-5", "claude-haiku-4-5-20251001")
@@ -174,7 +176,7 @@ def haiku_config_errors(
     if not is_haiku(model):
         return []
     if policy and (
-        any(c in model for c in "*?[")
+        is_glob_pattern(model)
         or backend not in ("anthropic", "github-copilot", "gemini", "openai")
     ):
         return []

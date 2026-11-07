@@ -111,6 +111,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from amplifier_foundation.model_patterns import is_glob_pattern as _is_glob_pattern
+
 from .resolver import (
     NoScopedRouteError,
     _get_provider_specs,
@@ -180,11 +182,6 @@ def _protected_config_keys() -> frozenset[str]:
     if isinstance(PROTECTED_CONFIG_KEYS, (set, frozenset)):
         return frozenset(PROTECTED_CONFIG_KEYS)
     return _PROTECTED_CONFIG_KEYS_FALLBACK  # pragma: no cover - defensive
-
-
-def _is_glob_pattern(model_hint: str) -> bool:
-    """Mirror of ``spawn_utils.is_glob_pattern`` (spawn_utils.py:364)."""
-    return any(c in model_hint for c in "*?[")
 
 
 def _priority_of(provider: Any) -> int:
