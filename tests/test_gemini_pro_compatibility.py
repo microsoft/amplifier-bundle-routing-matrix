@@ -68,7 +68,12 @@ async def test_recommended_inventory_resolves_exact_id(matrix, role, group, vect
         assert result[0]["model"] == vector["winner"]
         assert result[0]["model"] in vector["defaults"]
         assert result[0]["provider"] == "gemini"
-        assert result[0]["config"] == group[0]["config"]
+        # Ordinary agent resolution intentionally excludes native-operation
+        # knobs; test_order_and_same_config covers their unchanged YAML values.
+        assert result[0]["config"] == {
+            key: value for key, value in group[0]["config"].items()
+            if key != "image_generation"
+        }
 
 
 @pytest.mark.parametrize("model", [
