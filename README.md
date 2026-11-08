@@ -13,9 +13,25 @@ The hook uses the public
 API for inventory matching and ranking. Its Python 3.11+ metadata and lockfile
 declare that dependency explicitly; a host that supplies Foundation itself must
 load a revision with this API. There is no private-key or lexical fallback for
-an older Foundation. The dependency pins the accepted upstream revision from
-[Foundation PR #461](https://github.com/microsoft/amplifier-foundation/pull/461);
-hosts supplying Foundation independently must include that API.
+an older Foundation. The runtime dependency follows Foundation `main`;
+`modules/hooks-routing/uv.lock` records the exact revision qualified for repository
+development and CI (`uv sync --locked --extra dev`). A lock is an installed/tested
+snapshot, not a requirement that every host keep that commit forever.
+
+The API was introduced by
+[Foundation PR #461](https://github.com/microsoft/amplifier-foundation/pull/461).
+Hosts supplying Foundation independently must include it; the shared `1.0.0`
+package version alone does not distinguish older Git revisions without the API.
+Existing imports fail rather than substituting a private or lexical fallback.
+Host-owned locks, explicit user pins and local sources remain their owners'
+choices. An incompatible selected source must be reported, not silently replaced.
+
+Updating this declaration does not retroactively alter an installed routing
+checkout. Hosts must stage the updated routing source before using its new
+dependency policy to qualify a Foundation update. An updater that stops at a
+Foundation/pinned-routing conflict before it can stage routing needs an explicit
+host-owned transition; bypassing the conflict or editing live cache metadata is
+not part of this change.
 
 For mixed-version compatibility, `resolver._version_sort_key` remains an identity
 alias to Foundation's `model_pattern_sort_key`: older CLI previews import that

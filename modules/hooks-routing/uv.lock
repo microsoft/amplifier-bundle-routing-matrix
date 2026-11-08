@@ -25,7 +25,7 @@ wheels = [
 [[package]]
 name = "amplifier-foundation"
 version = "1.0.0"
-source = { git = "https://github.com/microsoft/amplifier-foundation?rev=a52ad1558419c828c86c0139b9b4bc351e3a618f#a52ad1558419c828c86c0139b9b4bc351e3a618f" }
+source = { git = "https://github.com/microsoft/amplifier-foundation?rev=main#c67e3ada021a5bbb93df9567feb23e2a72c93f55" }
 dependencies = [
     { name = "amplifier-core" },
     { name = "filelock" },
@@ -49,7 +49,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "amplifier-foundation", git = "https://github.com/microsoft/amplifier-foundation?rev=a52ad1558419c828c86c0139b9b4bc351e3a618f" },
+    { name = "amplifier-foundation", git = "https://github.com/microsoft/amplifier-foundation?rev=main" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-asyncio", marker = "extra == 'dev'" },
     { name = "pyyaml" },
