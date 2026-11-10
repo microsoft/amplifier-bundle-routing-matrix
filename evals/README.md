@@ -1,11 +1,13 @@
-# Offline routing-matrix evaluation program
+# Routing-matrix evaluation program
 
 **Plan and reconcile; do not execute.** This is maintained routing-specific tooling
 owned by this bundle, relocated from the evaluation-library example without changing
 the library semantics or historical sample bytes. It implements design v3's bounded
 offline contract. It never imports the evaluation runtime, initializes a model,
 reads production events, launches a CLI/DTU, fetches data, or enforces budgets.
-There is no `run` command, installation change, runtime hook, or generic API change.
+There is no `run` command in `cli.py`, installation change, runtime hook, or
+generic API change. A separate, blocked smoke prototype is described below; it
+does not change offline v1 or make its readiness supported.
 
 Routing owns evaluation configurations, scenarios, graders, reuse rules and promotion
 policy; generic execution bricks remain in the separate evaluation library as optional
@@ -283,3 +285,126 @@ minimal corrections and passed afterward. Both corrections passed re-review.
 See `REVIEW.md`. None of these checks establishes live execution readiness.
 Relocation preserves those 93 cases and adds 11 bounded regressions for explicit
 dependencies, historical sample preservation, redacted errors and import/CWD behavior.
+
+## Separate bounded smoke prototype
+
+**Pre-trial qualification, not paid execution authority.** `smoke_cli.py`
+exposes `preflight`, `run-baseline`, `run-pair` and `report` for the separate
+`routing-live-smoke/v1` contract. No shipped policy or offline v1 readiness changes.
+
+The evaluation-only shim now passes unchanged Core validation by mounting a
+permanently dormant, truthful unavailable Provider when no factory exists.
+That object never constructs a client and always refuses inference, listing
+and parsing. Actual sessions use the pinned OpenAIProvider, public `client=`
+injection and exact factory-object authority checked before load and before
+send. A capability key, provider class or coordinator classname is not authority.
+The standalone Foundation child receives only actual coding-resolver preferences
+and has zero tools. Current SDK 3.24 uses its supported HTTPX2 client/transport;
+the older SDK qualification is historical.
+
+Native count requests are refused **before underlying HTTP**, with local
+refusal receipts, not fake successful counts. Count billing remains unknown.
+Financial admission reserves the externally qualified full native context
+window and highest long-context input/output rates, rounded upward to cents:
+one Sol liability 5.32 USD; one Astra liability 26.56 USD. These are liabilities,
+not expected spend. The internal envelope is 100 USD campaign / 40 USD cell,
+three generations per cell (two root, one worker). The 8192 bound is UTF-8
+serialized BODY BYTES, not input tokens. No local estimate establishes a dollar
+bound. Requests require exact model/high effort, explicit default Standard tier,
+nonstreaming/store:false, the controlled root function or tool-free worker, and
+finite HTTP timeouts. Unknown usage/errors retain full liability; complete
+vendor gross/cache/reasoning usage alone may settle it without double billing.
+Quote rates/window/category semantics must come from parent-qualified evidence,
+never provider tables. Test quotes are synthetic.
+
+The synthetic task explicitly discloses `restricted-python-v1`: a finite
+task-specific AST grammar, protected bindings, direct approved calls/methods,
+no imports/reflection/IO/private names and separate model/driver namespaces.
+Host parses/hashes only. The assessor independently validates immutable source
+and normalized hashes inside a pinned credential-free network-none/nonroot
+read-only capability-dropped container. Expected answers remain controller-side.
+Correct, nonmerge, bool, mutation, constant and hang controls exercise actual
+Docker execution; spoofing and malformed code are refused before execution.
+Grammar refusal or incomplete grading yields no awards. Critical pass denotes
+observed input immutability on the complete set only. This is not arbitrary
+Python sandbox support.
+
+Preflight requires the exact source/quote/task/grammar/driver/image-bound
+qualification receipt, isolated controller/output authority and accounted
+resource-cost policy. Only parent-verified no-charge infrastructure is currently
+supported; priced resources require a separately implemented reservation and
+are refused, not silently treated as free. Hashes provide integrity and binding, not a trusted
+issuer: the parent must accept/pin the evidence. Old reference strings and
+image booleans cannot enable execution. Missing qualification remains blocked.
+An independently accepted whole-cell run/assessment/cleanup handoff and real
+quote are separate from direct SDK or synthetic CLI checks.
+
+The assignment is A0 instrumentation baseline, then fresh A1/B1 serial cells;
+the candidate changes only the coding model leaf. The root stays fixed.
+Descriptive instrumentation does not establish modern-model discrimination,
+model ranking, routing promotion, account containment or deployed adoption.
+All scheduled cells remain in offline reports, including blocked/not-run cells.
+
+### Check without model calls
+
+Dependency-light checks (pytest/Click; HTTPX is optional on this path):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+  python -m pytest -q -p no:cacheprovider --import-mode=importlib \
+  evals/test_live_transport.py evals/test_live_smoke.py
+```
+
+Explicit real-stack checks, **only in the separately supplied isolated mock
+environment** with the real native Core/Foundation, stock loop/context,
+provider, routing module and SDK installed, plus the local evaluation-only shim:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+  python -c "import amplifier_core, amplifier_foundation, pytest; \
+raise SystemExit(pytest.main(['evals/live_tests', '-q', '-p', 'no:cacheprovider', \
+'--import-mode=importlib']))"
+```
+
+Ordinary offline CI does not select those full-stack cases or import optional
+runtime dependencies. Explicit qualification must verify a nonempty selection;
+absence is not a pass. Retained actual root/child positive checks now require
+successful unchanged Core validation, zero transmitted counts, exact high effort
+and Standard tier, parentage, routing resolution and closure. Authority-negative
+checks cover absent/replaced/copied factories and replacement before send.
+Direct SDK guards do not replace those real session checks.
+No generated solution executes in these tests.
+
+### Private controller input
+
+The library accepts frozen `CampaignSpec`, `CellSpec`, `SmokeLimits`,
+`PriceQuote`, `AdmissionAuthority` and `AssessmentSpec` objects. The thin CLI
+reads the same private contract via `load_campaign`; no sample containing
+private configuration is shipped. Private source locks cover bounded complete
+package trees, the native Core artifact, task, and adapter/assessor code.
+Quotes contain externally verified timestamps, model rates, binding reference,
+currency/cache/window semantics and long-context rates; there are no live
+pricing defaults. `AssessmentAuthority` pins the registrar/claim scripts and
+private staging root. Resource intent and registration precede create; cleanup
+uses exact owned names and an independent absence probe. Whole-cell execution
+reserves time for assessment and cleanup and retains assessor custody through
+repeated cancellation. Parent-owned resources are never swept by this adapter.
+
+`--output-dir` must be exactly the qualified private root plus the campaign ID,
+outside source/package trees, with private permissions. Changing the directory
+cannot reset the same campaign's ledger; changing the spec cannot reuse its
+existing ledger. Output-root exclusion from publication still needs independent
+qualification. The dedicated runtime-only `SMOKE_OPENAI_CREDENTIAL` is never
+read by preflight/report or placed in argv, source, bundle config or receipts.
+Missing source-bound execution qualification prevents both execution commands
+from reaching that credential read or making any paid request. This source is
+not itself a paid authorization or accepted raw-result archive.
+
+```sh
+python evals/smoke_cli.py preflight --spec "$PRIVATE_SPEC" --output-dir "$PRIVATE_OUTPUT"
+python evals/smoke_cli.py report --spec "$PRIVATE_SPEC" --output-dir "$PRIVATE_OUTPUT"
+```
+
+Malformed input exits 2, readiness/measurement/protocol blockers exit 1,
+valid offline reporting exits 0. No live trial, broad model-quality conclusion,
+promotion or automatic publication is established by these mock/control checks.
